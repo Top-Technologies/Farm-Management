@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Transfer List View -->
+    <record id="view_farm_employee_transfer_list" model="ir.ui.view">
+        <field name="name">farm.employee.transfer.list</field>
+        <field name="model">farm.employee.transfer</field>
+        <field name="arch" type="xml">
+            <list string="Employee Transfers &amp; Placements">
+                <field name="transfer_date"/>
+                <field name="moving_date"/>
+                <field name="employee_id" widget="many2one_avatar"/>
+                <field name="farm_id"/>
+                <field name="sub_farm_id"/>
+                <field name="sub_unit_id"/>
+                <field name="block_id"/>
+                <field name="status" widget="badge" decoration-success="status == 'active'" decoration-muted="status == 'completed'"/>
+                <field name="notes"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Transfer Form View -->
+    <record id="view_farm_employee_transfer_form" model="ir.ui.view">
+        <field name="name">farm.employee.transfer.form</field>
+        <field name="model">farm.employee.transfer</field>
+        <field name="arch" type="xml">
+            <form string="Employee Transfer">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="employee_id" class="oe_edit_only"/>
+                        <h1>
+                            <field name="employee_id" placeholder="Select Employee..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group name="dates" string="Transfer Timeline">
+                            <field name="transfer_date"/>
+                            <field name="moving_date" placeholder="Leave empty if currently active"/>
+                            <field name="status" widget="badge" decoration-success="status == 'active'" decoration-muted="status == 'completed'"/>
+                        </group>
+                        <group name="destination" string="Farm Destination &amp; Placement">
+                            <field name="farm_id" options="{'no_create': True}"/>
+                            <field name="sub_farm_id" options="{'no_create': True}"/>
+                            <field name="sub_unit_id" options="{'no_create': True}"/>
+                            <field name="block_id" options="{'no_create': True}"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group name="remarks" string="Remarks">
+                        <field name="notes" placeholder="Reason for transfer, work shift, notes..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Transfer Search View -->
+    <record id="view_farm_employee_transfer_search" model="ir.ui.view">
+        <field name="name">farm.employee.transfer.search</field>
+        <field name="model">farm.employee.transfer</field>
+        <field name="arch" type="xml">
+            <search string="Search Transfers">
+                <field name="employee_id"/>
+                <field name="farm_id"/>
+                <field name="sub_farm_id"/>
+                <field name="sub_unit_id"/>
+                <field name="block_id"/>
+                <separator/>
+                <filter string="Current Active Assignments" name="current_active" domain="[('status', '=', 'active')]"/>
+                <filter string="Past / Completed Transfers" name="past_transfers" domain="[('status', '=', 'completed')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Farm" name="group_farm" context="{'group_by': 'farm_id'}"/>
+                    <filter string="Sub Farm" name="group_sub_farm" context="{'group_by': 'sub_farm_id'}"/>
+                    <filter string="Sub Unit" name="group_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
+                    <filter string="Transfer Date" name="group_transfer_date" context="{'group_by': 'transfer_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Transfer -->
+    <record id="action_farm_employee_transfer" model="ir.actions.act_window">
+        <field name="name">Employee Transfers</field>
+        <field name="res_model">farm.employee.transfer</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_farm_employee_transfer_search"/>
+        <field name="context">{'search_default_current_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Register an employee transfer!
+            </p>
+            <p>
+                Track employee movements between Farms, Sub Farms, Sub Units, and Blocks over time.
+            </p>
+        </field>
+    </record>
+</odoo>

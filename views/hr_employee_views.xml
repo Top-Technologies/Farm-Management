@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- HR Employee Form Inherit -->
+    <record id="view_employee_form_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.employee.form.farm.inherit</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <!-- Smart Buttons in Employee Header -->
+            <div name="button_box" position="inside">
+                <button name="action_view_managed_farms"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-tree"
+                        invisible="managed_farm_count == 0">
+                    <field name="managed_farm_count" widget="statinfo" string="Managed Farms"/>
+                </button>
+                <button name="action_view_transfers"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-exchange"
+                        invisible="transfer_count == 0">
+                    <field name="transfer_count" widget="statinfo" string="Transfers"/>
+                </button>
+                <button name="action_view_work_entries"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-tasks"
+                        invisible="work_entry_count == 0">
+                    <field name="work_entry_count" widget="statinfo" string="Work Entries"/>
+                </button>
+            </div>
+
+            <!-- Mandatory Agricultural Classification & Location Placement (Prominent above notebook) -->
+            <xpath expr="//notebook" position="before">
+                <div class="card p-3 mb-3 border-primary bg-light">
+                    <h5 class="text-primary mb-3"><i class="fa fa-map-marker me-2"/>Agricultural Classification &amp; Mandatory Location Placement</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <group>
+                                <field name="farm_employee_type" widget="radio" options="{'horizontal': true}" required="1"/>
+                                <label for="fms_employee_id" string="Employee ID"/>
+                                <div>
+                                    <field name="fms_employee_id" readonly="1" class="fw-bold fs-4 text-primary font-monospace"/>
+                                    <div class="text-muted small">Auto-generated format: [FarmCode][Type: P/T/Z][SequentialNumber]</div>
+                                </div>
+                            </group>
+                        </div>
+                        <div class="col-md-6">
+                            <group>
+                                <field name="initial_farm_id" options="{'no_create': True}" required="1" placeholder="Select Farm..."/>
+                                <field name="initial_sub_farm_id" options="{'no_create': True}" required="1" placeholder="Select Sub Farm..."/>
+                                <field name="initial_sub_unit_id" options="{'no_create': True}" required="1" placeholder="Select Sub Unit..."/>
+                                <field name="initial_block_id" options="{'no_create': True}" placeholder="Select Block (Optional)..."/>
+                            </group>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+
+            <!-- Dedicated Notebook Page for Agricultural Assignments & Transfer History -->
+            <xpath expr="//notebook" position="inside">
+                <page name="farm_assignments" string="Farm Assignments" groups="farm_management.group_farm_user">
+                    <!-- Live Structural Hierarchy Banner -->
+                    <div class="mb-4">
+                        <h4 class="text-primary mb-2"><i class="fa fa-sitemap me-2"/>Current Placement &amp; Management Roles</h4>
+                        <field name="farm_structure_hierarchy_display" widget="html" readonly="1" nolabel="1"/>
+                    </div>
+
+                    <!-- Management Scope: Easily assign employee as Manager / Supervisor -->
+                    <group string="Management Scope &amp; Supervision (Farms / Units Managed)">
+                        <group>
+                            <field name="managed_farm_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select farms to manage..."/>
+                            <field name="managed_sub_farm_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select sub farms to manage..."/>
+                        </group>
+                        <group>
+                            <field name="managed_sub_unit_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select sub units to manage..."/>
+                            <field name="supervised_block_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select blocks to supervise..."/>
+                        </group>
+                    </group>
+
+                    <!-- Transfer & Assignment History Table -->
+                    <group string="Transfer &amp; Assignment History (Movement between Sub Units &amp; Blocks)">
+                        <field name="transfer_history_ids" context="{'default_employee_id': id}">
+                            <list string="Transfer &amp; Assignment History" editable="bottom">
+                                <field name="transfer_date" string="Transfer Date"/>
+                                <field name="moving_date" string="Moving Date" placeholder="Active if empty"/>
+                                <field name="farm_id" options="{'no_create': True}"/>
+                                <field name="sub_farm_id" options="{'no_create': True}"/>
+                                <field name="sub_unit_id" options="{'no_create': True}"/>
+                                <field name="block_id" options="{'no_create': True}"/>
+                                <field name="status" widget="badge" decoration-success="status == 'active'" decoration-muted="status == 'completed'"/>
+                                <field name="notes" placeholder="e.g. Seasonal rotation, promotion..."/>
+                            </list>
+                        </field>
+                    </group>
+                </page>
+
+                <!-- Dedicated Page for Work Entries -->
+                <page name="farm_work_entries" string="Work Entries" groups="farm_management.group_farm_user">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <span class="text-muted">Total Calculated Earnings: </span>
+                            <span class="fs-4 fw-bold text-success"><field name="total_earned_amount" widget="monetary"/> Birr</span>
+                        </div>
+                    </div>
+                    <field name="work_entry_ids" context="{'default_employee_id': id}">
+                        <list string="Work Entries" editable="bottom">
+                            <field name="date"/>
+                            <field name="farm_id" options="{'no_create': True}"/>
+                            <field name="sub_unit_id" options="{'no_create': True}"/>
+                            <field name="activity_id" options="{'no_create': True}"/>
+                            <field name="score_value" string="Score"/>
+                            <field name="norm_rate" string="Norm Rate"/>
+                            <field name="uom_name" string="Unit"/>
+                            <field name="total_amount" sum="Total" decoration-bf="1"/>
+                            <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- HR Employee List View Inherit -->
+    <record id="view_employee_tree_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.employee.list.farm.inherit</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_tree"/>
+        <field name="arch" type="xml">
+            <field name="name" position="before">
+                <field name="fms_employee_id" string="Employee ID" optional="show"/>
+            </field>
+            <field name="work_email" position="after">
+                <field name="farm_employee_type" widget="badge" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'" optional="show"/>
+                <field name="current_farm_id" string="Farm" optional="show"/>
+                <field name="current_sub_unit_id" string="Sub Unit" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- HR Employee Search View Inherit -->
+    <record id="view_employee_filter_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.employee.search.farm.inherit</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_filter"/>
+        <field name="arch" type="xml">
+            <field name="name" position="before">
+                <field name="fms_employee_id" string="Employee ID (FMS)"/>
+            </field>
+            <filter name="group_job" position="after">
+                <separator/>
+                <filter string="Permanent Employees" name="filter_permanent" domain="[('farm_employee_type', '=', 'permanent')]"/>
+                <filter string="Temporary Employees" name="filter_temporary" domain="[('farm_employee_type', '=', 'temporary')]"/>
+                <filter string="Zemach Employees" name="filter_zemach" domain="[('farm_employee_type', '=', 'zemach')]"/>
+                <group expand="0" string="Farm Group By">
+                    <filter string="Employee Classification" name="group_farm_employee_type" context="{'group_by': 'farm_employee_type'}"/>
+                    <filter string="Current Farm" name="group_current_farm" context="{'group_by': 'current_farm_id'}"/>
+                    <filter string="Sub Unit" name="group_current_sub_unit" context="{'group_by': 'current_sub_unit_id'}"/>
+                </group>
+            </filter>
+        </field>
+    </record>
+</odoo>

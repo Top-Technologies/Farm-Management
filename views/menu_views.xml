@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Top-level Section inside HR / Employees Top Bar: Farm Management -->
+    <menuitem id="menu_farm_management_root"
+              name="Farm Management"
+              parent="hr.menu_hr_root"
+              sequence="15"
+              groups="farm_management.group_farm_user"/>
+
+    <!-- 1st Tier: Farms -->
+    <menuitem id="menu_farm_farm"
+              name="Farms"
+              parent="menu_farm_management_root"
+              action="action_farm_farm"
+              sequence="10"/>
+
+    <!-- 2nd Tier: Sub Farms -->
+    <menuitem id="menu_farm_sub_farm"
+              name="Sub Farms"
+              parent="menu_farm_management_root"
+              action="action_farm_sub_farm"
+              sequence="20"/>
+
+    <!-- 3rd Tier: Sub Units -->
+    <menuitem id="menu_farm_sub_unit"
+              name="Sub Units"
+              parent="menu_farm_management_root"
+              action="action_farm_sub_unit"
+              sequence="30"/>
+
+    <!-- 4th Tier: Blocks -->
+    <menuitem id="menu_farm_block"
+              name="Blocks"
+              parent="menu_farm_management_root"
+              action="action_farm_block"
+              sequence="40"/>
+
+    <!-- Work Entries under Farm Management -->
+    <menuitem id="menu_farm_work_entry"
+              name="Work Entries"
+              parent="menu_farm_management_root"
+              action="action_farm_work_entry"
+              sequence="50"/>
+
+    <!-- Top-level Section inside HR / Employees Top Bar: Activities -->
+    <menuitem id="menu_farm_activity_root"
+              name="Activities"
+              parent="hr.menu_hr_root"
+              sequence="16"
+              action="action_farm_activity"
+              groups="farm_management.group_farm_user"/>
+
+    <!-- Top-level Section inside HR / Employees Top Bar: Work Entries -->
+    <menuitem id="menu_farm_work_entry_root"
+              name="Work Entries"
+              parent="hr.menu_hr_root"
+              sequence="17"
+              action="action_farm_work_entry"
+              groups="farm_management.group_farm_user"/>
+</odoo>

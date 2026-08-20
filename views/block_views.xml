@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Block List View -->
+    <record id="view_farm_block_list" model="ir.ui.view">
+        <field name="name">farm.block.list</field>
+        <field name="model">farm.block</field>
+        <field name="arch" type="xml">
+            <list string="Blocks">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="sub_unit_id"/>
+                <field name="sub_farm_id"/>
+                <field name="farm_id"/>
+                <field name="supervisor_id" widget="many2one_avatar"/>
+                <field name="crop_type"/>
+                <field name="area" sum="Total Area"/>
+                <field name="status" widget="badge" decoration-success="status == 'active'" decoration-info="status == 'preparation'" decoration-warning="status == 'harvested'" decoration-muted="status == 'fallow'"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Block Form View -->
+    <record id="view_farm_block_form" model="ir.ui.view">
+        <field name="name">farm.block.form</field>
+        <field name="model">farm.block</field>
+        <field name="arch" type="xml">
+            <form string="Block">
+                <header>
+                    <field name="status" widget="statusbar" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Block A-1"/>
+                        </h1>
+                        <div class="d-flex align-items-baseline">
+                            <label for="code" class="me-2 text-muted"/>
+                            <field name="code" placeholder="e.g. BLK-001" style="max-width: 200px;"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group name="parent_structure" string="Location Hierarchy">
+                            <field name="sub_unit_id" options="{'no_quick_create': True}"/>
+                            <field name="sub_farm_id"/>
+                            <field name="farm_id"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group name="agricultural_specs" string="Agricultural Specifications">
+                            <field name="crop_type" placeholder="e.g. Wheat, Citrus, Olives"/>
+                            <field name="soil_type" placeholder="e.g. Clay loam, Sandy"/>
+                            <field name="area"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group name="supervision" string="Supervision">
+                        <field name="supervisor_id" widget="many2one_avatar"/>
+                    </group>
+                    <notebook>
+                        <page name="notes" string="Description &amp; Observations">
+                            <field name="description" placeholder="Soil condition, planting dates, irrigation notes..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Block Kanban View -->
+    <record id="view_farm_block_kanban" model="ir.ui.view">
+        <field name="name">farm.block.kanban</field>
+        <field name="model">farm.block</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="status" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="sub_unit_id"/>
+                <field name="sub_farm_id"/>
+                <field name="farm_id"/>
+                <field name="crop_type"/>
+                <field name="supervisor_id"/>
+                <field name="area"/>
+                <field name="status"/>
+                <field name="color"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="fw-bold mb-0">
+                                <field name="name"/>
+                            </h5>
+                            <span class="badge text-bg-light" t-if="record.code.raw_value">
+                                <field name="code"/>
+                            </span>
+                        </div>
+                        <div class="text-muted small mb-1">
+                            <span><field name="sub_unit_id"/></span>
+                            <span class="mx-1">•</span>
+                            <span><field name="farm_id"/></span>
+                        </div>
+                        <div class="my-2" t-if="record.crop_type.raw_value">
+                            <span class="badge rounded-pill text-bg-success">
+                                <i class="fa fa-leaf me-1"/> <field name="crop_type"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                            <span class="text-muted small">
+                                <i class="fa fa-map-o me-1"/> <field name="area"/> Area
+                            </span>
+                            <field name="supervisor_id" widget="many2one_avatar" options="{'display_avatar_name': False}"/>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Block Search View -->
+    <record id="view_farm_block_search" model="ir.ui.view">
+        <field name="name">farm.block.search</field>
+        <field name="model">farm.block</field>
+        <field name="arch" type="xml">
+            <search string="Search Blocks">
+                <field name="name" string="Block" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="crop_type"/>
+                <field name="sub_unit_id"/>
+                <field name="sub_farm_id"/>
+                <field name="farm_id"/>
+                <field name="supervisor_id"/>
+                <separator/>
+                <filter string="Active / Cultivated" name="active_status" domain="[('status', '=', 'active')]"/>
+                <filter string="Preparation" name="prep_status" domain="[('status', '=', 'preparation')]"/>
+                <filter string="Harvested" name="harvested_status" domain="[('status', '=', 'harvested')]"/>
+                <filter string="Fallow" name="fallow_status" domain="[('status', '=', 'fallow')]"/>
+                <separator/>
+                <filter string="My Supervised Blocks" name="my_blocks" domain="[('supervisor_id.user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Crop Type" name="group_crop" context="{'group_by': 'crop_type'}"/>
+                    <filter string="Sub Unit" name="group_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
+                    <filter string="Sub Farm" name="group_sub_farm" context="{'group_by': 'sub_farm_id'}"/>
+                    <filter string="Farm" name="group_farm" context="{'group_by': 'farm_id'}"/>
+                    <filter string="Supervisor" name="group_supervisor" context="{'group_by': 'supervisor_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Block -->
+    <record id="action_farm_block" model="ir.actions.act_window">
+        <field name="name">Blocks</field>
+        <field name="res_model">farm.block</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_farm_block_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Block!
+            </p>
+            <p>
+                Blocks represent the actionable plots/cultivation fields under a Sub Unit where crops are grown.
+            </p>
+        </field>
+    </record>
+</odoo>

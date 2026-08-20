@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Activity List View -->
+    <record id="view_farm_activity_list" model="ir.ui.view">
+        <field name="name">farm.activity.list</field>
+        <field name="model">farm.activity</field>
+        <field name="arch" type="xml">
+            <list string="Farm Activities">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="category" widget="badge" decoration-info="category == 'land_prep'" decoration-success="category in ('planting', 'crop_care')" decoration-warning="category == 'harvest'"/>
+                <field name="uom_name" string="Unit of Measure"/>
+                <field name="farm_norm_count" string="Configured Farms"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Activity Form View -->
+    <record id="view_farm_activity_form" model="ir.ui.view">
+        <field name="name">farm.activity.form</field>
+        <field name="model">farm.activity</field>
+        <field name="arch" type="xml">
+            <form string="Farm Activity">
+                <sheet>
+                    <field name="active" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Soil Preparation, Cultivating, Harvesting..."/>
+                        </h1>
+                        <div class="d-flex align-items-baseline">
+                            <label for="code" class="me-2 text-muted" string="Activity ID:"/>
+                            <field name="code" placeholder="e.g. SP, CULT, HARV" style="max-width: 150px; font-weight: bold;"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group name="general_specs" string="Activity Specifications">
+                            <field name="category"/>
+                            <field name="uom_name" placeholder="e.g. Birr/Kg"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="farm_norms" string="Farm Norms &amp; Targets">
+                            <field name="farm_norm_ids" context="{'default_activity_id': id}">
+                                <list editable="bottom" string="Farm Norms">
+                                    <field name="farm_id" options="{'no_create': True}"/>
+                                    <field name="norm_value" string="Standard Norm"/>
+                                    <field name="uom_name" string="Unit"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page name="sop_details" string="Description &amp; Guidelines">
+                            <field name="description" placeholder="Standard operating procedures, machine requirements, guidelines..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Activity Kanban View -->
+    <record id="view_farm_activity_kanban" model="ir.ui.view">
+        <field name="name">farm.activity.kanban</field>
+        <field name="model">farm.activity</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="category" class="o_kanban_small_column">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="category"/>
+                <field name="uom_name"/>
+                <field name="farm_norm_count"/>
+                <field name="color"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <h5 class="fw-bold mb-0">
+                                <field name="name"/>
+                            </h5>
+                            <span class="badge text-bg-primary">
+                                <field name="code"/>
+                            </span>
+                        </div>
+                        <div class="text-muted small mb-2">
+                            <i class="fa fa-tachometer me-1"/> Default Unit: <span class="fw-medium text-dark"><field name="uom_name"/></span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                            <span class="badge rounded-pill text-bg-light border">
+                                <i class="fa fa-university me-1 text-muted"/> <field name="farm_norm_count"/> Farms Configured
+                            </span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Activity Search View -->
+    <record id="view_farm_activity_search" model="ir.ui.view">
+        <field name="name">farm.activity.search</field>
+        <field name="model">farm.activity</field>
+        <field name="arch" type="xml">
+            <search string="Search Farm Activities">
+                <field name="name" string="Activity" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="code"/>
+                <field name="category"/>
+                <separator/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Category" name="group_category" context="{'group_by': 'category'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Activity -->
+    <record id="action_farm_activity" model="ir.actions.act_window">
+        <field name="name">Activities</field>
+        <field name="res_model">farm.activity</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_farm_activity_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define your first Farm Activity!
+            </p>
+            <p>
+                Activities define standard agricultural operations (e.g. Soil Preparation [SP], Cultivating [CULT]) and specify productivity norms per farm.
+            </p>
+        </field>
+    </record>
+</odoo>

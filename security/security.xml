@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Module Category -->
+        <record id="module_category_farm_management" model="ir.module.category">
+            <field name="name">Farm Management</field>
+            <field name="description">Manage Farms, Sub Farms, Sub Units, Blocks, Activities, Transfers, and Work Entries.</field>
+            <field name="sequence">25</field>
+        </record>
+
+        <!-- User Group -->
+        <record id="group_farm_user" model="res.groups">
+            <field name="name">User</field>
+            <field name="category_id" ref="module_category_farm_management"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- Manager Group -->
+        <record id="group_farm_manager" model="res.groups">
+            <field name="name">Administrator</field>
+            <field name="category_id" ref="module_category_farm_management"/>
+            <field name="implied_ids" eval="[(4, ref('group_farm_user')), (4, ref('hr.group_hr_user'))]"/>
+            <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- Multi-Company Record Rules -->
+        <record id="farm_farm_company_rule" model="ir.rule">
+            <field name="name">Farm Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_farm"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_sub_farm_company_rule" model="ir.rule">
+            <field name="name">Sub Farm Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_sub_farm"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_sub_unit_company_rule" model="ir.rule">
+            <field name="name">Sub Unit Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_sub_unit"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_block_company_rule" model="ir.rule">
+            <field name="name">Block Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_block"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_activity_company_rule" model="ir.rule">
+            <field name="name">Farm Activity Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_activity"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_activity_norm_company_rule" model="ir.rule">
+            <field name="name">Farm Activity Norm Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_activity_norm"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_employee_transfer_company_rule" model="ir.rule">
+            <field name="name">Farm Employee Transfer Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_employee_transfer"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_work_entry_company_rule" model="ir.rule">
+            <field name="name">Farm Work Entry Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_work_entry"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+    </data>
+</odoo>

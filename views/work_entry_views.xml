@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Work Entry Sequence -->
+    <data noupdate="1">
+        <record id="seq_farm_work_entry" model="ir.sequence">
+            <field name="name">Farm Work Entry</field>
+            <field name="code">farm.work.entry</field>
+            <field name="prefix">WE/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+
+    <!-- Work Entry List View -->
+    <record id="view_farm_work_entry_list" model="ir.ui.view">
+        <field name="name">farm.work.entry.list</field>
+        <field name="model">farm.work.entry</field>
+        <field name="arch" type="xml">
+            <list string="Farm Work Entries" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="employee_id" widget="many2one_avatar"/>
+                <field name="fms_employee_id" optional="show"/>
+                <field name="farm_id"/>
+                <field name="sub_unit_id"/>
+                <field name="activity_id"/>
+                <field name="score_value" string="Score" sum="Total Score"/>
+                <field name="norm_rate" string="Norm Rate"/>
+                <field name="uom_name" string="Unit"/>
+                <field name="total_amount" sum="Total Payment (Birr)" widget="monetary" decoration-bf="1"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Work Entry Form View -->
+    <record id="view_farm_work_entry_form" model="ir.ui.view">
+        <field name="name">farm.work.entry.form</field>
+        <field name="model">farm.work.entry</field>
+        <field name="arch" type="xml">
+            <form string="Farm Work Entry">
+                <header>
+                    <button name="action_confirm" string="Confirm" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve / Pay" type="object" class="btn-success" invisible="state != 'confirmed'"/>
+                    <button name="action_draft" string="Reset to Draft" type="object" invisible="state not in ('confirmed', 'cancelled')"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approved', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group name="employee_details" string="Employee &amp; Date">
+                            <field name="date" readonly="state == 'approved'"/>
+                            <field name="employee_id" widget="many2one_avatar" readonly="state == 'approved'"/>
+                            <field name="fms_employee_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group name="location_details" string="Farm Location">
+                            <field name="farm_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="sub_farm_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="sub_unit_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="block_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group name="activity_calculation" string="Activity &amp; Productivity Score">
+                            <field name="activity_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="activity_code"/>
+                            <field name="score_value" string="Score" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                        </group>
+                        <group name="payment_calculation" string="Norm Rate &amp; Deserved Payment">
+                            <label for="norm_rate" string="Norm Rate"/>
+                            <div class="d-flex align-items-baseline">
+                                <field name="norm_rate" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                                <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
+                            </div>
+                            <div class="d-flex flex-column mt-2 p-3 bg-light rounded border">
+                                <span class="text-muted small">Total Calculated Payment:</span>
+                                <h2 class="text-success fw-bold mb-0">
+                                    <field name="total_amount"/> <span class="fs-5">Birr</span>
+                                </h2>
+                                <span class="text-muted small mt-1">(Score × Norm Rate)</span>
+                            </div>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="remarks" string="Notes &amp; Description">
+                            <field name="notes" placeholder="Additional notes, quality grading, remarks..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Work Entry Pivot View -->
+    <record id="view_farm_work_entry_pivot" model="ir.ui.view">
+        <field name="name">farm.work.entry.pivot</field>
+        <field name="model">farm.work.entry</field>
+        <field name="arch" type="xml">
+            <pivot string="Work Entries Analysis" sample="1">
+                <field name="farm_id" type="row"/>
+                <field name="activity_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="score_value" type="measure" string="Score"/>
+                <field name="total_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Work Entry Graph View -->
+    <record id="view_farm_work_entry_graph" model="ir.ui.view">
+        <field name="name">farm.work.entry.graph</field>
+        <field name="model">farm.work.entry</field>
+        <field name="arch" type="xml">
+            <graph string="Work Entries &amp; Productivity" type="bar" sample="1">
+                <field name="farm_id"/>
+                <field name="total_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Work Entry Search View -->
+    <record id="view_farm_work_entry_search" model="ir.ui.view">
+        <field name="name">farm.work.entry.search</field>
+        <field name="model">farm.work.entry</field>
+        <field name="arch" type="xml">
+            <search string="Search Work Entries">
+                <field name="name" string="Reference"/>
+                <field name="employee_id"/>
+                <field name="fms_employee_id"/>
+                <field name="farm_id"/>
+                <field name="sub_unit_id"/>
+                <field name="activity_id"/>
+                <separator/>
+                <filter string="Draft" name="state_draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Confirmed" name="state_confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="Approved / Paid" name="state_approved" domain="[('state', '=', 'approved')]"/>
+                <separator/>
+                <filter string="Today" name="today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="This Month" name="this_month" domain="[('date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Farm" name="group_farm" context="{'group_by': 'farm_id'}"/>
+                    <filter string="Sub Unit" name="group_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
+                    <filter string="Activity" name="group_activity" context="{'group_by': 'activity_id'}"/>
+                    <filter string="Work Date" name="group_date" context="{'group_by': 'date:month'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Work Entry -->
+    <record id="action_farm_work_entry" model="ir.actions.act_window">
+        <field name="name">Work Entries</field>
+        <field name="res_model">farm.work.entry</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="search_view_id" ref="view_farm_work_entry_search"/>
+        <field name="context">{'search_default_this_month': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Record a Farm Work Entry!
+            </p>
+            <p>
+                Work entries record daily employee activity scores and calculate payments based on farm activity norms.
+            </p>
+        </field>
+    </record>
+</odoo>

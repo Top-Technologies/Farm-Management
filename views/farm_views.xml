@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Farm List View -->
+    <record id="view_farm_farm_list" model="ir.ui.view">
+        <field name="name">farm.farm.list</field>
+        <field name="model">farm.farm</field>
+        <field name="arch" type="xml">
+            <list string="Farms">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="manager_id" widget="many2one_avatar"/>
+                <field name="sub_farm_count" string="Sub Farms"/>
+                <field name="sub_unit_count" string="Sub Units"/>
+                <field name="block_count" string="Blocks"/>
+                <field name="activity_norm_count" string="Activities"/>
+                <field name="total_area" sum="Total Area"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Farm Form View -->
+    <record id="view_farm_farm_form" model="ir.ui.view">
+        <field name="name">farm.farm.form</field>
+        <field name="model">farm.farm</field>
+        <field name="arch" type="xml">
+            <form string="Farm">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_sub_farms" type="object" class="oe_stat_button" icon="fa-th-large">
+                            <field name="sub_farm_count" widget="statinfo" string="Sub Farms"/>
+                        </button>
+                        <button name="action_view_sub_units" type="object" class="oe_stat_button" icon="fa-th">
+                            <field name="sub_unit_count" widget="statinfo" string="Sub Units"/>
+                        </button>
+                        <button name="action_view_blocks" type="object" class="oe_stat_button" icon="fa-cubes">
+                            <field name="block_count" widget="statinfo" string="Blocks"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Green Valley Farm"/>
+                        </h1>
+                        <div class="d-flex align-items-baseline">
+                            <label for="code" class="me-2 text-muted"/>
+                            <field name="code" placeholder="e.g. FARM-001" style="max-width: 200px;"/>
+                        </div>
+                    </div>
+                    <group>
+                        <group name="general_info" string="Management">
+                            <field name="manager_id" widget="many2one_avatar"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group name="geographic_info" string="Land &amp; Geography">
+                            <field name="total_area"/>
+                            <field name="location" placeholder="e.g. 30.0444° N, 31.2357° E"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="sub_farms" string="Sub Farms">
+                            <field name="sub_farm_ids" context="{'default_farm_id': id}">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="code"/>
+                                    <field name="manager_id" widget="many2one_avatar"/>
+                                    <field name="area"/>
+                                    <field name="sub_unit_count" string="Sub Units"/>
+                                    <field name="block_count" string="Blocks"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page name="activity_norms" string="Activity Norms">
+                            <field name="activity_norm_ids" context="{'default_farm_id': id}">
+                                <list editable="bottom" string="Activity Standards &amp; Norms">
+                                    <field name="activity_id" options="{'no_create': True}"/>
+                                    <field name="norm_value" string="Standard Norm"/>
+                                    <field name="uom_name" string="Unit"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page name="location_details" string="Address &amp; Location">
+                            <group>
+                                <field name="address" placeholder="Physical location / street / district..."/>
+                            </group>
+                        </page>
+                        <page name="notes" string="Description &amp; Notes">
+                            <field name="description" placeholder="Additional notes about the farm, history, or operations..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Farm Kanban View -->
+    <record id="view_farm_farm_kanban" model="ir.ui.view">
+        <field name="name">farm.farm.kanban</field>
+        <field name="model">farm.farm</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_dashboard">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="manager_id"/>
+                <field name="sub_farm_count"/>
+                <field name="sub_unit_count"/>
+                <field name="block_count"/>
+                <field name="activity_norm_count"/>
+                <field name="total_area"/>
+                <field name="color"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h4 class="fw-bold mb-0">
+                                <field name="name"/>
+                            </h4>
+                            <span class="badge text-bg-light" t-if="record.code.raw_value">
+                                <field name="code"/>
+                            </span>
+                        </div>
+                        <div class="text-muted small mb-2" t-if="record.manager_id.raw_value">
+                            <i class="fa fa-user me-1"/> <field name="manager_id"/>
+                        </div>
+                        <div class="row g-2 text-center my-2">
+                            <div class="col-4">
+                                <div class="p-2 border rounded bg-light">
+                                    <div class="fw-bold fs-5 text-primary"><field name="sub_farm_count"/></div>
+                                    <div class="small text-muted">Sub Farms</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="p-2 border rounded bg-light">
+                                    <div class="fw-bold fs-5 text-success"><field name="sub_unit_count"/></div>
+                                    <div class="small text-muted">Sub Units</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="p-2 border rounded bg-light">
+                                    <div class="fw-bold fs-5 text-info"><field name="block_count"/></div>
+                                    <div class="small text-muted">Blocks</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                            <span class="text-muted small">
+                                <i class="fa fa-map-o me-1"/> <field name="total_area"/> Area
+                            </span>
+                            <span class="badge text-bg-light border" title="Configured Activities">
+                                <i class="fa fa-tasks me-1 text-muted"/> <field name="activity_norm_count"/> Activities
+                            </span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Farm Search View -->
+    <record id="view_farm_farm_search" model="ir.ui.view">
+        <field name="name">farm.farm.search</field>
+        <field name="model">farm.farm</field>
+        <field name="arch" type="xml">
+            <search string="Search Farms">
+                <field name="name" string="Farm" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="manager_id"/>
+                <field name="location"/>
+                <separator/>
+                <filter string="My Managed Farms" name="my_farms" domain="[('manager_id.user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Manager" name="group_manager" context="{'group_by': 'manager_id'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Farm -->
+    <record id="action_farm_farm" model="ir.actions.act_window">
+        <field name="name">Farms</field>
+        <field name="res_model">farm.farm</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_farm_farm_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Farm!
+            </p>
+            <p>
+                A Farm is the top-level entity in the agricultural structure, containing Sub Farms, Sub Units, and Blocks.
+            </p>
+        </field>
+    </record>
+</odoo>
