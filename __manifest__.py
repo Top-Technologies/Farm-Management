@@ -1,19 +1,22 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Farm Management',
-    'version': '18.0.1.0.0',
+    'version': '1.0.0',
     'category': 'Human Resources/Farm Management',
-    'summary': 'Manage Agricultural Farms, Sub Farms, Sub Units, Blocks, Activities, Transfers, and Work Entries within HR Employees',
+    'summary': 'Manage Agricultural Farms, Sub Farms, Sub Units, Blocks, Activities, Temporary Worker Rates, Transfers, and Work Entries within HR Employees',
     'description': """
-Farm Management for Odoo 18 Enterprise
-======================================
+Farm Management for Odoo 18 & 19 Enterprise
+============================================
 This module structures agricultural operations directly integrated into the HR Employees ecosystem:
 - 4-Tier Hierarchy: Farm -> Sub Farm -> Sub Unit -> Block (1:Many relationships)
 - Employee and Supervisor assignments per farm tier
 - Sub Unit level field workforce assignment
+- Employee Classification (Permanent, Temporary, Zemach) & Auto-generated 3-part ID (e.g. FM01T0001)
 - Employee Transfer & Movement History with Transfer Date & Moving Date tracking
-- Farm Activities management with unique IDs and per-farm target productivity norms
-- Farm Work Entries with FMS Employee ID integration and dynamic payment calculation (Score × Norm Rate)
+- Farm Activities management with unique IDs and per-farm target productivity norms (Piece-Rate)
+- Temporary Worker Wage Rates with Full Day (1.0) and Half Day (0.5) daily fixed rates per farm
+- Farm Work Entries with FMS Employee ID integration and dynamic payment calculation
+- RESTful JSON API endpoints for external FMS system synchronization
 - Smart navigation and integrated chatter/activity tracking
     """,
     'author': 'Custom Development',
@@ -27,6 +30,7 @@ This module structures agricultural operations directly integrated into the HR E
         'views/sub_unit_views.xml',
         'views/block_views.xml',
         'views/activity_views.xml',
+        'views/temporary_rate_views.xml',
         'views/transfer_views.xml',
         'views/work_entry_views.xml',
         'views/hr_employee_views.xml',

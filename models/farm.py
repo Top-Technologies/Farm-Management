@@ -44,6 +44,13 @@ class Farm(models.Model):
         string='Activity Norms',
     )
 
+    # Temporary Worker Wage Rates for this Farm
+    temporary_rate_ids = fields.One2many(
+        'farm.temporary.rate',
+        'farm_id',
+        string='Temporary Worker Rates',
+    )
+
     # Computed Counts & Statistics
     sub_farm_count = fields.Integer(
         string='Sub Farms Count',
@@ -61,6 +68,10 @@ class Farm(models.Model):
         string='Activity Norms Count',
         compute='_compute_counts',
     )
+    temporary_rate_count = fields.Integer(
+        string='Temporary Rates Count',
+        compute='_compute_counts',
+    )
     total_area = fields.Float(
         string='Total Area',
         compute='_compute_total_area',
@@ -68,7 +79,7 @@ class Farm(models.Model):
         help='Total combined area of all sub farms under this farm.',
     )
 
-    @api.depends('sub_farm_ids', 'sub_farm_ids.sub_unit_ids', 'sub_farm_ids.sub_unit_ids.block_ids', 'activity_norm_ids')
+    @api.depends('sub_farm_ids', 'sub_farm_ids.sub_unit_ids', 'sub_farm_ids.sub_unit_ids.block_ids', 'activity_norm_ids', 'temporary_rate_ids')
     def _compute_counts(self):
         for farm in self:
             sub_farms = farm.sub_farm_ids
@@ -78,6 +89,7 @@ class Farm(models.Model):
             farm.sub_unit_count = len(sub_units)
             farm.block_count = len(blocks)
             farm.activity_norm_count = len(farm.activity_norm_ids)
+            farm.temporary_rate_count = len(farm.temporary_rate_ids)
 
     @api.depends('sub_farm_ids.area')
     def _compute_total_area(self):

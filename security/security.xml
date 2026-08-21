@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        <!-- Module Category -->
-        <record id="module_category_farm_management" model="ir.module.category">
-            <field name="name">Farm Management</field>
-            <field name="description">Manage Farms, Sub Farms, Sub Units, Blocks, Activities, Transfers, and Work Entries.</field>
-            <field name="sequence">25</field>
-        </record>
-
-        <!-- User Group -->
+        <!-- User Group (Odoo 19 Compatible) -->
         <record id="group_farm_user" model="res.groups">
-            <field name="name">User</field>
-            <field name="category_id" ref="module_category_farm_management"/>
+            <field name="name">Farm Management / User</field>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         </record>
 
-        <!-- Manager Group -->
+        <!-- Manager Group (Odoo 19 Compatible) -->
         <record id="group_farm_manager" model="res.groups">
-            <field name="name">Administrator</field>
-            <field name="category_id" ref="module_category_farm_management"/>
+            <field name="name">Farm Management / Administrator</field>
             <field name="implied_ids" eval="[(4, ref('group_farm_user')), (4, ref('hr.group_hr_user'))]"/>
             <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
         </record>
@@ -57,6 +48,12 @@
         <record id="farm_activity_norm_company_rule" model="ir.rule">
             <field name="name">Farm Activity Norm Multi-Company Rule</field>
             <field name="model_id" ref="model_farm_activity_norm"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="farm_temporary_rate_company_rule" model="ir.rule">
+            <field name="name">Farm Temporary Rate Multi-Company Rule</field>
+            <field name="model_id" ref="model_farm_temporary_rate"/>
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
 

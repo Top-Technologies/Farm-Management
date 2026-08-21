@@ -229,7 +229,7 @@ class FmsRestController(http.Controller):
                 "message": "Field 'score' must be a positive number."
             }, status=400)
 
-        work_date = fields.Date.context_today(request.env['farm.work.entry'])
+        work_date = fields.Date.today()
         if date_str:
             try:
                 work_date = datetime.datetime.strptime(str(date_str).strip(), '%Y-%m-%d').date()

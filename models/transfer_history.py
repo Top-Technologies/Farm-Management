@@ -59,7 +59,7 @@ class FarmEmployeeTransfer(models.Model):
     # Transfer Dates & Status
     transfer_date = fields.Date(
         string='Transfer Date',
-        default=fields.Date.context_today,
+        default=fields.Date.today,
         required=True,
         tracking=True,
         help='The date when the employee transferred into this location.',

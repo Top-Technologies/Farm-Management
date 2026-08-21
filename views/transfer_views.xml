@@ -8,7 +8,7 @@
             <list string="Employee Transfers &amp; Placements">
                 <field name="transfer_date"/>
                 <field name="moving_date"/>
-                <field name="employee_id" widget="many2one_avatar"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
                 <field name="farm_id"/>
                 <field name="sub_farm_id"/>
                 <field name="sub_unit_id"/>

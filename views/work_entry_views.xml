@@ -19,13 +19,14 @@
             <list string="Farm Work Entries" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="date"/>
-                <field name="employee_id" widget="many2one_avatar"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
                 <field name="fms_employee_id" optional="show"/>
+                <field name="entry_type" widget="badge" decoration-info="entry_type == 'piece_rate'" decoration-warning="entry_type == 'temporary_rate'"/>
                 <field name="farm_id"/>
                 <field name="sub_unit_id"/>
-                <field name="activity_id"/>
-                <field name="score_value" string="Score" sum="Total Score"/>
-                <field name="norm_rate" string="Norm Rate"/>
+                <field name="activity_id" invisible="entry_type == 'temporary_rate'"/>
+                <field name="score_value" string="Score / Days" sum="Total Score"/>
+                <field name="norm_rate" string="Applied Rate"/>
                 <field name="uom_name" string="Unit"/>
                 <field name="total_amount" sum="Total Payment (Birr)" widget="monetary" decoration-bf="1"/>
                 <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
@@ -45,7 +46,7 @@
                     <button name="action_approve" string="Approve / Pay" type="object" class="btn-success" invisible="state != 'confirmed'"/>
                     <button name="action_draft" string="Reset to Draft" type="object" invisible="state not in ('confirmed', 'cancelled')"/>
                     <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approved', 'cancelled')"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,approved"/>
+                    <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -55,22 +56,26 @@
                         </h1>
                     </div>
                     <group>
-                        <group name="employee_details" string="Employee &amp; Date">
+                        <group name="entry_type_grp" string="Payment Category &amp; Date">
+                            <field name="entry_type" widget="radio" options="{'horizontal': true}" readonly="state == 'approved'"/>
                             <field name="date" readonly="state == 'approved'"/>
-                            <field name="employee_id" widget="many2one_avatar" readonly="state == 'approved'"/>
+                            <field name="employee_id" widget="many2one_avatar_employee" readonly="state == 'approved'"/>
                             <field name="fms_employee_id"/>
+                            <field name="employee_type" widget="badge" decoration-primary="employee_type == 'permanent'" decoration-warning="employee_type == 'temporary'" decoration-info="employee_type == 'zemach'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
-                        <group name="location_details" string="Farm Location">
+                        <group name="location_details" string="Farm Deployment Location">
                             <field name="farm_id" options="{'no_create': True}" readonly="state == 'approved'"/>
                             <field name="sub_farm_id" options="{'no_create': True}" readonly="state == 'approved'"/>
                             <field name="sub_unit_id" options="{'no_create': True}" readonly="state == 'approved'"/>
                             <field name="block_id" options="{'no_create': True}" readonly="state == 'approved'"/>
                         </group>
                     </group>
-                    <group>
+
+                    <!-- Piece Rate Section -->
+                    <group invisible="entry_type != 'piece_rate'">
                         <group name="activity_calculation" string="Activity &amp; Productivity Score">
-                            <field name="activity_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="activity_id" options="{'no_create': True}" required="entry_type == 'piece_rate'" readonly="state == 'approved'"/>
                             <field name="activity_code"/>
                             <field name="score_value" string="Score" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                         </group>
@@ -89,9 +94,33 @@
                             </div>
                         </group>
                     </group>
+
+                    <!-- Temporary Worker Daily Wage Section -->
+                    <group invisible="entry_type != 'temporary_rate'">
+                        <group name="temp_work_calculation" string="Temporary Attendance &amp; Duration">
+                            <field name="work_duration" widget="radio" options="{'horizontal': true}" readonly="state == 'approved'"/>
+                            <field name="score_value" string="Days / Score" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                            <field name="temporary_rate_id" readonly="1"/>
+                        </group>
+                        <group name="temp_payment_calculation" string="Daily Wage Rate &amp; Payment">
+                            <label for="norm_rate" string="Applied Rate"/>
+                            <div class="d-flex align-items-baseline">
+                                <field name="norm_rate" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                                <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
+                            </div>
+                            <div class="d-flex flex-column mt-2 p-3 bg-light rounded border border-primary">
+                                <span class="text-muted small">Total Temporary Worker Payment:</span>
+                                <h2 class="text-success fw-bold mb-0">
+                                    <field name="total_amount"/> <span class="fs-5">Birr</span>
+                                </h2>
+                                <span class="text-muted small mt-1">(Calculated via Farm Temporary Rate: 1.0 Day / 0.5 Day)</span>
+                            </div>
+                        </group>
+                    </group>
+
                     <notebook>
                         <page name="remarks" string="Notes &amp; Description">
-                            <field name="notes" placeholder="Additional notes, quality grading, remarks..."/>
+                            <field name="notes" placeholder="Additional notes, quality grading, shift remarks..."/>
                         </page>
                     </notebook>
                 </sheet>
@@ -107,9 +136,9 @@
         <field name="arch" type="xml">
             <pivot string="Work Entries Analysis" sample="1">
                 <field name="farm_id" type="row"/>
-                <field name="activity_id" type="row"/>
+                <field name="entry_type" type="row"/>
                 <field name="date" interval="month" type="col"/>
-                <field name="score_value" type="measure" string="Score"/>
+                <field name="score_value" type="measure" string="Score / Days"/>
                 <field name="total_amount" type="measure"/>
             </pivot>
         </field>
@@ -140,6 +169,9 @@
                 <field name="sub_unit_id"/>
                 <field name="activity_id"/>
                 <separator/>
+                <filter string="Piece Rate (Norms)" name="filter_piece_rate" domain="[('entry_type', '=', 'piece_rate')]"/>
+                <filter string="Temporary (Daily Rates)" name="filter_temporary_rate" domain="[('entry_type', '=', 'temporary_rate')]"/>
+                <separator/>
                 <filter string="Draft" name="state_draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Confirmed" name="state_confirmed" domain="[('state', '=', 'confirmed')]"/>
                 <filter string="Approved / Paid" name="state_approved" domain="[('state', '=', 'approved')]"/>
@@ -147,6 +179,7 @@
                 <filter string="Today" name="today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
                 <filter string="This Month" name="this_month" domain="[('date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Payment Type" name="group_entry_type" context="{'group_by': 'entry_type'}"/>
                     <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
                     <filter string="Farm" name="group_farm" context="{'group_by': 'farm_id'}"/>
                     <filter string="Sub Unit" name="group_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
@@ -170,7 +203,7 @@
                 Record a Farm Work Entry!
             </p>
             <p>
-                Work entries record daily employee activity scores and calculate payments based on farm activity norms.
+                Work entries record piece-rate activity scores (calculated via Norms) and temporary/seasonal daily attendance (calculated via Full Day / Half Day Wage Rates).
             </p>
         </field>
     </record>

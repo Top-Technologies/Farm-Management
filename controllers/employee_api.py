@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import json
-import base64
 import logging
 import datetime
+import werkzeug.wrappers
 import odoo
-from odoo import http, api, SUPERUSER_ID, fields, _
+from odoo import http, fields
 from odoo.http import request
-import odoo.modules.registry
 
 _logger = logging.getLogger(__name__)
 
@@ -52,58 +51,35 @@ class EmployeeAPI(http.Controller):
             _logger.error("Failed to connect to database '%s': %s", db_name, str(e))
             return None, None, None
 
-        auth_header = request.httprequest.headers.get('Authorization')
-        uid = None
+        uid = odoo.SUPERUSER_ID
 
-        if auth_header:
+        # Try API Key / Bearer Auth
+        auth_header = request.httprequest.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:].strip()
             try:
-                auth_parts = auth_header.split(' ', 1)
-                if len(auth_parts) == 2:
-                    auth_type, auth_val = auth_parts
-                    auth_type = auth_type.lower()
-
-                    if auth_type == 'bearer':
-                        token = auth_val.strip()
-                        with registry.cursor() as check_cr:
-                            check_env = api.Environment(check_cr, SUPERUSER_ID, {})
-                            uid = check_env['res.users.apikeys']._check_credentials(scope='rpc', key=token)
-
-                    elif auth_type == 'basic':
-                        decoded = base64.b64decode(auth_val).decode('utf-8')
-                        username, password = decoded.split(':', 1) if ':' in decoded else (decoded, '')
-                        with registry.cursor() as check_cr:
-                            check_env = api.Environment(check_cr, SUPERUSER_ID, {})
-                            uid = check_env['res.users.apikeys']._check_credentials(scope='rpc', key=password)
-                            if not uid:
-                                uid = check_env['res.users.apikeys']._check_credentials(scope='rpc', key=username)
-                            if not uid:
-                                try:
-                                    uid = check_env['res.users'].authenticate(
-                                        db_name, username, password, {'interactive': False}
-                                    )
-                                except Exception:
-                                    pass
+                env_root = odoo.api.Environment(cr, odoo.SUPERUSER_ID, {})
+                checked_uid = env_root['res.users.apikeys']._check_credentials(scope='rpc', key=token)
+                if checked_uid:
+                    uid = checked_uid
             except Exception as e:
-                _logger.error("Authentication error in REST API: %s", str(e))
+                _logger.warning("API key authentication check failed: %s", str(e))
 
-        # If no specific user authenticated, default to SUPERUSER_ID for API operations
-        if not uid:
-            uid = SUPERUSER_ID
-
-        env = api.Environment(cr, uid, {})
+        env = odoo.api.Environment(cr, uid, {})
         return env, cr, db_name
 
     def _json_response(self, data, status=200):
-        """Helper to return formatted JSON responses with CORS headers."""
-        return request.make_response(
+        """Helper to build standard HTTP JSON Response with CORS headers."""
+        headers = [
+            ('Content-Type', 'application/json; charset=utf-8'),
+            ('Access-Control-Allow-Origin', '*'),
+            ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'),
+            ('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Odoo-Db, X-Database'),
+        ]
+        return werkzeug.wrappers.Response(
             json.dumps(data, default=str),
-            headers=[
-                ('Content-Type', 'application/json'),
-                ('Access-Control-Allow-Origin', '*'),
-                ('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, X-Odoo-Db, X-Database'),
-                ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            ],
-            status=status
+            status=status,
+            headers=headers
         )
 
     # -------------------------------------------------------------------------
@@ -123,29 +99,22 @@ class EmployeeAPI(http.Controller):
         if not env:
             return self._json_response({
                 "status": "error",
-                "message": "Database not found or could not be loaded."
+                "message": "Database not found or could not connect."
             }, status=500)
 
         try:
-            farm_code = request.httprequest.args.get('farm_code') or kwargs.get('farm_code')
-            employee_type = request.httprequest.args.get('employee_type') or kwargs.get('employee_type')
-            search_query = request.httprequest.args.get('search') or kwargs.get('search')
+            emp_id = kwargs.get('id') or kwargs.get('employee_id')
+            farm_code = kwargs.get('farm') or kwargs.get('farm_code')
+            employee_type = kwargs.get('type') or kwargs.get('classification')
 
-            domain = []
-            if farm_code:
-                domain.append('|')
-                domain.append(('current_farm_id.code', '=ilike', farm_code.strip()))
-                domain.append(('initial_farm_id.code', '=ilike', farm_code.strip()))
-
+            domain = [('active', '=', True)]
+            if emp_id:
+                domain = ['|', ('fms_employee_id', '=ilike', f'%{emp_id}%'),
+                               ('employee_code', '=ilike', f'%{emp_id}%')]
             if employee_type:
-                domain.append(('farm_employee_type', '=', employee_type.strip().lower()))
+                domain.append(('farm_employee_type', '=', employee_type.lower()))
 
-            if search_query:
-                domain.append('|')
-                domain.append(('name', 'ilike', search_query.strip()))
-                domain.append(('fms_employee_id', 'ilike', search_query.strip()))
-
-            employees = env['hr.employee'].search(domain, order='id asc')
+            employees = env['hr.employee'].search(domain, order='fms_employee_id asc, id asc')
 
             data = []
             for emp in employees:
@@ -154,8 +123,20 @@ class EmployeeAPI(http.Controller):
                 sub_unit = emp.current_sub_unit_id or emp.initial_sub_unit_id
                 block = emp.current_block_id or emp.initial_block_id
 
+                if farm_code and farm and farm.code and farm.code.lower() != farm_code.lower():
+                    continue
+
                 classification_labels = dict(emp._fields['farm_employee_type'].selection) if 'farm_employee_type' in emp._fields else {}
                 class_label = classification_labels.get(emp.farm_employee_type, emp.farm_employee_type or 'Temporary')
+
+                # Only temporary workers get the temporary wage rate
+                temp_rate = False
+                is_temp_worker = (emp.farm_employee_type == 'temporary') or ('T' in (emp.fms_employee_id or '').upper())
+                if farm and is_temp_worker:
+                    temp_rate = env['farm.temporary.rate'].search([
+                        ('farm_id', '=', farm.id),
+                        ('active', '=', True)
+                    ], limit=1)
 
                 data.append({
                     "id": emp.id,
@@ -183,6 +164,11 @@ class EmployeeAPI(http.Controller):
                         "code": block.code if block else "",
                         "name": block.name if block else ""
                     } if block else None,
+                    "temporary_wage_rate": {
+                        "full_day_rate": temp_rate.full_day_rate if temp_rate else None,
+                        "half_day_rate": temp_rate.half_day_rate if temp_rate else None,
+                        "uom": temp_rate.uom_name if temp_rate else "Birr/Day"
+                    } if temp_rate else None,
                     "job_title": emp.job_title or (emp.job_id.name if emp.job_id else ""),
                     "department": emp.department_id.name if emp.department_id else "",
                     "work_phone": emp.work_phone or emp.mobile_phone or "",
@@ -230,7 +216,7 @@ class EmployeeAPI(http.Controller):
 
         # Parse request body (JSON or form data)
         payload = {}
-        if request.httprequest.content_type == 'application/json':
+        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
             try:
                 raw_body = request.httprequest.data.decode('utf-8')
                 payload = json.loads(raw_body) if raw_body else {}
@@ -243,10 +229,12 @@ class EmployeeAPI(http.Controller):
         else:
             payload = kwargs
 
-        emp_identifier = payload.get('employee_id')
-        activity_identifier = payload.get('activity_id')
+        emp_identifier = payload.get('employee_id') or payload.get('emp_id')
+        activity_identifier = payload.get('activity_id') or payload.get('activity_code')
         score_val = payload.get('score', payload.get('score_value'))
         date_str = payload.get('date')
+        entry_type_req = payload.get('entry_type')
+        duration_req = payload.get('work_duration') or payload.get('duration')
         notes = payload.get('notes', '')
 
         # Validations
@@ -257,18 +245,11 @@ class EmployeeAPI(http.Controller):
                 "message": "Missing required field: 'employee_id' (e.g. 'FM01T0001')."
             }, status=400)
 
-        if not activity_identifier:
-            if cr: cr.close()
-            return self._json_response({
-                "status": "error",
-                "message": "Missing required field: 'activity_id' (e.g. 'SP')."
-            }, status=400)
-
         if score_val is None:
             if cr: cr.close()
             return self._json_response({
                 "status": "error",
-                "message": "Missing required field: 'score'."
+                "message": "Missing required field: 'score' (e.g. 1.0 for Full Day, 0.5 for Half Day, or piece-rate score)."
             }, status=400)
 
         try:
@@ -279,10 +260,10 @@ class EmployeeAPI(http.Controller):
             if cr: cr.close()
             return self._json_response({
                 "status": "error",
-                "message": "Field 'score' must be a positive number."
+                "message": "Field 'score' must be a positive number (e.g. 1.0, 0.5, 6.0)."
             }, status=400)
 
-        work_date = fields.Date.context_today(env['farm.work.entry'])
+        work_date = fields.Date.today()
         if date_str:
             try:
                 work_date = datetime.datetime.strptime(str(date_str).strip(), '%Y-%m-%d').date()
@@ -310,22 +291,10 @@ class EmployeeAPI(http.Controller):
                     "message": f"Employee with ID '{emp_identifier}' not found in database '{db_name}'."
                 }, status=404)
 
-            # 2. Resolve Activity
-            activity = env['farm.activity'].search([
-                ('code', '=ilike', str(activity_identifier).strip())
-            ], limit=1)
+            emp_code = (emp.fms_employee_id or emp.employee_code or '').upper()
+            is_temp_worker = (emp.farm_employee_type == 'temporary') and ('T' in emp_code if emp_code else True)
 
-            if not activity and str(activity_identifier).isdigit():
-                activity = env['farm.activity'].browse(int(activity_identifier)).exists()
-
-            if not activity:
-                if cr: cr.close()
-                return self._json_response({
-                    "status": "error",
-                    "message": f"Activity '{activity_identifier}' not found."
-                }, status=404)
-
-            # 3. Resolve Location
+            # 2. Resolve Farm Location
             farm = emp.current_farm_id or emp.initial_farm_id
             sub_farm = emp.current_sub_farm_id or emp.initial_sub_farm_id
             sub_unit = emp.current_sub_unit_id or emp.initial_sub_unit_id
@@ -338,27 +307,112 @@ class EmployeeAPI(http.Controller):
                 if cr: cr.close()
                 return self._json_response({
                     "status": "error",
-                    "message": "No farm found in the system to calculate activity norm."
+                    "message": "No farm found in the system to calculate rates."
                 }, status=400)
 
-            # 4. Resolve Activity Norm Rate
-            norm_rec = env['farm.activity.norm'].search([
-                ('activity_id', '=', activity.id),
-                ('farm_id', '=', farm.id)
-            ], limit=1)
+            # 3. Determine Entry Type & Enforce Restrictions
+            is_temporary_rate = False
+            if entry_type_req in ('temporary_rate', 'daily_rate', 'temporary'):
+                is_temporary_rate = True
+            elif not activity_identifier:
+                # If no activity is passed, check if temporary worker
+                if is_temp_worker:
+                    is_temporary_rate = True
+                else:
+                    if cr: cr.close()
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"Work entries without an 'activity_id' (Temporary Worker Rates) are ONLY permitted for Temporary Workers whose ID contains 'T'. Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as '{emp.farm_employee_type}'. Please specify an 'activity_id' (e.g. 'SP', 'CULT', 'HARV')."
+                    }, status=400)
+            elif str(activity_identifier).upper() in ('TEMP', 'TEMPORARY', 'DAILY', 'ATTENDANCE'):
+                is_temporary_rate = True
 
-            norm_rate = norm_rec.norm_value if norm_rec else 0.0
-            total_payment = round(score_float * norm_rate, 2)
+            # If temporary rate is requested for a non-temporary worker, REJECT
+            if is_temporary_rate and not is_temp_worker:
+                if cr: cr.close()
+                return self._json_response({
+                    "status": "error",
+                    "message": f"Temporary Worker Daily Rate entries are ONLY permitted for Temporary Workers (IDs containing 'T'). Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as '{emp.farm_employee_type}'. Please submit a standard piece-rate work entry with 'activity_id'."
+                }, status=400)
 
-            # 5. Create Work Entry
+            activity = False
+            norm_rate = 0.0
+            total_payment = 0.0
+            uom_name = 'Birr/Day'
+            work_duration = 'full_day' if score_float == 1.0 else ('half_day' if score_float == 0.5 else 'custom')
+            if duration_req:
+                work_duration = 'half_day' if str(duration_req).lower() in ('half', 'half_day', '0.5') else 'full_day'
+
+            if is_temporary_rate:
+                entry_type = 'temporary_rate'
+                # Look up temporary rate for farm
+                temp_rate = env['farm.temporary.rate'].search([
+                    ('farm_id', '=', farm.id),
+                    ('active', '=', True)
+                ], limit=1)
+
+                if temp_rate:
+                    if score_float == 0.5 or work_duration == 'half_day':
+                        norm_rate = temp_rate.half_day_rate
+                        total_payment = round(temp_rate.half_day_rate, 2)
+                        uom_name = 'Birr/Half-Day'
+                    elif score_float == 1.0 or work_duration == 'full_day':
+                        norm_rate = temp_rate.full_day_rate
+                        total_payment = round(temp_rate.full_day_rate, 2)
+                        uom_name = 'Birr/Day'
+                    else:
+                        norm_rate = temp_rate.full_day_rate
+                        total_payment = round(score_float * temp_rate.full_day_rate, 2)
+                        uom_name = 'Birr/Day'
+                else:
+                    # Fallback to custom fixed wage passed in payload if any
+                    fixed_wage = float(payload.get('wage', payload.get('rate', 0.0)))
+                    norm_rate = fixed_wage
+                    total_payment = round(score_float * fixed_wage, 2)
+
+            else:
+                entry_type = 'piece_rate'
+                if not activity_identifier:
+                    if cr: cr.close()
+                    return self._json_response({
+                        "status": "error",
+                        "message": "Missing required field: 'activity_id' (e.g. 'SP', 'CULT', 'HARV') for piece-rate work entries."
+                    }, status=400)
+
+                activity = env['farm.activity'].search([
+                    ('code', '=ilike', str(activity_identifier).strip())
+                ], limit=1)
+
+                if not activity and str(activity_identifier).isdigit():
+                    activity = env['farm.activity'].browse(int(activity_identifier)).exists()
+
+                if not activity:
+                    if cr: cr.close()
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"Activity '{activity_identifier}' not found."
+                    }, status=404)
+
+                norm_rec = env['farm.activity.norm'].search([
+                    ('activity_id', '=', activity.id),
+                    ('farm_id', '=', farm.id)
+                ], limit=1)
+
+                norm_rate = norm_rec.norm_value if norm_rec else 0.0
+                uom_name = activity.uom_name or 'Birr/Kg'
+                total_payment = round(score_float * norm_rate, 2)
+
+            # 4. Create Work Entry Record
             vals = {
                 'date': work_date,
                 'employee_id': emp.id,
+                'entry_type': entry_type,
+                'work_duration': work_duration,
                 'farm_id': farm.id,
                 'sub_farm_id': sub_farm.id if sub_farm else False,
                 'sub_unit_id': sub_unit.id if sub_unit else False,
                 'block_id': block.id if block else False,
-                'activity_id': activity.id,
+                'activity_id': activity.id if activity else False,
                 'norm_rate': norm_rate,
                 'score_value': score_float,
                 'total_amount': total_payment,
@@ -376,6 +430,7 @@ class EmployeeAPI(http.Controller):
                     "id": work_entry.id,
                     "reference": work_entry.name,
                     "date": str(work_entry.date),
+                    "payment_type": "Temporary Worker Daily Rate" if entry_type == 'temporary_rate' else "Activity Piece Rate (Norm)",
                     "employee": {
                         "id": emp.id,
                         "employee_id": emp.fms_employee_id or emp.employee_code,
@@ -394,11 +449,12 @@ class EmployeeAPI(http.Controller):
                         "id": activity.id,
                         "code": activity.code,
                         "name": activity.name
-                    },
+                    } if activity else None,
                     "calculation": {
-                        "score": score_float,
-                        "norm_rate": norm_rate,
-                        "uom": activity.uom_name,
+                        "score_or_days": score_float,
+                        "duration": work_duration,
+                        "applied_rate": norm_rate,
+                        "uom": uom_name,
                         "total_payment_birr": total_payment
                     },
                     "state": work_entry.state
@@ -438,7 +494,7 @@ class EmployeeAPI(http.Controller):
             data = []
             for act in activities:
                 norms = []
-                for n in act.norm_ids:
+                for n in act.farm_norm_ids:
                     if not farm_code or (n.farm_id.code and n.farm_id.code.lower() == farm_code.lower()):
                         norms.append({
                             "farm_id": n.farm_id.id,
@@ -451,17 +507,72 @@ class EmployeeAPI(http.Controller):
                     "id": act.id,
                     "code": act.code,
                     "name": act.name,
-                    "uom": act.uom_name,
+                    "category": act.category,
+                    "uom_name": act.uom_name,
                     "norms": norms
                 })
 
             return self._json_response({
                 "status": "success",
+                "database": db_name,
                 "count": len(data),
                 "data": data
             }, status=200)
+
         except Exception as e:
-            return self._json_response({"status": "error", "message": str(e)}, status=500)
+            _logger.error("Error retrieving activities in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # GET /api/temporary_rates & /odoo/api/temporary_rates & /api/fms/temporary_rates
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/temporary_rates',
+        '/odoo/api/temporary_rates',
+        '/api/fms/temporary_rates',
+        '/odoo/api/fms/temporary_rates'
+    ], type='http', auth='none', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
+    def get_temporary_rates(self, farm_code=None, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found."}, status=500)
+
+        try:
+            domain = [('active', '=', True)]
+            rates = env['farm.temporary.rate'].search(domain, order='farm_id asc')
+            data = []
+            for r in rates:
+                if farm_code and r.farm_id.code and r.farm_id.code.lower() != farm_code.lower():
+                    continue
+                data.append({
+                    "id": r.id,
+                    "farm": {
+                        "id": r.farm_id.id,
+                        "code": r.farm_id.code or "",
+                        "name": r.farm_id.name
+                    },
+                    "full_day_rate": r.full_day_rate,
+                    "half_day_rate": r.half_day_rate,
+                    "uom": r.uom_name or "Birr/Day",
+                    "remarks": r.notes or ""
+                })
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "count": len(data),
+                "data": data
+            }, status=200)
+
+        except Exception as e:
+            _logger.error("Error retrieving temporary rates in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
         finally:
             if cr:
                 cr.close()

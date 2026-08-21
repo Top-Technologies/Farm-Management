@@ -47,8 +47,21 @@
               name="Activities"
               parent="hr.menu_hr_root"
               sequence="16"
-              action="action_farm_activity"
               groups="farm_management.group_farm_user"/>
+
+    <!-- Sub-menu 1: Farm Activities -->
+    <menuitem id="menu_farm_activity_list"
+              name="Farm Activities"
+              parent="menu_farm_activity_root"
+              action="action_farm_activity"
+              sequence="10"/>
+
+    <!-- Sub-menu 2: Temporary Worker Rates -->
+    <menuitem id="menu_farm_temporary_rate"
+              name="Temporary Worker Rates"
+              parent="menu_farm_activity_root"
+              action="action_farm_temporary_rate"
+              sequence="20"/>
 
     <!-- Top-level Section inside HR / Employees Top Bar: Work Entries -->
     <menuitem id="menu_farm_work_entry_root"

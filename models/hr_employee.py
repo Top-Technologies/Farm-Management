@@ -107,6 +107,11 @@ class HrEmployee(models.Model):
         compute='_compute_work_entry_stats',
         digits=(16, 2),
     )
+    currency_id = fields.Many2one(
+        'res.currency',
+        string='Currency',
+        related='company_id.currency_id',
+    )
 
     # Current Assignment from Latest Active Transfer
     current_transfer_id = fields.Many2one(
@@ -280,7 +285,7 @@ class HrEmployee(models.Model):
                     'sub_farm_id': emp.initial_sub_farm_id.id if emp.initial_sub_farm_id else False,
                     'sub_unit_id': emp.initial_sub_unit_id.id if emp.initial_sub_unit_id else False,
                     'block_id': emp.initial_block_id.id if emp.initial_block_id else False,
-                    'transfer_date': fields.Date.context_today(self),
+                    'transfer_date': fields.Date.today(),
                     'notes': _('Initial baseline placement upon employee registration'),
                 })
         return employees

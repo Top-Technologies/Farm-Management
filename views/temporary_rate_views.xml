@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Temporary Worker Rates List View -->
+    <record id="view_farm_temporary_rate_list" model="ir.ui.view">
+        <field name="name">farm.temporary.rate.list</field>
+        <field name="model">farm.temporary.rate</field>
+        <field name="arch" type="xml">
+            <list string="Temporary Worker Wage Rates">
+                <field name="farm_id"/>
+                <field name="full_day_rate" string="Full Day Wage (Birr)"/>
+                <field name="half_day_rate" string="Half Day Wage (Birr)"/>
+                <field name="uom_name" string="Unit"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Temporary Worker Rates Form View -->
+    <record id="view_farm_temporary_rate_form" model="ir.ui.view">
+        <field name="name">farm.temporary.rate.form</field>
+        <field name="model">farm.temporary.rate</field>
+        <field name="arch" type="xml">
+            <form string="Temporary Worker Wage Rate">
+                <sheet>
+                    <field name="active" invisible="1"/>
+                    <field name="company_id" invisible="1"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="farm_id" string="Farm"/>
+                        <h1>
+                            <field name="farm_id" options="{'no_create': True}" placeholder="Select Farm..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Unit of Measure">
+                            <field name="uom_name" placeholder="e.g. Birr/Day"/>
+                        </group>
+                        <group string="Wage Rates (Fixed Daily Payment)">
+                            <label for="full_day_rate" string="Full Day Wage (1.0 Day)"/>
+                            <div class="d-flex align-items-baseline">
+                                <field name="full_day_rate" class="fw-bold fs-4 text-success me-2"/>
+                                <span class="text-muted">Birr / Full Day</span>
+                            </div>
+                            <label for="half_day_rate" string="Half Day Wage (0.5 Day)"/>
+                            <div class="d-flex align-items-baseline">
+                                <field name="half_day_rate" class="fw-bold fs-5 text-primary me-2"/>
+                                <span class="text-muted">Birr / Half Day</span>
+                            </div>
+                        </group>
+                    </group>
+                    <group string="Remarks &amp; Guidelines">
+                        <field name="notes" nolabel="1" placeholder="Add seasonal payment guidelines, effective dates, or payment policies..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Temporary Worker Rates Search View -->
+    <record id="view_farm_temporary_rate_search" model="ir.ui.view">
+        <field name="name">farm.temporary.rate.search</field>
+        <field name="model">farm.temporary.rate</field>
+        <field name="arch" type="xml">
+            <search string="Search Temporary Rates">
+                <field name="farm_id"/>
+                <separator/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Farm" name="group_farm" context="{'group_by': 'farm_id'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Temporary Worker Rates -->
+    <record id="action_farm_temporary_rate" model="ir.actions.act_window">
+        <field name="name">Temporary Worker Rates</field>
+        <field name="res_model">farm.temporary.rate</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_farm_temporary_rate_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Set up the Temporary Worker Daily Wage Rate for this Farm!
+            </p>
+            <p>
+                Define fixed daily and half-day wage rates for temporary workers per farm. When FMS posts a full day (1.0) or half day (0.5) for a temporary worker (ID containing 'T'), payments will be calculated automatically based on these rates.
+            </p>
+        </field>
+    </record>
+</odoo>
