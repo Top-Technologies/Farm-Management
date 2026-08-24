@@ -16,7 +16,7 @@
         <field name="name">farm.work.entry.list</field>
         <field name="model">farm.work.entry</field>
         <field name="arch" type="xml">
-            <list string="Farm Work Entries" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'">
+            <list string="Farm Work Entries" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="payment_status == 'paid'" decoration-muted="state == 'cancelled'">
                 <field name="name"/>
                 <field name="date"/>
                 <field name="employee_id" widget="many2one_avatar_employee"/>
@@ -30,6 +30,8 @@
                 <field name="uom_name" string="Unit"/>
                 <field name="total_amount" sum="Total Payment (Birr)" widget="monetary" decoration-bf="1"/>
                 <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
+                <field name="payment_status" widget="badge" decoration-warning="payment_status == 'unpaid'" decoration-info="payment_status == 'in_payroll'" decoration-success="payment_status == 'paid'"/>
+                <field name="payslip_id" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
             </list>
         </field>
@@ -43,9 +45,9 @@
             <form string="Farm Work Entry">
                 <header>
                     <button name="action_confirm" string="Confirm" type="object" class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_approve" string="Approve / Pay" type="object" class="btn-success" invisible="state != 'confirmed'"/>
-                    <button name="action_draft" string="Reset to Draft" type="object" invisible="state not in ('confirmed', 'cancelled')"/>
-                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approved', 'cancelled')"/>
+                    <button name="action_approve" string="Approve" type="object" class="btn-success" invisible="state != 'confirmed'"/>
+                    <button name="action_draft" string="Reset to Draft" type="object" invisible="state not in ('confirmed', 'cancelled') or payment_status == 'paid'"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approved', 'cancelled') or payment_status == 'paid'"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
@@ -57,32 +59,32 @@
                     </div>
                     <group>
                         <group name="entry_type_grp" string="Payment Category &amp; Date">
-                            <field name="entry_type" widget="radio" options="{'horizontal': true}" readonly="state == 'approved'"/>
-                            <field name="date" readonly="state == 'approved'"/>
-                            <field name="employee_id" widget="many2one_avatar_employee" readonly="state == 'approved'"/>
+                            <field name="entry_type" widget="radio" options="{'horizontal': true}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="date" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="employee_id" widget="many2one_avatar_employee" readonly="state == 'approved' or payment_status == 'paid'"/>
                             <field name="fms_employee_id"/>
                             <field name="employee_type" widget="badge" decoration-primary="employee_type == 'permanent'" decoration-warning="employee_type == 'temporary'" decoration-info="employee_type == 'zemach'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                         <group name="location_details" string="Farm Deployment Location">
-                            <field name="farm_id" options="{'no_create': True}" readonly="state == 'approved'"/>
-                            <field name="sub_farm_id" options="{'no_create': True}" readonly="state == 'approved'"/>
-                            <field name="sub_unit_id" options="{'no_create': True}" readonly="state == 'approved'"/>
-                            <field name="block_id" options="{'no_create': True}" readonly="state == 'approved'"/>
+                            <field name="farm_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="sub_farm_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="sub_unit_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="block_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
                         </group>
                     </group>
 
                     <!-- Piece Rate Section -->
                     <group invisible="entry_type != 'piece_rate'">
                         <group name="activity_calculation" string="Activity &amp; Productivity Score">
-                            <field name="activity_id" options="{'no_create': True}" required="entry_type == 'piece_rate'" readonly="state == 'approved'"/>
+                            <field name="activity_id" options="{'no_create': True}" required="entry_type == 'piece_rate'" readonly="state == 'approved' or payment_status == 'paid'"/>
                             <field name="activity_code"/>
-                            <field name="score_value" string="Score" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                            <field name="score_value" string="Score / Quantity" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                         </group>
                         <group name="payment_calculation" string="Norm Rate &amp; Deserved Payment">
                             <label for="norm_rate" string="Norm Rate"/>
                             <div class="d-flex align-items-baseline">
-                                <field name="norm_rate" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                                <field name="norm_rate" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                                 <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
                             </div>
                             <div class="d-flex flex-column mt-2 p-3 bg-light rounded border">
@@ -97,15 +99,15 @@
 
                     <!-- Temporary Worker Daily Wage Section -->
                     <group invisible="entry_type != 'temporary_rate'">
-                        <group name="temp_work_calculation" string="Temporary Attendance &amp; Duration">
-                            <field name="work_duration" widget="radio" options="{'horizontal': true}" readonly="state == 'approved'"/>
-                            <field name="score_value" string="Days / Score" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                        <group name="temp_work_calculation" string="Temporary Attendance Duration">
+                            <field name="work_duration" widget="radio" options="{'horizontal': true}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="score_value" string="Days (0.5 / 1.0 / 1.5)" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                             <field name="temporary_rate_id" readonly="1"/>
                         </group>
                         <group name="temp_payment_calculation" string="Daily Wage Rate &amp; Payment">
                             <label for="norm_rate" string="Applied Rate"/>
                             <div class="d-flex align-items-baseline">
-                                <field name="norm_rate" readonly="state == 'approved'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                                <field name="norm_rate" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                                 <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
                             </div>
                             <div class="d-flex flex-column mt-2 p-3 bg-light rounded border border-primary">
@@ -113,8 +115,20 @@
                                 <h2 class="text-success fw-bold mb-0">
                                     <field name="total_amount"/> <span class="fs-5">Birr</span>
                                 </h2>
-                                <span class="text-muted small mt-1">(Calculated via Farm Temporary Rate: 1.0 Day / 0.5 Day)</span>
+                                <span class="text-muted small mt-1">(Calculated via Farm Temporary Rate: 1.0 Day / 0.5 Day / 1.5 Days)</span>
                             </div>
+                        </group>
+                    </group>
+
+                    <!-- Payroll & Settlement Tracking Section -->
+                    <group string="Payroll &amp; Settlement Tracking">
+                        <group>
+                            <field name="payment_status" widget="badge" decoration-warning="payment_status == 'unpaid'" decoration-info="payment_status == 'in_payroll'" decoration-success="payment_status == 'paid'"/>
+                            <field name="paid_date" invisible="not paid_date"/>
+                        </group>
+                        <group>
+                            <field name="payslip_id" readonly="1" invisible="not payslip_id"/>
+                            <field name="payslip_run_id" readonly="1" invisible="not payslip_run_id"/>
                         </group>
                     </group>
 
@@ -137,6 +151,7 @@
             <pivot string="Work Entries Analysis" sample="1">
                 <field name="farm_id" type="row"/>
                 <field name="entry_type" type="row"/>
+                <field name="payment_status" type="row"/>
                 <field name="date" interval="month" type="col"/>
                 <field name="score_value" type="measure" string="Score / Days"/>
                 <field name="total_amount" type="measure"/>
@@ -168,22 +183,30 @@
                 <field name="farm_id"/>
                 <field name="sub_unit_id"/>
                 <field name="activity_id"/>
+                <field name="payslip_id"/>
+                <field name="payslip_run_id"/>
+                <separator/>
+                <filter string="Unpaid (Ready for Payroll)" name="filter_unpaid" domain="[('payment_status', '=', 'unpaid')]"/>
+                <filter string="In Payroll Batch" name="filter_in_payroll" domain="[('payment_status', '=', 'in_payroll')]"/>
+                <filter string="Paid" name="filter_paid" domain="[('payment_status', '=', 'paid')]"/>
                 <separator/>
                 <filter string="Piece Rate (Norms)" name="filter_piece_rate" domain="[('entry_type', '=', 'piece_rate')]"/>
                 <filter string="Temporary (Daily Rates)" name="filter_temporary_rate" domain="[('entry_type', '=', 'temporary_rate')]"/>
                 <separator/>
                 <filter string="Draft" name="state_draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Confirmed" name="state_confirmed" domain="[('state', '=', 'confirmed')]"/>
-                <filter string="Approved / Paid" name="state_approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Approved" name="state_approved" domain="[('state', '=', 'approved')]"/>
                 <separator/>
                 <filter string="Today" name="today" domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
                 <filter string="This Month" name="this_month" domain="[('date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Payment Status" name="group_payment_status" context="{'group_by': 'payment_status'}"/>
                     <filter string="Payment Type" name="group_entry_type" context="{'group_by': 'entry_type'}"/>
                     <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
                     <filter string="Farm" name="group_farm" context="{'group_by': 'farm_id'}"/>
                     <filter string="Sub Unit" name="group_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
                     <filter string="Activity" name="group_activity" context="{'group_by': 'activity_id'}"/>
+                    <filter string="Payslip Batch" name="group_payslip_run" context="{'group_by': 'payslip_run_id'}"/>
                     <filter string="Work Date" name="group_date" context="{'group_by': 'date:month'}"/>
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
                 </group>
@@ -191,7 +214,7 @@
         </field>
     </record>
 
-    <!-- Action Work Entry -->
+    <!-- Action Work Entry: All Work Entries -->
     <record id="action_farm_work_entry" model="ir.actions.act_window">
         <field name="name">Work Entries</field>
         <field name="res_model">farm.work.entry</field>
@@ -204,6 +227,24 @@
             </p>
             <p>
                 Work entries record piece-rate activity scores (calculated via Norms) and temporary/seasonal daily attendance (calculated via Full Day / Half Day Wage Rates).
+            </p>
+        </field>
+    </record>
+
+    <!-- Action Work Entry: Unpaid Work Entries (Payroll Queue) -->
+    <record id="action_farm_work_entry_unpaid" model="ir.actions.act_window">
+        <field name="name">Unpaid Work Entries (Payroll Queue)</field>
+        <field name="res_model">farm.work.entry</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="search_view_id" ref="view_farm_work_entry_search"/>
+        <field name="domain">[('payment_status', '=', 'unpaid')]</field>
+        <field name="context">{'search_default_filter_unpaid': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No unpaid work entries pending payroll!
+            </p>
+            <p>
+                All submitted work entries have been processed and settled in payroll batches.
             </p>
         </field>
     </record>

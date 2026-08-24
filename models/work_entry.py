@@ -32,9 +32,9 @@ class FarmWorkEntry(models.Model):
     ], string='Payment Type', default='piece_rate', required=True, tracking=True)
 
     work_duration = fields.Selection([
-        ('full_day', 'Full Day (1.0)'),
         ('half_day', 'Half Day (0.5)'),
-        ('custom', 'Custom Duration / Score'),
+        ('full_day', 'Full Day (1.0)'),
+        ('one_and_half_day', 'Full Day + Half Day (1.5)'),
     ], string='Work Duration', default='full_day', tracking=True)
 
     # Employee & FMS Identifiers
@@ -150,9 +150,41 @@ class FarmWorkEntry(models.Model):
     state = fields.Selection([
         ('draft', 'Draft'),
         ('confirmed', 'Confirmed'),
-        ('approved', 'Approved / Paid'),
+        ('approved', 'Approved'),
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', tracking=True, index=True)
+
+    # Payroll & Payment Integration
+    payment_status = fields.Selection([
+        ('unpaid', 'Unpaid'),
+        ('in_payroll', 'In Payroll'),
+        ('paid', 'Paid'),
+    ], string='Payment Status', default='unpaid', required=True, tracking=True, index=True)
+
+    payslip_id = fields.Many2one(
+        'hr.payslip',
+        string='Payslip',
+        readonly=True,
+        copy=False,
+        ondelete='set null',
+        tracking=True,
+        index=True,
+    )
+    payslip_run_id = fields.Many2one(
+        'hr.payslip.run',
+        string='Payslip Batch',
+        readonly=True,
+        copy=False,
+        ondelete='set null',
+        tracking=True,
+        index=True,
+    )
+    paid_date = fields.Date(
+        string='Payment Date',
+        readonly=True,
+        copy=False,
+        tracking=True,
+    )
 
     company_id = fields.Many2one(
         'res.company',
@@ -163,7 +195,7 @@ class FarmWorkEntry(models.Model):
     )
     notes = fields.Text(string='Notes / Remarks')
 
-    @api.constrains('entry_type', 'employee_id')
+    @api.constrains('entry_type', 'employee_id', 'score_value', 'work_duration')
     def _check_temporary_worker_restriction(self):
         for entry in self:
             if entry.entry_type == 'temporary_rate':
@@ -179,6 +211,12 @@ class FarmWorkEntry(models.Model):
                         "Employee '%s' (ID: %s) is classified as '%s'. "
                         "Please use Activity Piece Rate for Permanent and Zemach workers."
                     ) % (emp.name, emp.fms_employee_id or emp.id, type_str))
+
+                if entry.score_value not in (0.5, 1.0, 1.5):
+                    raise ValidationError(_(
+                        "Temporary Worker work score must be strictly 0.5 (Half Day), 1.0 (Full Day), or 1.5 (Full + Half Day).\n"
+                        "Received score: %s. Custom scores are not permitted for temporary workers."
+                    ) % entry.score_value)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -226,20 +264,23 @@ class FarmWorkEntry(models.Model):
     @api.onchange('work_duration')
     def _onchange_work_duration(self):
         if self.entry_type == 'temporary_rate':
-            if self.work_duration == 'full_day':
-                self.score_value = 1.0
-            elif self.work_duration == 'half_day':
+            if self.work_duration == 'half_day':
                 self.score_value = 0.5
+            elif self.work_duration == 'one_and_half_day':
+                self.score_value = 1.5
+            else:
+                self.score_value = 1.0
 
     @api.onchange('score_value')
     def _onchange_score_value(self):
         if self.entry_type == 'temporary_rate':
-            if self.score_value == 1.0:
-                self.work_duration = 'full_day'
-            elif self.score_value == 0.5:
+            if self.score_value == 0.5:
                 self.work_duration = 'half_day'
+            elif self.score_value == 1.5:
+                self.work_duration = 'one_and_half_day'
             else:
-                self.work_duration = 'custom'
+                self.score_value = 1.0
+                self.work_duration = 'full_day'
 
     @api.depends('farm_id', 'entry_type')
     def _compute_temporary_rate(self):
@@ -273,6 +314,9 @@ class FarmWorkEntry(models.Model):
                     if entry.score_value == 0.5 or entry.work_duration == 'half_day':
                         entry.norm_rate = temp_rate.half_day_rate
                         entry.uom_name = _('Birr/Half-Day')
+                    elif entry.score_value == 1.5 or entry.work_duration == 'one_and_half_day':
+                        entry.norm_rate = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
+                        entry.uom_name = _('Birr/1.5-Day')
                     else:
                         entry.norm_rate = temp_rate.full_day_rate
                         entry.uom_name = _('Birr/Day')
@@ -288,10 +332,10 @@ class FarmWorkEntry(models.Model):
                 if temp_rate:
                     if entry.score_value == 0.5 or entry.work_duration == 'half_day':
                         entry.total_amount = temp_rate.half_day_rate
-                    elif entry.score_value == 1.0 or entry.work_duration == 'full_day':
-                        entry.total_amount = temp_rate.full_day_rate
+                    elif entry.score_value == 1.5 or entry.work_duration == 'one_and_half_day':
+                        entry.total_amount = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
                     else:
-                        entry.total_amount = (entry.score_value or 0.0) * temp_rate.full_day_rate
+                        entry.total_amount = temp_rate.full_day_rate
                 else:
                     entry.total_amount = (entry.score_value or 0.0) * (entry.norm_rate or 0.0)
             else:
@@ -342,6 +386,8 @@ class FarmWorkEntry(models.Model):
                         "Temporary Worker Daily Rate entries are ONLY permitted for Temporary Workers (IDs containing 'T')!\n\n"
                         "Employee '%s' (ID: %s) is not a Temporary Worker."
                     ) % (emp.name, emp.fms_employee_id or emp.id))
+                if entry.score_value not in (0.5, 1.0, 1.5):
+                    raise ValidationError(_("Temporary Worker work score must be strictly 0.5 (Half Day), 1.0 (Full Day), or 1.5 (Full + Half Day)."))
             entry.state = 'confirmed'
 
     def action_approve(self):
@@ -350,8 +396,48 @@ class FarmWorkEntry(models.Model):
 
     def action_draft(self):
         for entry in self:
+            if entry.payment_status == 'paid':
+                raise ValidationError(_("Cannot reset a Paid work entry to Draft! Please refund/cancel the associated payslip first."))
             entry.state = 'draft'
+            entry.payment_status = 'unpaid'
+            entry.payslip_id = False
+            entry.payslip_run_id = False
+            entry.paid_date = False
 
     def action_cancel(self):
         for entry in self:
+            if entry.payment_status == 'paid':
+                raise ValidationError(_("Cannot cancel a Paid work entry! Please refund/cancel the associated payslip first."))
             entry.state = 'cancelled'
+            entry.payment_status = 'unpaid'
+            entry.payslip_id = False
+            entry.payslip_run_id = False
+            entry.paid_date = False
+
+    def write(self, vals):
+        # If payslip link is removed and payment_status is not explicitly passed, auto-revert to unpaid
+        if ('payslip_id' in vals and not vals['payslip_id']) or ('payslip_run_id' in vals and not vals['payslip_run_id']):
+            if 'payment_status' not in vals:
+                for entry in self:
+                    if entry.payment_status == 'in_payroll':
+                        vals['payment_status'] = 'unpaid'
+                        vals['paid_date'] = False
+                        break
+        return super().write(vals)
+
+    def init(self):
+        super().init()
+        # 1. Backfill any existing records without payment_status
+        # 2. Fix any orphaned records that are 'in_payroll' but have no payslip_id and no payslip_run_id
+        try:
+            self.env.cr.execute("""
+                UPDATE farm_work_entry
+                SET payment_status = 'unpaid',
+                    payslip_id = NULL,
+                    payslip_run_id = NULL,
+                    paid_date = NULL
+                WHERE payment_status IS NULL 
+                   OR (payment_status = 'in_payroll' AND (payslip_id IS NULL AND payslip_run_id IS NULL));
+            """)
+        except Exception:
+            pass

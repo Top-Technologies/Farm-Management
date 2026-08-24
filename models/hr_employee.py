@@ -107,6 +107,20 @@ class HrEmployee(models.Model):
         compute='_compute_work_entry_stats',
         digits=(16, 2),
     )
+    unpaid_work_entry_count = fields.Integer(
+        string='Unpaid Work Entries',
+        compute='_compute_work_entry_stats',
+    )
+    unpaid_work_entry_amount = fields.Float(
+        string='Unpaid Earnings (Birr)',
+        compute='_compute_work_entry_stats',
+        digits=(16, 2),
+    )
+    paid_work_entry_amount = fields.Float(
+        string='Paid Earnings (Birr)',
+        compute='_compute_work_entry_stats',
+        digits=(16, 2),
+    )
     currency_id = fields.Many2one(
         'res.currency',
         string='Currency',
@@ -303,12 +317,17 @@ class HrEmployee(models.Model):
                     vals['employee_code'] = new_id
         return super().write(vals)
 
-    @api.depends('work_entry_ids', 'work_entry_ids.total_amount', 'work_entry_ids.state')
+    @api.depends('work_entry_ids', 'work_entry_ids.total_amount', 'work_entry_ids.state', 'work_entry_ids.payment_status')
     def _compute_work_entry_stats(self):
         for employee in self:
-            entries = employee.work_entry_ids
+            entries = employee.work_entry_ids.filtered(lambda e: e.state != 'cancelled')
             employee.work_entry_count = len(entries)
-            employee.total_earned_amount = sum(entries.filtered(lambda e: e.state != 'cancelled').mapped('total_amount'))
+            employee.total_earned_amount = sum(entries.mapped('total_amount'))
+            unpaid = entries.filtered(lambda e: e.payment_status == 'unpaid' and e.state in ('confirmed', 'approved'))
+            employee.unpaid_work_entry_count = len(unpaid)
+            employee.unpaid_work_entry_amount = sum(unpaid.mapped('total_amount'))
+            paid = entries.filtered(lambda e: e.payment_status == 'paid')
+            employee.paid_work_entry_amount = sum(paid.mapped('total_amount'))
 
     @api.depends('transfer_history_ids', 'transfer_history_ids.moving_date', 'transfer_history_ids.transfer_date')
     def _compute_current_transfer(self):
@@ -482,3 +501,49 @@ class HrEmployee(models.Model):
             'domain': [('employee_id', '=', self.id)],
             'context': {'default_employee_id': self.id},
         }
+
+    def action_view_unpaid_work_entries(self):
+        self.ensure_one()
+        return {
+            'name': _('Unpaid Work Entries: %s', self.name),
+            'type': 'ir.actions.act_window',
+            'res_model': 'farm.work.entry',
+            'view_mode': 'list,form',
+            'domain': [('employee_id', '=', self.id), ('payment_status', '=', 'unpaid')],
+            'context': {'default_employee_id': self.id, 'search_default_unpaid': 1},
+        }
+
+    def _get_or_create_farm_contract(self):
+        """Ensures an active contract exists for Temporary/Zemach workers to allow seamless payslip computation."""
+        self.ensure_one()
+        Contract = self.env['hr.contract']
+        existing = Contract.search([
+            ('employee_id', '=', self.id),
+            ('state', 'in', ('open', 'draft', 'close')),
+        ], order='date_start desc', limit=1)
+        if existing:
+            return existing
+
+        struct_type = self.env.ref('farm_management.structure_type_farm_worker', raise_if_not_found=False)
+        if not struct_type:
+            struct_type = self.env['hr.payroll.structure.type'].search([], limit=1)
+
+        struct = False
+        if self.farm_employee_type == 'temporary':
+            struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
+        elif self.farm_employee_type == 'zemach':
+            struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
+
+        type_name = dict(self._fields['farm_employee_type'].selection).get(self.farm_employee_type, self.farm_employee_type or 'Worker')
+        contract_vals = {
+            'name': f"Farm Contract - {self.name} ({type_name})",
+            'employee_id': self.id,
+            'company_id': self.company_id.id,
+            'structure_type_id': struct_type.id if struct_type else False,
+            'wage': 0.0,
+            'state': 'open',
+            'date_start': fields.Date.today(),
+        }
+        if struct and hasattr(Contract, 'struct_id'):
+            contract_vals['struct_id'] = struct.id
+        return Contract.create(contract_vals)

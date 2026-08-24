@@ -42,6 +42,13 @@
               action="action_farm_work_entry"
               sequence="50"/>
 
+    <!-- Unpaid Work Entries Queue -->
+    <menuitem id="menu_farm_work_entry_unpaid_queue"
+              name="Unpaid Work Entries (Payroll)"
+              parent="menu_farm_management_root"
+              action="action_farm_work_entry_unpaid"
+              sequence="55"/>
+
     <!-- Top-level Section inside HR / Employees Top Bar: Activities -->
     <menuitem id="menu_farm_activity_root"
               name="Activities"
@@ -68,6 +75,17 @@
               name="Work Entries"
               parent="hr.menu_hr_root"
               sequence="17"
-              action="action_farm_work_entry"
               groups="farm_management.group_farm_user"/>
+
+    <menuitem id="menu_farm_work_entry_sub_all"
+              name="All Work Entries"
+              parent="menu_farm_work_entry_root"
+              action="action_farm_work_entry"
+              sequence="10"/>
+
+    <menuitem id="menu_farm_work_entry_sub_unpaid"
+              name="Unpaid Work Entries (Payroll Queue)"
+              parent="menu_farm_work_entry_root"
+              action="action_farm_work_entry_unpaid"
+              sequence="20"/>
 </odoo>

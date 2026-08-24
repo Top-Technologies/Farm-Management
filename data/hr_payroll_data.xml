@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Structure Type for Agricultural Field Workers -->
+        <record id="structure_type_farm_worker" model="hr.payroll.structure.type">
+            <field name="name">Agricultural Field Worker</field>
+            <field name="country_id" eval="False"/>
+        </record>
+
+        <!-- 1. Salary Structure: Temporary Workers (Daily Wage) -->
+        <record id="structure_farm_temporary" model="hr.payroll.structure">
+            <field name="name">Temporary Worker (Daily Wage Structure)</field>
+            <field name="type_id" ref="structure_type_farm_worker"/>
+            <field name="country_id" eval="False"/>
+        </record>
+
+        <!-- Salary Rules for Temporary Structure -->
+        <record id="rule_farm_temp_wage" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.BASIC"/>
+            <field name="name">Temporary Daily Wage</field>
+            <field name="code">TEMP_WAGE</field>
+            <field name="sequence">10</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.farm_work_total_amount
+            </field>
+            <field name="struct_id" ref="structure_farm_temporary"/>
+        </record>
+
+        <record id="rule_farm_temp_gross" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.GROSS"/>
+            <field name="name">Gross Wage</field>
+            <field name="code">GROSS</field>
+            <field name="sequence">100</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = categories['BASIC'] + categories['ALW']
+            </field>
+            <field name="struct_id" ref="structure_farm_temporary"/>
+        </record>
+
+        <record id="rule_farm_temp_net" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.NET"/>
+            <field name="name">Net Wage</field>
+            <field name="code">NET</field>
+            <field name="sequence">200</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = categories['GROSS'] - categories['DED']
+            </field>
+            <field name="struct_id" ref="structure_farm_temporary"/>
+        </record>
+
+        <!-- 2. Salary Structure: Seasonal (Zemach) Workers (Piece Rate) -->
+        <record id="structure_farm_zemach" model="hr.payroll.structure">
+            <field name="name">Seasonal / Zemach Worker (Piece Rate Structure)</field>
+            <field name="type_id" ref="structure_type_farm_worker"/>
+            <field name="country_id" eval="False"/>
+        </record>
+
+        <!-- Salary Rules for Seasonal / Zemach Structure -->
+        <record id="rule_farm_zemach_piece_rate" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.BASIC"/>
+            <field name="name">Piece Rate Agricultural Earnings</field>
+            <field name="code">PIECE_RATE</field>
+            <field name="sequence">10</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.farm_work_total_amount
+            </field>
+            <field name="struct_id" ref="structure_farm_zemach"/>
+        </record>
+
+        <record id="rule_farm_zemach_gross" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.GROSS"/>
+            <field name="name">Gross Wage</field>
+            <field name="code">GROSS</field>
+            <field name="sequence">100</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = categories['BASIC'] + categories['ALW']
+            </field>
+            <field name="struct_id" ref="structure_farm_zemach"/>
+        </record>
+
+        <record id="rule_farm_zemach_net" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.NET"/>
+            <field name="name">Net Wage</field>
+            <field name="code">NET</field>
+            <field name="sequence">200</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = categories['GROSS'] - categories['DED']
+            </field>
+            <field name="struct_id" ref="structure_farm_zemach"/>
+        </record>
+    </data>
+</odoo>

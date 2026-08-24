@@ -2,7 +2,6 @@
 import json
 import logging
 import datetime
-import werkzeug.wrappers
 import odoo
 from odoo import http, fields
 from odoo.http import request
@@ -70,17 +69,18 @@ class EmployeeAPI(http.Controller):
 
     def _json_response(self, data, status=200):
         """Helper to build standard HTTP JSON Response with CORS headers."""
-        headers = [
-            ('Content-Type', 'application/json; charset=utf-8'),
-            ('Access-Control-Allow-Origin', '*'),
-            ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'),
-            ('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Odoo-Db, X-Database'),
-        ]
-        return werkzeug.wrappers.Response(
-            json.dumps(data, default=str),
-            status=status,
-            headers=headers
+        body = json.dumps(data, default=str)
+        response = request.make_response(
+            body,
+            headers=[
+                ('Content-Type', 'application/json; charset=utf-8'),
+                ('Access-Control-Allow-Origin', '*'),
+                ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'),
+                ('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Odoo-Db, X-Database'),
+            ],
         )
+        response.status_code = status
+        return response
 
     # -------------------------------------------------------------------------
     # GET /api/employees & /odoo/api/employees & /api/fms/employees
@@ -339,12 +339,22 @@ class EmployeeAPI(http.Controller):
             norm_rate = 0.0
             total_payment = 0.0
             uom_name = 'Birr/Day'
-            work_duration = 'full_day' if score_float == 1.0 else ('half_day' if score_float == 0.5 else 'custom')
-            if duration_req:
-                work_duration = 'half_day' if str(duration_req).lower() in ('half', 'half_day', '0.5') else 'full_day'
-
             if is_temporary_rate:
+                if score_float not in (0.5, 1.0, 1.5):
+                    if cr: cr.close()
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"Score for temporary worker attendance must be strictly 0.5 (Half Day), 1.0 (Full Day), or 1.5 (Full + Half Day). Received: {score_float}. Custom scores are not permitted."
+                    }, status=400)
+
                 entry_type = 'temporary_rate'
+                if score_float == 0.5:
+                    work_duration = 'half_day'
+                elif score_float == 1.5:
+                    work_duration = 'one_and_half_day'
+                else:
+                    work_duration = 'full_day'
+
                 # Look up temporary rate for farm
                 temp_rate = env['farm.temporary.rate'].search([
                     ('farm_id', '=', farm.id),
@@ -352,23 +362,22 @@ class EmployeeAPI(http.Controller):
                 ], limit=1)
 
                 if temp_rate:
-                    if score_float == 0.5 or work_duration == 'half_day':
+                    if score_float == 0.5:
                         norm_rate = temp_rate.half_day_rate
                         total_payment = round(temp_rate.half_day_rate, 2)
                         uom_name = 'Birr/Half-Day'
-                    elif score_float == 1.0 or work_duration == 'full_day':
+                    elif score_float == 1.5:
+                        norm_rate = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
+                        total_payment = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
+                        uom_name = 'Birr/1.5-Day'
+                    else:
                         norm_rate = temp_rate.full_day_rate
                         total_payment = round(temp_rate.full_day_rate, 2)
                         uom_name = 'Birr/Day'
-                    else:
-                        norm_rate = temp_rate.full_day_rate
-                        total_payment = round(score_float * temp_rate.full_day_rate, 2)
-                        uom_name = 'Birr/Day'
                 else:
-                    # Fallback to custom fixed wage passed in payload if any
-                    fixed_wage = float(payload.get('wage', payload.get('rate', 0.0)))
-                    norm_rate = fixed_wage
-                    total_payment = round(score_float * fixed_wage, 2)
+                    norm_rate = 0.0
+                    total_payment = 0.0
+                    uom_name = 'Birr/Day'
 
             else:
                 entry_type = 'piece_rate'
@@ -457,7 +466,8 @@ class EmployeeAPI(http.Controller):
                         "uom": uom_name,
                         "total_payment_birr": total_payment
                     },
-                    "state": work_entry.state
+                    "state": work_entry.state,
+                    "payment_status": work_entry.payment_status
                 }
             }, status=201)
 

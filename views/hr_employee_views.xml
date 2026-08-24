@@ -29,6 +29,13 @@
                         invisible="work_entry_count == 0">
                     <field name="work_entry_count" widget="statinfo" string="Work Entries"/>
                 </button>
+                <button name="action_view_unpaid_work_entries"
+                        type="object"
+                        class="oe_stat_button"
+                        icon="fa-money"
+                        invisible="unpaid_work_entry_count == 0">
+                    <field name="unpaid_work_entry_count" widget="statinfo" string="Unpaid Entries"/>
+                </button>
             </div>
 
             <!-- Mandatory Agricultural Classification & Location Placement (Prominent above notebook) -->
@@ -103,18 +110,24 @@
                             <span class="text-muted">Total Calculated Earnings: </span>
                             <span class="fs-4 fw-bold text-success"><field name="total_earned_amount" widget="monetary"/> Birr</span>
                         </div>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-warning text-dark p-2" invisible="unpaid_work_entry_count == 0"><i class="fa fa-clock-o me-1"/>Unpaid: <field name="unpaid_work_entry_amount" widget="monetary"/> Birr (<field name="unpaid_work_entry_count"/>)</span>
+                            <span class="badge bg-success p-2" invisible="paid_work_entry_amount == 0"><i class="fa fa-check-circle me-1"/>Paid: <field name="paid_work_entry_amount" widget="monetary"/> Birr</span>
+                        </div>
                     </div>
                     <field name="work_entry_ids" context="{'default_employee_id': id}">
                         <list string="Work Entries" editable="bottom">
                             <field name="date"/>
                             <field name="farm_id" options="{'no_create': True}"/>
                             <field name="sub_unit_id" options="{'no_create': True}"/>
+                            <field name="entry_type" widget="badge"/>
                             <field name="activity_id" options="{'no_create': True}"/>
-                            <field name="score_value" string="Score"/>
-                            <field name="norm_rate" string="Norm Rate"/>
+                            <field name="score_value" string="Score / Days"/>
+                            <field name="norm_rate" string="Rate"/>
                             <field name="uom_name" string="Unit"/>
                             <field name="total_amount" sum="Total" decoration-bf="1"/>
                             <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
+                            <field name="payment_status" widget="badge" decoration-warning="payment_status == 'unpaid'" decoration-info="payment_status == 'in_payroll'" decoration-success="payment_status == 'paid'"/>
                         </list>
                     </field>
                 </page>

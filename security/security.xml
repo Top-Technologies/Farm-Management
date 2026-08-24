@@ -11,7 +11,6 @@
         <record id="group_farm_manager" model="res.groups">
             <field name="name">Farm Management / Administrator</field>
             <field name="implied_ids" eval="[(4, ref('group_farm_user')), (4, ref('hr.group_hr_user'))]"/>
-            <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
         </record>
 
         <!-- Multi-Company Record Rules -->

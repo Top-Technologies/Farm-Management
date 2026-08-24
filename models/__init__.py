@@ -8,3 +8,6 @@ from . import activity
 from . import temporary_rate
 from . import transfer_history
 from . import work_entry
+from . import hr_payslip
+from . import hr_payslip_run
+from . import hr_payslip_employees

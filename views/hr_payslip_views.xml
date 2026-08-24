@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- HR Payslip Form Inherit: Farm Work Entries -->
+    <record id="view_hr_payslip_form_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payslip.form.farm.inherit</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
+        <field name="arch" type="xml">
+            <field name="employee_id" position="after">
+                <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'"/>
+                <field name="farm_id" invisible="not farm_id"/>
+                <field name="sub_unit_id" invisible="not sub_unit_id"/>
+            </field>
+
+            <notebook position="inside">
+                <page string="Farm Work Entries" name="farm_work_entries" invisible="farm_work_entries_count == 0 and farm_employee_type not in ('temporary', 'zemach')">
+                    <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="farm_work_entries_count == 0">
+                        <i class="fa fa-calculator fa-2x me-3"></i>
+                        <div>
+                            <strong>Agricultural Work Breakdown:</strong>
+                            <span> <field name="farm_work_entries_count" class="fw-bold"/> work entries attached. Total Gross: <strong><field name="farm_work_total_amount" widget="monetary"/></strong></span>
+                            <span invisible="farm_employee_type != 'temporary'"> (Total Days: <strong><field name="farm_work_days_count"/></strong>)</span>
+                        </div>
+                    </div>
+                    <field name="farm_work_entry_ids" readonly="1">
+                        <list decoration-success="payment_status == 'paid'" decoration-info="payment_status == 'in_payroll'" decoration-warning="payment_status == 'unpaid'">
+                            <field name="date"/>
+                            <field name="farm_id"/>
+                            <field name="sub_unit_id"/>
+                            <field name="activity_id" optional="show"/>
+                            <field name="entry_type" widget="badge"/>
+                            <field name="score_value" string="Score / Days"/>
+                            <field name="norm_rate" string="Rate"/>
+                            <field name="uom_name" string="Unit"/>
+                            <field name="total_amount" sum="Total (Birr)" widget="monetary"/>
+                            <field name="payment_status" widget="badge" decoration-success="payment_status == 'paid'" decoration-info="payment_status == 'in_payroll'" decoration-warning="payment_status == 'unpaid'"/>
+                        </list>
+                    </field>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <!-- HR Payslip Batch Form Inherit: Farm Management Integration -->
+    <record id="hr_payslip_run_form_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form.farm.inherit</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_form"/>
+        <field name="arch" type="xml">
+            <!-- Add Action Button to Header -->
+            <header position="inside">
+                <button string="⚡ Generate Farm Payslips" name="action_generate_farm_payslips" type="object" class="btn-success" invisible="state != 'draft'"/>
+            </header>
+
+            <!-- Add Farm & Worker Classification Options -->
+            <group position="after">
+                <group string="Workforce &amp; Location Filters">
+                    <group>
+                        <field name="worker_type" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
+                    </group>
+                    <group>
+                        <field name="farm_id" placeholder="All Farms (Optional)" readonly="state != 'draft'"/>
+                        <field name="sub_unit_id" placeholder="All Sub Units (Optional)" readonly="state != 'draft'" invisible="not farm_id"/>
+                    </group>
+                </group>
+                <group string="Agricultural Payout Summary" invisible="farm_work_entry_count == 0">
+                    <group>
+                        <field name="farm_worker_count" string="Workers Count"/>
+                        <field name="farm_work_entry_count" string="Work Entries Included"/>
+                    </group>
+                    <group>
+                        <field name="farm_total_amount" string="Total Agricultural Amount (Birr)" widget="monetary"/>
+                    </group>
+                </group>
+            </group>
+        </field>
+    </record>
+</odoo>
