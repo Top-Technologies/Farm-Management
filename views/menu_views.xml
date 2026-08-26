@@ -92,20 +92,21 @@
     <!-- ================================================================= -->
     <!-- PAYROLL MENU INTEGRATION: Salary Matrix Scales                    -->
     <!-- ================================================================= -->
-    <!-- Top-level section / subsection directly inside Payroll Top Bar -->
+    <!-- Direct section on Payroll top bar -->
     <menuitem id="menu_payroll_salary_matrix_root"
               name="Salary Matrix Scales"
-              parent="hr_payroll.menu_hr_payroll_root"
+              parent="hr_work_entry_contract_enterprise.menu_hr_payroll_root"
               action="action_hr_salary_matrix"
-              sequence="35"
+              sequence="65"
               groups="hr.group_hr_user"/>
 
-    <!-- Also available inside Payroll > Configuration -->
+    <!-- Also under Payroll > Configuration > Salary -->
     <menuitem id="menu_payroll_salary_matrix_config"
               name="Salary Matrix Scales"
-              parent="hr_payroll.menu_hr_payroll_configuration"
+              parent="hr_payroll.menu_hr_salary_configuration"
               action="action_hr_salary_matrix"
-              sequence="45"
+              sequence="25"
               groups="hr.group_hr_user"/>
 </odoo>
+
 
