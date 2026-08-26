@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- HR Contract Form Inherit: Salary Matrix Placement & Clean UI -->
+    <record id="hr_contract_view_form_salary_matrix" model="ir.ui.view">
+        <field name="name">hr.contract.form.salary.matrix</field>
+        <field name="model">hr.contract</field>
+        <field name="inherit_id" ref="hr_contract.hr_contract_view_form"/>
+        <field name="priority">20</field>
+        <field name="arch" type="xml">
+            <!-- Prominent Salary Matrix Placement card under Salary Information -->
+            <group name="salary_info" position="before">
+                <div class="card p-3 mb-3 border-success bg-light" invisible="farm_employee_type in ('temporary', 'zemach')">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="text-success mb-0"><i class="fa fa-calculator me-2"/>Salary Matrix Placement (Grade &amp; Level Scale)</h5>
+                        <span class="badge text-bg-success fs-6" invisible="matrix_basic_wage == 0">
+                            Scale Basic Wage: <field name="matrix_basic_wage" widget="monetary" readonly="1" class="text-white fw-bold"/>
+                        </span>
+                    </div>
+                    <p class="text-muted small mb-3">
+                        Select the Scale Category, Grade, and Level. The contract monthly wage will be automatically populated based on the company salary matrix.
+                    </p>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <group>
+                                <field name="salary_matrix_type" widget="selection" placeholder="Select Scale Category..."/>
+                            </group>
+                        </div>
+                        <div class="col-md-4">
+                            <group>
+                                <field name="salary_grade" placeholder="Select Grade (1–22)..." invisible="not salary_matrix_type"/>
+                            </group>
+                        </div>
+                        <div class="col-md-4">
+                            <group>
+                                <field name="salary_level" placeholder="Select Step / Level..." invisible="not salary_grade"/>
+                            </group>
+                        </div>
+                    </div>
+                </div>
+            </group>
+
+            <!-- Hide standard yearly benefits group to keep the contract clean -->
+            <xpath expr="//group[@name='yearly_benefits']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

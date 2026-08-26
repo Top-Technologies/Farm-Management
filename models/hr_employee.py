@@ -127,74 +127,33 @@ class HrEmployee(models.Model):
         related='company_id.currency_id',
     )
 
-    # Permanent Employee Salary Matrix (Grade & Level Scale)
-    salary_matrix_type = fields.Selection([
-        ('head_office', 'Head Office (ዋና መ/ቤት)'),
-        ('cpw', 'CPW'),
-        ('farm', 'Farm Permanent (የእርሻ ልማቶች - ቋሚ)'),
-    ], string='Salary Scale Category', tracking=True, help='Select which Salary Matrix applies to this permanent employee.')
-
-    salary_grade = fields.Selection([
-        (str(i), f'Grade {i} (ደረጃ {i})') for i in range(1, 23)
-    ], string='Salary Grade (ደረጃ)', tracking=True, help='Employee grade from Grade 1 to Grade 22.')
-
-    salary_level = fields.Selection([
-        ('base', 'Base (መነሻ)'),
-        ('1', 'Step 1'),
-        ('2', 'Step 2'),
-        ('3', 'Step 3'),
-        ('4', 'Step 4'),
-        ('5', 'Step 5'),
-        ('6', 'Step 6'),
-        ('7', 'Step 7'),
-        ('8', 'Step 8'),
-        ('9', 'Step 9'),
-        ('10', 'Step 10'),
-        ('11', 'Step 11'),
-        ('12', 'Step 12'),
-        ('max', 'Max / Ceiling (ጣሪያ)'),
-    ], string='Salary Step / Level', tracking=True, help='Step / Level from Base to Step 12 to Max.')
-
+    # Permanent Employee Salary Matrix Placement (Reflected from Active Contract)
+    salary_matrix_type = fields.Selection(
+        related='contract_id.salary_matrix_type',
+        string='Salary Scale Category',
+        readonly=True,
+        store=True,
+    )
+    salary_grade = fields.Selection(
+        related='contract_id.salary_grade',
+        string='Salary Grade (ደረጃ)',
+        readonly=True,
+        store=True,
+    )
+    salary_level = fields.Selection(
+        related='contract_id.salary_level',
+        string='Salary Step / Level',
+        readonly=True,
+        store=True,
+    )
     matrix_basic_wage = fields.Float(
+        related='contract_id.matrix_basic_wage',
         string='Matrix Basic Wage (Birr)',
-        compute='_compute_matrix_basic_wage',
+        readonly=True,
         store=True,
         digits=(16, 2),
-        tracking=True,
-        help='Monthly basic wage determined automatically by the Salary Matrix.',
     )
 
-    @api.depends('salary_matrix_type', 'salary_grade', 'salary_level', 'company_id', 'farm_employee_type')
-    def _compute_matrix_basic_wage(self):
-        for emp in self:
-            # Salary matrix applies only to permanent staff, not daily/piece-rate temporary/zemach workers
-            if emp.farm_employee_type in ('temporary', 'zemach'):
-                emp.matrix_basic_wage = 0.0
-                continue
-
-            if emp.salary_matrix_type and emp.salary_grade and emp.salary_level:
-                try:
-                    wage = self.env['hr.salary.matrix'].get_matrix_wage(
-                        matrix_type=emp.salary_matrix_type,
-                        grade=int(emp.salary_grade),
-                        level=emp.salary_level,
-                        company_id=emp.company_id.id if emp.company_id else None,
-                    )
-                    emp.matrix_basic_wage = wage
-                except Exception as e:
-                    _logger.warning("Failed to compute matrix basic wage for employee %s: %s", emp.name, str(e))
-                    emp.matrix_basic_wage = 0.0
-            else:
-                emp.matrix_basic_wage = 0.0
-
-    @api.onchange('farm_employee_type')
-    def _onchange_farm_employee_type_matrix(self):
-        if self.farm_employee_type == 'permanent' and not self.salary_matrix_type:
-            self.salary_matrix_type = 'farm'
-        elif self.farm_employee_type in ('temporary', 'zemach'):
-            self.salary_matrix_type = False
-            self.salary_grade = False
-            self.salary_level = False
 
     # Current Assignment from Latest Active Transfer
     current_transfer_id = fields.Many2one(
