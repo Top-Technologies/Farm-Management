@@ -70,6 +70,13 @@
               action="action_farm_temporary_rate"
               sequence="20"/>
 
+    <!-- Sub-menu 3: Salary Matrix / Scales (Permanent Staff) -->
+    <menuitem id="menu_farm_salary_matrix"
+              name="Salary Matrix Scales"
+              parent="menu_farm_activity_root"
+              action="action_hr_salary_matrix"
+              sequence="30"/>
+
     <!-- Top-level Section inside HR / Employees Top Bar: Work Entries -->
     <menuitem id="menu_farm_work_entry_root"
               name="Work Entries"

@@ -17,3 +17,8 @@ access_farm_employee_transfer_user,farm.employee.transfer.user,model_farm_employ
 access_farm_employee_transfer_manager,farm.employee.transfer.manager,model_farm_employee_transfer,group_farm_manager,1,1,1,1
 access_farm_work_entry_user,farm.work.entry.user,model_farm_work_entry,group_farm_user,1,1,1,0
 access_farm_work_entry_manager,farm.work.entry.manager,model_farm_work_entry,group_farm_manager,1,1,1,1
+access_hr_salary_matrix_user,hr.salary.matrix.user,model_hr_salary_matrix,group_farm_user,1,0,0,0
+access_hr_salary_matrix_manager,hr.salary.matrix.manager,model_hr_salary_matrix,group_farm_manager,1,1,1,1
+access_hr_salary_matrix_line_user,hr.salary.matrix.line.user,model_hr_salary_matrix_line,group_farm_user,1,0,0,0
+access_hr_salary_matrix_line_manager,hr.salary.matrix.line.manager,model_hr_salary_matrix_line,group_farm_manager,1,1,1,1
+

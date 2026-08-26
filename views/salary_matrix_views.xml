@@ -1,0 +1,114 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View: Salary Matrix -->
+    <record id="view_hr_salary_matrix_list" model="ir.ui.view">
+        <field name="name">hr.salary.matrix.list</field>
+        <field name="model">hr.salary.matrix</field>
+        <field name="arch" type="xml">
+            <list string="Salary Scales" sample="1">
+                <field name="name"/>
+                <field name="matrix_type" widget="badge" decoration-info="matrix_type == 'head_office'" decoration-warning="matrix_type == 'cpw'" decoration-success="matrix_type == 'farm'"/>
+                <field name="effective_date"/>
+                <field name="line_count" string="Scale Lines"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View: Salary Matrix -->
+    <record id="view_hr_salary_matrix_form" model="ir.ui.view">
+        <field name="name">hr.salary.matrix.form</field>
+        <field name="model">hr.salary.matrix</field>
+        <field name="arch" type="xml">
+            <form string="Salary Scale">
+                <header>
+                    <button name="action_populate_standard_scale"
+                            string="⚡ Populate Standard Baseline Scale"
+                            type="object"
+                            class="btn-primary"
+                            confirm="Are you sure you want to populate / overwrite this scale with the standard baseline values?"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Salary Scale Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Head Office Salary Scale 2018 E.C."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="matrix_type" widget="radio" options="{'horizontal': true}"/>
+                            <field name="effective_date"/>
+                        </group>
+                        <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="active" invisible="1"/>
+                            <field name="line_count" string="Total Scale Entries" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="matrix_grid" string="📊 Salary Matrix 2D Grid">
+                            <field name="matrix_html_table" widget="html" readonly="1" nolabel="1"/>
+                        </page>
+                        <page name="scale_lines" string="📋 Scale Lines (Grade × Level)">
+                            <field name="line_ids">
+                                <list editable="bottom" string="Scale Entries" default_order="grade asc, level asc">
+                                    <field name="grade"/>
+                                    <field name="level"/>
+                                    <field name="amount" widget="monetary"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page name="notes_page" string="📝 Notes &amp; Reference">
+                            <field name="notes" placeholder="Add administrative background notes or circular references..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View: Salary Matrix -->
+    <record id="view_hr_salary_matrix_search" model="ir.ui.view">
+        <field name="name">hr.salary.matrix.search</field>
+        <field name="model">hr.salary.matrix</field>
+        <field name="arch" type="xml">
+            <search string="Search Salary Scales">
+                <field name="name" string="Scale Name"/>
+                <field name="matrix_type"/>
+                <filter string="Head Office" name="head_office" domain="[('matrix_type', '=', 'head_office')]"/>
+                <filter string="CPW" name="cpw" domain="[('matrix_type', '=', 'cpw')]"/>
+                <filter string="Farm Permanent" name="farm" domain="[('matrix_type', '=', 'farm')]"/>
+                <separator/>
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_matrix_type" context="{'group_by': 'matrix_type'}"/>
+                    <filter name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: Salary Matrix -->
+    <record id="action_hr_salary_matrix" model="ir.actions.act_window">
+        <field name="name">Salary Matrix Scales</field>
+        <field name="res_model">hr.salary.matrix</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hr_salary_matrix_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define and configure company-wide Salary Scales (Grade × Level Matrices)
+            </p>
+            <p>
+                Set up Grade (1–22) and Level (Base, 1–12, Max) salary matrices for Head Office, CPW, and Farm Permanent staff.
+            </p>
+        </field>
+    </record>
+</odoo>

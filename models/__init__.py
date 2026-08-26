@@ -11,3 +11,4 @@ from . import work_entry
 from . import hr_payslip
 from . import hr_payslip_run
 from . import hr_payslip_employees
+from . import salary_matrix

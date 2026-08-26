@@ -27,6 +27,30 @@ class HrPayslip(models.Model):
         readonly=True,
     )
 
+    # Permanent Employee Salary Matrix Placement
+    salary_matrix_type = fields.Selection(
+        related='employee_id.salary_matrix_type',
+        string='Salary Scale Category',
+        readonly=True,
+    )
+    salary_grade = fields.Selection(
+        related='employee_id.salary_grade',
+        string='Salary Grade',
+        readonly=True,
+    )
+    salary_level = fields.Selection(
+        related='employee_id.salary_level',
+        string='Salary Step / Level',
+        readonly=True,
+    )
+    matrix_basic_wage = fields.Float(
+        related='employee_id.matrix_basic_wage',
+        string='Matrix Basic Wage (Birr)',
+        store=True,
+        readonly=True,
+        digits=(16, 2),
+    )
+
     # Linked Farm Work Entries
     farm_work_entry_ids = fields.One2many(
         'farm.work.entry',

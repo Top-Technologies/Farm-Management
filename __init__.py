@@ -33,3 +33,10 @@ def post_init_hook(env):
         WHERE module = 'Farm_Management'
         AND name IN ('group_farm_user', 'group_farm_manager', 'module_category_farm')
     """)
+
+    # Initialize all 3 standard salary scales (Head Office, CPW, Farm Permanent)
+    try:
+        env['hr.salary.matrix'].load_default_matrices()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to initialize default salary matrices: %s", str(e))

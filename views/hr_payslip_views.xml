@@ -8,8 +8,13 @@
         <field name="arch" type="xml">
             <field name="employee_id" position="after">
                 <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'"/>
+                <field name="salary_matrix_type" invisible="farm_employee_type in ('temporary', 'zemach') or not salary_matrix_type"/>
+                <field name="salary_grade" invisible="farm_employee_type in ('temporary', 'zemach') or not salary_grade"/>
+                <field name="salary_level" invisible="farm_employee_type in ('temporary', 'zemach') or not salary_level"/>
+                <field name="matrix_basic_wage" widget="monetary" invisible="farm_employee_type in ('temporary', 'zemach') or matrix_basic_wage == 0"/>
                 <field name="farm_id" invisible="not farm_id"/>
                 <field name="sub_unit_id" invisible="not sub_unit_id"/>
+
             </field>
 
             <notebook position="inside">
