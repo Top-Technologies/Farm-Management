@@ -292,7 +292,23 @@ class EmployeeAPI(http.Controller):
                 }, status=404)
 
             emp_code = (emp.fms_employee_id or emp.employee_code or '').upper()
-            is_temp_worker = (emp.farm_employee_type == 'temporary') and ('T' in emp_code if emp_code else True)
+            emp_type = emp.farm_employee_type or ''
+
+            is_temp_worker   = (emp_type == 'temporary')
+            is_zemach_worker = (emp_type == 'zemach')
+            is_permanent     = (emp_type == 'permanent')
+
+            # PERMANENT workers are on regular payroll — reject entirely
+            if is_permanent:
+                if cr: cr.close()
+                return self._json_response({
+                    "status": "error",
+                    "message": (
+                        f"Permanent employees are managed through regular payroll and do NOT submit "
+                        f"farm work entries via this API. "
+                        f"Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as 'Permanent'."
+                    )
+                }, status=400)
 
             # 2. Resolve Farm Location
             farm = emp.current_farm_id or emp.initial_farm_id
@@ -310,35 +326,60 @@ class EmployeeAPI(http.Controller):
                     "message": "No farm found in the system to calculate rates."
                 }, status=400)
 
-            # 3. Determine Entry Type & Enforce Restrictions
+            # 3. Determine Entry Type & Enforce Rules
+            #    Temporary  → daily rate ONLY (score: 0.5 / 1.0 / 1.5)
+            #    Zemach     → piece rate ONLY (activity + quantity score)
             is_temporary_rate = False
             if entry_type_req in ('temporary_rate', 'daily_rate', 'temporary'):
                 is_temporary_rate = True
             elif not activity_identifier:
-                # If no activity is passed, check if temporary worker
                 if is_temp_worker:
                     is_temporary_rate = True
-                else:
+                elif is_zemach_worker:
                     if cr: cr.close()
                     return self._json_response({
                         "status": "error",
-                        "message": f"Work entries without an 'activity_id' (Temporary Worker Rates) are ONLY permitted for Temporary Workers whose ID contains 'T'. Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as '{emp.farm_employee_type}'. Please specify an 'activity_id' (e.g. 'SP', 'CULT', 'HARV')."
+                        "message": (
+                            f"Zemach (seasonal) workers use piece-rate entries. "
+                            f"Please provide 'activity_id' (e.g. 'SP', 'CULT', 'HARV') and 'score' (quantity produced). "
+                            f"Employee: '{emp.name}' (ID: {emp.fms_employee_id or emp.id})."
+                        )
                     }, status=400)
             elif str(activity_identifier).upper() in ('TEMP', 'TEMPORARY', 'DAILY', 'ATTENDANCE'):
                 is_temporary_rate = True
 
-            # If temporary rate is requested for a non-temporary worker, REJECT
+            # Daily rate requested → must be a Temporary worker
             if is_temporary_rate and not is_temp_worker:
                 if cr: cr.close()
                 return self._json_response({
                     "status": "error",
-                    "message": f"Temporary Worker Daily Rate entries are ONLY permitted for Temporary Workers (IDs containing 'T'). Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as '{emp.farm_employee_type}'. Please submit a standard piece-rate work entry with 'activity_id'."
+                    "message": (
+                        f"Daily rate entries (attendance) are ONLY for Temporary workers. "
+                        f"Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as "
+                        f"'{emp_type}'. "
+                        f"{'Use piece-rate with an activity_id for Zemach workers.' if is_zemach_worker else ''}"
+                    )
+                }, status=400)
+
+            # Piece rate requested → must be a Zemach worker
+            if not is_temporary_rate and activity_identifier and not is_zemach_worker:
+                if cr: cr.close()
+                return self._json_response({
+                    "status": "error",
+                    "message": (
+                        f"Piece-rate (activity-based) entries are ONLY for Zemach (seasonal) workers. "
+                        f"Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as "
+                        f"'{emp_type}'. "
+                        f"{'Use a daily rate entry (score: 0.5/1.0/1.5) for Temporary workers.' if is_temp_worker else ''}"
+                    )
                 }, status=400)
 
             activity = False
             norm_rate = 0.0
             total_payment = 0.0
             uom_name = 'Birr/Day'
+            work_duration = 'full_day'  # default; overridden for temporary rate entries
+
             if is_temporary_rate:
                 if score_float not in (0.5, 1.0, 1.5):
                     if cr: cr.close()
@@ -380,13 +421,9 @@ class EmployeeAPI(http.Controller):
                     uom_name = 'Birr/Day'
 
             else:
+                # Piece-rate — Zemach (seasonal) workers only
                 entry_type = 'piece_rate'
-                if not activity_identifier:
-                    if cr: cr.close()
-                    return self._json_response({
-                        "status": "error",
-                        "message": "Missing required field: 'activity_id' (e.g. 'SP', 'CULT', 'HARV') for piece-rate work entries."
-                    }, status=400)
+                work_duration = 'full_day'  # not applicable for piece-rate but required by model
 
                 activity = env['farm.activity'].search([
                     ('code', '=ilike', str(activity_identifier).strip())
@@ -399,7 +436,7 @@ class EmployeeAPI(http.Controller):
                     if cr: cr.close()
                     return self._json_response({
                         "status": "error",
-                        "message": f"Activity '{activity_identifier}' not found."
+                        "message": f"Activity '{activity_identifier}' not found. Use GET /api/fms/activities to see valid activity codes."
                     }, status=404)
 
                 norm_rec = env['farm.activity.norm'].search([
