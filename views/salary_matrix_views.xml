@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- List View: Salary Matrix -->
     <record id="view_hr_salary_matrix_list" model="ir.ui.view">
@@ -57,7 +57,8 @@
                         </page>
                         <page name="scale_lines" string="📋 Scale Lines (Grade × Level)">
                             <field name="line_ids">
-                                <list editable="bottom" string="Scale Entries" default_order="grade asc, level asc">
+                                <list editable="bottom" string="Scale Entries" default_order="grade asc, sequence asc">
+                                    <field name="sequence" column_invisible="True"/>
                                     <field name="grade"/>
                                     <field name="level"/>
                                     <field name="amount" widget="monetary"/>
@@ -65,6 +66,7 @@
                                 </list>
                             </field>
                         </page>
+
                         <page name="notes_page" string="📝 Notes &amp; Reference">
                             <field name="notes" placeholder="Add administrative background notes or circular references..."/>
                         </page>

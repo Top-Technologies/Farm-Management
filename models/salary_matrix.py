@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 from markupsafe import Markup
@@ -263,7 +263,7 @@ class HrSalaryMatrix(models.Model):
 class HrSalaryMatrixLine(models.Model):
     _name = 'hr.salary.matrix.line'
     _description = 'Salary Matrix Line (Grade x Level Amount)'
-    _order = 'grade asc, level asc'
+    _order = 'grade asc, sequence asc, id asc'
 
     matrix_id = fields.Many2one(
         'hr.salary.matrix',
@@ -289,6 +289,13 @@ class HrSalaryMatrixLine(models.Model):
         required=True,
         index=True,
     )
+    sequence = fields.Integer(
+        string='Sequence',
+        compute='_compute_sequence',
+        store=True,
+        index=True,
+        help='Calculated sorting order: Grade 1 Base, Grade 1 Steps 1..12, Grade 1 Max, Grade 2 Base...',
+    )
     amount = fields.Float(
         string='Basic Wage (Birr)',
         required=True,
@@ -299,6 +306,14 @@ class HrSalaryMatrixLine(models.Model):
         string='Currency',
         related='matrix_id.currency_id',
     )
+
+    @api.depends('grade', 'level')
+    def _compute_sequence(self):
+        level_order_map = {k: i for i, k in enumerate(LEVEL_KEYS)}
+        for line in self:
+            lvl_seq = level_order_map.get(line.level, 99) if line.level else 99
+            grade_val = line.grade or 0
+            line.sequence = (grade_val * 100) + lvl_seq
 
     @api.constrains('matrix_id', 'grade', 'level')
     def _check_unique_grade_level(self):
@@ -313,3 +328,4 @@ class HrSalaryMatrixLine(models.Model):
                 raise ValidationError(_(
                     "Duplicate Entry: Grade %s and Level '%s' already exists in this Salary Scale!"
                 ) % (line.grade, line.level))
+
