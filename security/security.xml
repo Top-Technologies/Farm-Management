@@ -1,19 +1,37 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+<<<<<<< HEAD
     <data noupdate="1">
         <!-- User Group (Odoo 19 Compatible) -->
+=======
+    <!-- noupdate="0": re-applied on every upgrade so group changes take effect -->
+    <data noupdate="0">
+        <!-- Module Category: makes groups appear as a row in Settings > Users -->
+        <record id="module_category_farm" model="ir.module.category">
+            <field name="name">Farm Management</field>
+            <field name="sequence">25</field>
+        </record>
+
+        <!-- User Group -->
+>>>>>>> 46c148e (fix(security): move groups to noupdate=0 so they update on upgrade)
         <record id="group_farm_user" model="res.groups">
             <field name="name">Farm Management / User</field>
             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         </record>
 
+<<<<<<< HEAD
         <!-- Manager Group (Odoo 19 Compatible) -->
+=======
+        <!-- Administrator Group: auto-assigned to Odoo admin users on install/upgrade -->
+>>>>>>> 46c148e (fix(security): move groups to noupdate=0 so they update on upgrade)
         <record id="group_farm_manager" model="res.groups">
             <field name="name">Farm Management / Administrator</field>
             <field name="implied_ids" eval="[(4, ref('group_farm_user')), (4, ref('hr.group_hr_user'))]"/>
         </record>
+    </data>
 
-        <!-- Multi-Company Record Rules -->
+    <!-- noupdate="1": record rules only created once; manual edits are preserved -->
+    <data noupdate="1">
         <record id="farm_farm_company_rule" model="ir.rule">
             <field name="name">Farm Multi-Company Rule</field>
             <field name="model_id" ref="model_farm_farm"/>
