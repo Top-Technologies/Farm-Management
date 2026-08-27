@@ -87,6 +87,65 @@ class SubUnit(models.Model):
         for unit in self:
             unit.worker_count = len(unit.assigned_employee_ids)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for unit in records:
+            if unit.assigned_employee_ids:
+                unit._sync_assigned_employees()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'assigned_employee_ids' in vals or 'sub_farm_id' in vals:
+            for unit in self:
+                unit._sync_assigned_employees()
+        return res
+
+    def _sync_assigned_employees(self):
+        """Synchronizes assigned employees with the Sub Unit location and generates their FMS IDs."""
+        for unit in self:
+            for emp in unit.assigned_employee_ids:
+                updates = {}
+                need_id_gen = False
+
+                if emp.initial_sub_unit_id != unit:
+                    updates['initial_sub_unit_id'] = unit.id
+                    updates['initial_sub_farm_id'] = unit.sub_farm_id.id if unit.sub_farm_id else False
+                    updates['initial_farm_id'] = unit.farm_id.id if unit.farm_id else False
+                    need_id_gen = True
+
+                if need_id_gen or not emp.fms_employee_id or '_' in str(emp.fms_employee_id):
+                    new_id = emp._generate_farm_employee_id(unit.farm_id, emp.farm_employee_type)
+                    updates['fms_employee_id'] = new_id
+                    updates['employee_code'] = new_id
+
+                if updates:
+                    emp.with_context(skip_sub_unit_sync=True).write(updates)
+
+                # Ensure active transfer record exists for this employee at this sub unit
+                active_transfers = emp.transfer_history_ids.filtered(lambda t: not t.moving_date)
+                if not active_transfers:
+                    self.env['farm.employee.transfer'].create({
+                        'employee_id': emp.id,
+                        'farm_id': unit.farm_id.id if unit.farm_id else False,
+                        'sub_farm_id': unit.sub_farm_id.id if unit.sub_farm_id else False,
+                        'sub_unit_id': unit.id,
+                        'transfer_date': fields.Date.today(),
+                        'notes': _('Assigned as field worker in Sub Unit: %s', unit.name),
+                    })
+                elif active_transfers[0].sub_unit_id != unit:
+                    active_transfers[0].write({'moving_date': fields.Date.today()})
+                    self.env['farm.employee.transfer'].create({
+                        'employee_id': emp.id,
+                        'farm_id': unit.farm_id.id if unit.farm_id else False,
+                        'sub_farm_id': unit.sub_farm_id.id if unit.sub_farm_id else False,
+                        'sub_unit_id': unit.id,
+                        'transfer_date': fields.Date.today(),
+                        'notes': _('Reassigned to Sub Unit: %s', unit.name),
+                    })
+
+
     def action_view_blocks(self):
         self.ensure_one()
         return {

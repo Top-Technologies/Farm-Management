@@ -223,43 +223,46 @@ class FarmWorkEntry(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('farm.work.entry') or _('New')
-            # Auto-populate location from employee if not explicitly passed
-            if vals.get('employee_id') and not vals.get('farm_id'):
+            # Auto-populate location from employee
+            if vals.get('employee_id'):
                 emp = self.env['hr.employee'].browse(vals['employee_id'])
                 curr = emp.current_transfer_id
-                if curr and not curr.moving_date:
-                    vals['farm_id'] = curr.farm_id.id
-                    vals['sub_farm_id'] = curr.sub_farm_id.id if curr.sub_farm_id else False
-                    vals['sub_unit_id'] = curr.sub_unit_id.id if curr.sub_unit_id else False
-                    vals['block_id'] = curr.block_id.id if curr.block_id else False
-                elif emp.current_farm_id:
-                    vals['farm_id'] = emp.current_farm_id.id
-                    vals['sub_farm_id'] = emp.current_sub_farm_id.id if emp.current_sub_farm_id else False
-                    vals['sub_unit_id'] = emp.current_sub_unit_id.id if emp.current_sub_unit_id else False
-                    vals['block_id'] = emp.current_block_id.id if emp.current_block_id else False
+                target_farm = (curr.farm_id if curr and not curr.moving_date else False) or emp.current_farm_id or emp.initial_farm_id
+                target_sub_farm = (curr.sub_farm_id if curr and not curr.moving_date else False) or emp.current_sub_farm_id or emp.initial_sub_farm_id
+                target_sub_unit = (curr.sub_unit_id if curr and not curr.moving_date else False) or emp.current_sub_unit_id or emp.initial_sub_unit_id
+                target_block = (curr.block_id if curr and not curr.moving_date else False) or emp.current_block_id or emp.initial_block_id
+
+                if target_farm:
+                    vals['farm_id'] = target_farm.id
+                if target_sub_farm:
+                    vals['sub_farm_id'] = target_sub_farm.id
+                if target_sub_unit:
+                    vals['sub_unit_id'] = target_sub_unit.id
+                if target_block and not vals.get('block_id'):
+                    vals['block_id'] = target_block.id
         return super().create(vals_list)
 
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         if self.employee_id:
-            # Auto-fill farm location from employee current location
-            curr = self.employee_id.current_transfer_id
-            if curr and not curr.moving_date:
-                self.farm_id = curr.farm_id
-                self.sub_farm_id = curr.sub_farm_id
-                self.sub_unit_id = curr.sub_unit_id
-                self.block_id = curr.block_id
-            elif self.employee_id.current_farm_id:
-                self.farm_id = self.employee_id.current_farm_id
-                self.sub_farm_id = self.employee_id.current_sub_farm_id
-                self.sub_unit_id = self.employee_id.current_sub_unit_id
-                self.block_id = self.employee_id.current_block_id
+            emp = self.employee_id
+            curr = emp.current_transfer_id
+            target_farm = (curr.farm_id if curr and not curr.moving_date else False) or emp.current_farm_id or emp.initial_farm_id
+            target_sub_farm = (curr.sub_farm_id if curr and not curr.moving_date else False) or emp.current_sub_farm_id or emp.initial_sub_farm_id
+            target_sub_unit = (curr.sub_unit_id if curr and not curr.moving_date else False) or emp.current_sub_unit_id or emp.initial_sub_unit_id
+            target_block = (curr.block_id if curr and not curr.moving_date else False) or emp.current_block_id or emp.initial_block_id
+
+            self.farm_id = target_farm
+            self.sub_farm_id = target_sub_farm
+            self.sub_unit_id = target_sub_unit
+            self.block_id = target_block
 
             # Auto-suggest payment type: Temporary worker defaults to temporary rate; others default to piece rate
-            if self.employee_id.farm_employee_type == 'temporary':
+            if emp.farm_employee_type == 'temporary':
                 self.entry_type = 'temporary_rate'
             else:
                 self.entry_type = 'piece_rate'
+
 
     @api.onchange('work_duration')
     def _onchange_work_duration(self):

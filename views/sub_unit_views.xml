@@ -62,12 +62,12 @@
                         <page name="assigned_workers" string="Field Workers">
                             <field name="assigned_employee_ids">
                                 <list string="Assigned Field Workers">
+                                    <field name="fms_employee_id" string="Employee ID" decoration-bf="1"/>
                                     <field name="name" string="Worker Name"/>
-                                    <field name="job_title" string="Job Position"/>
+                                    <field name="farm_employee_type" widget="badge" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'"/>
                                     <field name="work_phone" string="Phone"/>
-                                    <field name="work_email" string="Email"/>
-                                    <field name="department_id" string="Department"/>
-                                    <field name="company_id" groups="base.group_multi_company"/>
+                                    <field name="department_id" string="Department" optional="show"/>
+                                    <field name="company_id" groups="base.group_multi_company" optional="hide"/>
                                 </list>
                             </field>
                         </page>

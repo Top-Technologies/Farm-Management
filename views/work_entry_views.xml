@@ -66,10 +66,10 @@
                             <field name="employee_type" widget="badge" decoration-primary="employee_type == 'permanent'" decoration-warning="employee_type == 'temporary'" decoration-info="employee_type == 'zemach'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
-                        <group name="location_details" string="Farm Deployment Location">
-                            <field name="farm_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
-                            <field name="sub_farm_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
-                            <field name="sub_unit_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                        <group name="location_details" string="Farm Deployment Location (Autofilled from Employee ID)">
+                            <field name="farm_id" readonly="1"/>
+                            <field name="sub_farm_id" readonly="1"/>
+                            <field name="sub_unit_id" readonly="1"/>
                             <field name="block_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
                         </group>
                     </group>

@@ -35,19 +35,6 @@
               action="action_farm_block"
               sequence="40"/>
 
-    <!-- Work Entries under Farm Management -->
-    <menuitem id="menu_farm_work_entry"
-              name="Work Entries"
-              parent="menu_farm_management_root"
-              action="action_farm_work_entry"
-              sequence="50"/>
-
-    <!-- Unpaid Work Entries Queue -->
-    <menuitem id="menu_farm_work_entry_unpaid_queue"
-              name="Unpaid Work Entries (Payroll)"
-              parent="menu_farm_management_root"
-              action="action_farm_work_entry_unpaid"
-              sequence="55"/>
 
     <!-- Top-level Section inside HR / Employees Top Bar: Activities -->
     <menuitem id="menu_farm_activity_root"

@@ -308,6 +308,16 @@ class HrEmployee(models.Model):
             emp_type = vals.get('farm_employee_type', 'temporary')
             vals['farm_employee_type'] = emp_type
 
+            # Cascade hierarchy from initial_sub_unit_id if provided
+            sub_unit_id = vals.get('initial_sub_unit_id')
+            if sub_unit_id:
+                sub_unit = self.env['farm.sub.unit'].browse(sub_unit_id)
+                if sub_unit:
+                    if not vals.get('initial_sub_farm_id') and sub_unit.sub_farm_id:
+                        vals['initial_sub_farm_id'] = sub_unit.sub_farm_id.id
+                    if not vals.get('initial_farm_id') and sub_unit.farm_id:
+                        vals['initial_farm_id'] = sub_unit.farm_id.id
+
             farm_id = vals.get('initial_farm_id')
             farm = self.env['farm.farm'].browse(farm_id) if farm_id else self.env['farm.farm'].search([], limit=1)
 
@@ -318,7 +328,7 @@ class HrEmployee(models.Model):
 
         employees = super().create(vals_list)
 
-        # Auto-create initial transfer record if placement is specified
+        # Auto-create initial transfer record & sync sub unit field workers
         for emp in employees:
             if emp.initial_farm_id and not emp.transfer_history_ids:
                 self.env['farm.employee.transfer'].create({
@@ -330,20 +340,62 @@ class HrEmployee(models.Model):
                     'transfer_date': fields.Date.today(),
                     'notes': _('Initial baseline placement upon employee registration'),
                 })
+            emp._sync_sub_unit_assignment()
         return employees
 
     def write(self, vals):
-        if 'farm_employee_type' in vals or 'initial_farm_id' in vals:
+        # Cascade hierarchy if initial_sub_unit_id is modified
+        if 'initial_sub_unit_id' in vals and vals['initial_sub_unit_id']:
+            sub_unit = self.env['farm.sub.unit'].browse(vals['initial_sub_unit_id'])
+            if sub_unit:
+                if sub_unit.sub_farm_id and 'initial_sub_farm_id' not in vals:
+                    vals['initial_sub_farm_id'] = sub_unit.sub_farm_id.id
+                if sub_unit.farm_id and 'initial_farm_id' not in vals:
+                    vals['initial_farm_id'] = sub_unit.farm_id.id
+
+        if 'farm_employee_type' in vals or 'initial_farm_id' in vals or 'initial_sub_unit_id' in vals:
             for employee in self:
                 new_type = vals.get('farm_employee_type', employee.farm_employee_type)
                 farm_id = vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
                 new_farm = self.env['farm.farm'].browse(farm_id) if farm_id else (employee.current_farm_id or employee.initial_farm_id)
 
-                if new_type != employee.farm_employee_type or (farm_id and farm_id != (employee.initial_farm_id.id if employee.initial_farm_id else False)):
+                if new_type != employee.farm_employee_type or (farm_id and farm_id != (employee.initial_farm_id.id if employee.initial_farm_id else False)) or not employee.fms_employee_id:
                     new_id = employee._generate_farm_employee_id(new_farm, new_type)
                     vals['fms_employee_id'] = new_id
                     vals['employee_code'] = new_id
-        return super().write(vals)
+
+        res = super().write(vals)
+
+        if 'initial_sub_unit_id' in vals or 'initial_farm_id' in vals:
+            for emp in self:
+                emp._sync_sub_unit_assignment()
+
+        return res
+
+    def _sync_sub_unit_assignment(self):
+        """Ensures the employee is added to their assigned sub unit's worker list."""
+        if self.env.context.get('skip_sub_unit_sync'):
+            return
+        for emp in self:
+            if emp.initial_sub_unit_id:
+                # Add to new sub unit if not already present
+                if emp not in emp.initial_sub_unit_id.assigned_employee_ids:
+                    emp.initial_sub_unit_id.with_context(skip_sub_unit_sync=True).assigned_employee_ids = [(4, emp.id)]
+                # Remove from any other sub units
+                other_units = self.env['farm.sub.unit'].search([
+                    ('id', '!=', emp.initial_sub_unit_id.id),
+                    ('assigned_employee_ids', 'in', [emp.id])
+                ])
+                for ou in other_units:
+                    ou.with_context(skip_sub_unit_sync=True).assigned_employee_ids = [(3, emp.id)]
+            elif 'initial_sub_unit_id' in self.env.context:
+                # Removed from sub unit
+                other_units = self.env['farm.sub.unit'].search([
+                    ('assigned_employee_ids', 'in', [emp.id])
+                ])
+                for ou in other_units:
+                    ou.with_context(skip_sub_unit_sync=True).assigned_employee_ids = [(3, emp.id)]
+
 
     @api.depends('work_entry_ids', 'work_entry_ids.total_amount', 'work_entry_ids.state', 'work_entry_ids.payment_status')
     def _compute_work_entry_stats(self):
