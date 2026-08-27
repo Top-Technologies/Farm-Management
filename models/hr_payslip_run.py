@@ -151,17 +151,19 @@ class HrPayslipRun(models.Model):
         self.state = 'verify'
         self.slip_ids.write({'state': 'verify'})
 
+        # Immediately transition UI to view the generated payslips
         return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Farm Payslips Generated'),
-                'message': _('Successfully generated %d payslips for %d work entries totaling %.2f Birr.',
-                             len(created_slips), self.farm_work_entry_count, self.farm_total_amount),
-                'type': 'success',
-                'sticky': False,
-            }
+            'name': _('Payslips - %s', self.name),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.payslip',
+            'view_mode': 'list,form',
+            'views': [(False, 'list'), (False, 'form')],
+            'domain': [('id', 'in', self.slip_ids.ids)],
+            'context': {
+                'default_payslip_run_id': self.id,
+            },
         }
+
 
     def action_validate(self):
         res = super().action_validate() if hasattr(super(), 'action_validate') else True
