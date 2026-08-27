@@ -13,10 +13,12 @@ class HrEmployee(models.Model):
 
     # Agricultural Employee Classification (Mandatory)
     farm_employee_type = fields.Selection([
-        ('permanent', 'Permanent'),
-        ('temporary', 'Temporary'),
-        ('zemach', 'Zemach'),
+        ('head_office', 'Head Office Permanent (ዋና መ/ቤት ቋሚ)'),
+        ('permanent', 'Farm Permanent (የእርሻ ልማቶች ቋሚ)'),
+        ('temporary', 'Temporary (ጊዜያዊ)'),
+        ('zemach', 'Zemach / Seasonal (ዘመች)'),
     ], string='Employee Classification', default='temporary', required=True, tracking=True)
+
 
     # Agricultural Placement Fields
     initial_farm_id = fields.Many2one(
@@ -266,17 +268,47 @@ class HrEmployee(models.Model):
 
     @api.onchange('farm_employee_type')
     def _onchange_farm_employee_type(self):
+        if self.farm_employee_type == 'head_office':
+            self.initial_farm_id = False
+            self.initial_sub_farm_id = False
+            self.initial_sub_unit_id = False
+            self.initial_block_id = False
         self._update_preview_id()
 
     def _update_preview_id(self):
-        farm = self.initial_farm_id or self.current_farm_id
-        if farm and self.farm_employee_type:
-            new_id = self._generate_farm_employee_id(farm, self.farm_employee_type)
+        if self.farm_employee_type == 'head_office':
+            new_id = self._generate_farm_employee_id(False, 'head_office')
             self.fms_employee_id = new_id
             self.employee_code = new_id
+        else:
+            farm = self.initial_farm_id or self.current_farm_id
+            if farm and self.farm_employee_type:
+                new_id = self._generate_farm_employee_id(farm, self.farm_employee_type)
+                self.fms_employee_id = new_id
+                self.employee_code = new_id
 
     def _generate_farm_employee_id(self, farm, emp_type):
-        """Generates sequential ID in format [FarmCode][TypeCode][SequentialNumber] (e.g. FM01T0001)."""
+        """Generates sequential ID:
+        - Head Office Permanent: HQ001, HQ002, HQ003...
+        - Farm Employees: [FarmCode][TypeCode][SequentialNumber] e.g. FM01T0001, FM01P0001, FM01Z0001.
+        """
+        if emp_type == 'head_office':
+            prefix = 'HQ'
+            existing_domain = [('fms_employee_id', '=like', f"{prefix}%")]
+            if self.id:
+                existing_domain.append(('id', '!=', self.id))
+            existing_records = self.env['hr.employee'].search(existing_domain)
+            max_num = 0
+            for rec in existing_records:
+                code_val = rec.fms_employee_id or ''
+                num_part = code_val[len(prefix):]
+                if num_part.isdigit():
+                    num = int(num_part)
+                    if num > max_num:
+                        max_num = num
+            next_num = max_num + 1
+            return f"{prefix}{next_num:03d}"
+
         type_map = {'permanent': 'P', 'temporary': 'T', 'zemach': 'Z'}
         type_code = type_map.get(emp_type or 'temporary', 'T')
         if farm:
@@ -308,42 +340,59 @@ class HrEmployee(models.Model):
             emp_type = vals.get('farm_employee_type', 'temporary')
             vals['farm_employee_type'] = emp_type
 
-            # Cascade hierarchy from initial_sub_unit_id if provided
-            sub_unit_id = vals.get('initial_sub_unit_id')
-            if sub_unit_id:
-                sub_unit = self.env['farm.sub.unit'].browse(sub_unit_id)
-                if sub_unit:
-                    if not vals.get('initial_sub_farm_id') and sub_unit.sub_farm_id:
-                        vals['initial_sub_farm_id'] = sub_unit.sub_farm_id.id
-                    if not vals.get('initial_farm_id') and sub_unit.farm_id:
-                        vals['initial_farm_id'] = sub_unit.farm_id.id
+            if emp_type == 'head_office':
+                vals['initial_farm_id'] = False
+                vals['initial_sub_farm_id'] = False
+                vals['initial_sub_unit_id'] = False
+                vals['initial_block_id'] = False
+                if not vals.get('fms_employee_id') or '_' in str(vals.get('fms_employee_id', '')):
+                    new_id = self._generate_farm_employee_id(False, 'head_office')
+                    vals['fms_employee_id'] = new_id
+                    vals['employee_code'] = new_id
+            else:
+                # Cascade hierarchy from initial_sub_unit_id if provided
+                sub_unit_id = vals.get('initial_sub_unit_id')
+                if sub_unit_id:
+                    sub_unit = self.env['farm.sub.unit'].browse(sub_unit_id)
+                    if sub_unit:
+                        if not vals.get('initial_sub_farm_id') and sub_unit.sub_farm_id:
+                            vals['initial_sub_farm_id'] = sub_unit.sub_farm_id.id
+                        if not vals.get('initial_farm_id') and sub_unit.farm_id:
+                            vals['initial_farm_id'] = sub_unit.farm_id.id
 
-            farm_id = vals.get('initial_farm_id')
-            farm = self.env['farm.farm'].browse(farm_id) if farm_id else self.env['farm.farm'].search([], limit=1)
+                farm_id = vals.get('initial_farm_id')
+                farm = self.env['farm.farm'].browse(farm_id) if farm_id else self.env['farm.farm'].search([], limit=1)
 
-            if not vals.get('fms_employee_id') or '_' in str(vals.get('fms_employee_id', '')):
-                new_id = self._generate_farm_employee_id(farm, emp_type)
-                vals['fms_employee_id'] = new_id
-                vals['employee_code'] = new_id
+                if not vals.get('fms_employee_id') or '_' in str(vals.get('fms_employee_id', '')):
+                    new_id = self._generate_farm_employee_id(farm, emp_type)
+                    vals['fms_employee_id'] = new_id
+                    vals['employee_code'] = new_id
 
         employees = super().create(vals_list)
 
-        # Auto-create initial transfer record & sync sub unit field workers
+        # Auto-create initial transfer record & sync sub unit field workers for farm employees
         for emp in employees:
-            if emp.initial_farm_id and not emp.transfer_history_ids:
-                self.env['farm.employee.transfer'].create({
-                    'employee_id': emp.id,
-                    'farm_id': emp.initial_farm_id.id,
-                    'sub_farm_id': emp.initial_sub_farm_id.id if emp.initial_sub_farm_id else False,
-                    'sub_unit_id': emp.initial_sub_unit_id.id if emp.initial_sub_unit_id else False,
-                    'block_id': emp.initial_block_id.id if emp.initial_block_id else False,
-                    'transfer_date': fields.Date.today(),
-                    'notes': _('Initial baseline placement upon employee registration'),
-                })
-            emp._sync_sub_unit_assignment()
+            if emp.farm_employee_type != 'head_office':
+                if emp.initial_farm_id and not emp.transfer_history_ids:
+                    self.env['farm.employee.transfer'].create({
+                        'employee_id': emp.id,
+                        'farm_id': emp.initial_farm_id.id,
+                        'sub_farm_id': emp.initial_sub_farm_id.id if emp.initial_sub_farm_id else False,
+                        'sub_unit_id': emp.initial_sub_unit_id.id if emp.initial_sub_unit_id else False,
+                        'block_id': emp.initial_block_id.id if emp.initial_block_id else False,
+                        'transfer_date': fields.Date.today(),
+                        'notes': _('Initial baseline placement upon employee registration'),
+                    })
+                emp._sync_sub_unit_assignment()
         return employees
 
     def write(self, vals):
+        if 'farm_employee_type' in vals and vals['farm_employee_type'] == 'head_office':
+            vals['initial_farm_id'] = False
+            vals['initial_sub_farm_id'] = False
+            vals['initial_sub_unit_id'] = False
+            vals['initial_block_id'] = False
+
         # Cascade hierarchy if initial_sub_unit_id is modified
         if 'initial_sub_unit_id' in vals and vals['initial_sub_unit_id']:
             sub_unit = self.env['farm.sub.unit'].browse(vals['initial_sub_unit_id'])
@@ -356,8 +405,11 @@ class HrEmployee(models.Model):
         if 'farm_employee_type' in vals or 'initial_farm_id' in vals or 'initial_sub_unit_id' in vals:
             for employee in self:
                 new_type = vals.get('farm_employee_type', employee.farm_employee_type)
-                farm_id = vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
-                new_farm = self.env['farm.farm'].browse(farm_id) if farm_id else (employee.current_farm_id or employee.initial_farm_id)
+                if new_type == 'head_office':
+                    new_farm = False
+                else:
+                    farm_id = vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
+                    new_farm = self.env['farm.farm'].browse(farm_id) if farm_id else (employee.current_farm_id or employee.initial_farm_id)
 
                 if new_type != employee.farm_employee_type or (farm_id and farm_id != (employee.initial_farm_id.id if employee.initial_farm_id else False)) or not employee.fms_employee_id:
                     new_id = employee._generate_farm_employee_id(new_farm, new_type)
@@ -366,11 +418,12 @@ class HrEmployee(models.Model):
 
         res = super().write(vals)
 
-        if 'initial_sub_unit_id' in vals or 'initial_farm_id' in vals:
+        if 'initial_sub_unit_id' in vals or 'initial_farm_id' in vals or 'farm_employee_type' in vals:
             for emp in self:
                 emp._sync_sub_unit_assignment()
 
         return res
+
 
     def _sync_sub_unit_assignment(self):
         """Ensures the employee is added to their assigned sub unit's worker list."""

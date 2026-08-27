@@ -296,7 +296,8 @@ class EmployeeAPI(http.Controller):
 
             is_temp_worker   = (emp_type == 'temporary')
             is_zemach_worker = (emp_type == 'zemach')
-            is_permanent     = (emp_type == 'permanent')
+            is_permanent     = (emp_type in ('permanent', 'head_office'))
+
 
             # PERMANENT workers are on regular payroll — reject entirely
             if is_permanent:

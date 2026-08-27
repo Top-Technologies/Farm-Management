@@ -9,7 +9,8 @@ class HrPayslipRun(models.Model):
     worker_type = fields.Selection([
         ('temporary', 'Temporary Workers (Daily Wage)'),
         ('zemach', 'Seasonal / Zemach Workers (Piece Rate)'),
-        ('permanent', 'Permanent Employees (Standard Salary)'),
+        ('permanent', 'Farm Permanent Employees (Standard Salary)'),
+        ('head_office', 'Head Office Permanent Employees (Standard Salary)'),
         ('all', 'All Workers'),
     ], string='Worker Classification', default='temporary', required=True,
        help='Select which category of workers this payroll batch is targeting.')
@@ -86,16 +87,17 @@ class HrPayslipRun(models.Model):
         unpaid_entries = self.env['farm.work.entry'].search(we_domain)
 
         # 2. Resolve eligible employees
-        if self.worker_type == 'permanent':
+        if self.worker_type in ('permanent', 'head_office'):
             emp_domain = [
-                ('farm_employee_type', '=', 'permanent'),
+                ('farm_employee_type', '=', self.worker_type),
                 '|', ('company_id', '=', False), ('company_id', '=', self.company_id.id)
             ]
-            if self.farm_id:
+            if self.farm_id and self.worker_type == 'permanent':
                 emp_domain.extend(['|', ('current_farm_id', '=', self.farm_id.id), ('initial_farm_id', '=', self.farm_id.id)])
             eligible_employees = self.env['hr.employee'].search(emp_domain)
         else:
             eligible_employees = unpaid_entries.mapped('employee_id')
+
 
         if not eligible_employees:
             worker_label = dict(self._fields['worker_type'].selection).get(self.worker_type, self.worker_type)

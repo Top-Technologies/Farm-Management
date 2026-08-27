@@ -7,7 +7,7 @@
         <field name="inherit_id" ref="hr_payroll.view_hr_payslip_form"/>
         <field name="arch" type="xml">
             <field name="employee_id" position="after">
-                <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'"/>
+                <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type in ('permanent', 'head_office')" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'"/>
                 <field name="salary_matrix_type" invisible="farm_employee_type in ('temporary', 'zemach') or not salary_matrix_type"/>
                 <field name="salary_grade" invisible="farm_employee_type in ('temporary', 'zemach') or not salary_grade"/>
                 <field name="salary_level" invisible="farm_employee_type in ('temporary', 'zemach') or not salary_level"/>

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 import logging
 
@@ -108,7 +108,10 @@ class HrContract(models.Model):
     @api.onchange('employee_id')
     def _onchange_employee_matrix_default(self):
         if self.employee_id:
-            if self.employee_id.farm_employee_type == 'permanent' and not self.salary_matrix_type:
+            if self.employee_id.farm_employee_type == 'head_office':
+                self.salary_matrix_type = 'head_office'
+            elif self.employee_id.farm_employee_type == 'permanent':
                 self.salary_matrix_type = 'farm'
             elif not self.salary_matrix_type:
                 self.salary_matrix_type = 'head_office'
+
