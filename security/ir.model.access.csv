@@ -21,4 +21,7 @@ access_hr_salary_matrix_user,hr.salary.matrix.user,model_hr_salary_matrix,group_
 access_hr_salary_matrix_manager,hr.salary.matrix.manager,model_hr_salary_matrix,group_farm_manager,1,1,1,1
 access_hr_salary_matrix_line_user,hr.salary.matrix.line.user,model_hr_salary_matrix_line,group_farm_user,1,0,0,0
 access_hr_salary_matrix_line_manager,hr.salary.matrix.line.manager,model_hr_salary_matrix_line,group_farm_manager,1,1,1,1
+access_hr_employee_family_member_user,hr.employee.family.member.user,model_hr_employee_family_member,base.group_user,1,1,1,1
+access_hr_employee_family_member_manager,hr.employee.family.member.manager,model_hr_employee_family_member,group_farm_manager,1,1,1,1
+
 

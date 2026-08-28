@@ -175,6 +175,18 @@
                     </field>
                 </page>
             </xpath>
+
+            <!-- Family Members Section inside Private Information page -->
+            <xpath expr="//page[@name='personal_information']/group" position="inside">
+                <group string="Family Members" colspan="2">
+                    <field name="family_member_ids" nolabel="1" colspan="2">
+                        <list editable="bottom" string="Family Members">
+                            <field name="name" string="Name" placeholder="Full Name (e.g. Abebech Tadesse)..."/>
+                            <field name="relationship" string="Relationship" widget="badge" decoration-info="relationship in ('wife', 'children')" decoration-primary="relationship in ('mother', 'father')" decoration-warning="relationship in ('grandmother', 'grandfather')" decoration-muted="relationship in ('uncle', 'aunt')"/>
+                        </list>
+                    </field>
+                </group>
+            </xpath>
         </field>
     </record>
 

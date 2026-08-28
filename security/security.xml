@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- noupdate="0": re-applied on every upgrade so group changes take effect -->
     <data noupdate="0">
@@ -83,6 +83,12 @@
         <record id="hr_salary_matrix_company_rule" model="ir.rule">
             <field name="name">Salary Matrix Multi-Company Rule</field>
             <field name="model_id" ref="model_hr_salary_matrix"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="hr_employee_family_member_company_rule" model="ir.rule">
+            <field name="name">Employee Family Member Multi-Company Rule</field>
+            <field name="model_id" ref="model_hr_employee_family_member"/>
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
     </data>

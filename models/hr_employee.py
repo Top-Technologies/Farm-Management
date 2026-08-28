@@ -94,6 +94,14 @@ class HrEmployee(models.Model):
         string='Transfer & Assignment History',
     )
 
+    # Family Members
+    family_member_ids = fields.One2many(
+        'hr.employee.family.member',
+        'employee_id',
+        string='Family Members',
+    )
+
+
     # Work Entries & Productivity Tracking
     work_entry_ids = fields.One2many(
         'farm.work.entry',

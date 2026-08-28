@@ -13,3 +13,5 @@ from . import hr_payslip_run
 from . import hr_payslip_employees
 from . import salary_matrix
 from . import hr_contract
+from . import family_member
+
