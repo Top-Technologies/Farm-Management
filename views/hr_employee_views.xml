@@ -183,6 +183,8 @@
                         <list editable="bottom" string="Family Members">
                             <field name="name" string="Name" placeholder="Full Name (e.g. Abebech Tadesse)..." required="1"/>
                             <field name="relationship" string="Relationship" required="1"/>
+                            <field name="birthday" string="Date of Birth" invisible="relationship != 'children'" required="relationship == 'children'"/>
+                            <field name="age" string="Age (Years)" readonly="1" invisible="relationship != 'children'"/>
                         </list>
                     </field>
                 </group>

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 
 RELATIONSHIP_SELECTION = [
@@ -36,6 +36,16 @@ class HrEmployeeFamilyMember(models.Model):
         required=True,
         help='Relationship with the employee.',
     )
+    birthday = fields.Date(
+        string='Date of Birth',
+        help='Date of birth (applicable for children).',
+    )
+    age = fields.Integer(
+        string='Age',
+        compute='_compute_age',
+        store=True,
+        help='Calculated age in years from Date of Birth.',
+    )
     company_id = fields.Many2one(
         'res.company',
         string='Company',
@@ -43,3 +53,31 @@ class HrEmployeeFamilyMember(models.Model):
         store=True,
         readonly=True,
     )
+
+    @api.depends('birthday', 'relationship')
+    def _compute_age(self):
+        today = fields.Date.today()
+        for rec in self:
+            if rec.relationship == 'children' and rec.birthday:
+                d_birth = rec.birthday
+                age = today.year - d_birth.year - ((today.month, today.day) < (d_birth.month, d_birth.day))
+                rec.age = max(0, age)
+            else:
+                rec.age = 0
+
+    @api.onchange('relationship')
+    def _onchange_relationship(self):
+        if self.relationship != 'children':
+            self.birthday = False
+            self.age = 0
+
+    @api.onchange('birthday')
+    def _onchange_birthday(self):
+        if self.birthday and self.relationship == 'children':
+            today = fields.Date.today()
+            d_birth = self.birthday
+            age = today.year - d_birth.year - ((today.month, today.day) < (d_birth.month, d_birth.day))
+            self.age = max(0, age)
+        else:
+            self.age = 0
+
