@@ -66,6 +66,84 @@ class HrContract(models.Model):
     )
 
     # =========================================================================
+    # Allowances & Earnings Engine
+    # =========================================================================
+    transport_allowance_rule = fields.Selection([
+        ('fixed_4000', 'Fixed Transport Allowance (ETB 4,000 / month) — Grade ≤ 17'),
+        ('fuel_50', 'Transport Allowance 50 Litres Fuel — Grade 18'),
+        ('fuel_60', 'Transport Allowance 60 Litres Fuel — Grade 19+'),
+        ('custom', 'Custom / Manual Transport Allowance'),
+        ('none', 'No Transport Allowance (Company Vehicle Assigned)'),
+    ], string='Transport Policy', compute='_compute_transport_policy', store=True, readonly=False, tracking=True)
+
+    fuel_price_per_liter = fields.Float(
+        string='Fuel Price / Liter (Birr)',
+        default=100.0,
+        digits=(16, 2),
+        tracking=True,
+        help='Applicable daily fuel price in Birr per liter (e.g. 100.00 Birr/L).',
+    )
+    fuel_liters = fields.Float(
+        string='Fuel Liters (L)',
+        compute='_compute_fuel_liters',
+        store=True,
+        digits=(16, 1),
+        help='Fuel entitlement in liters based on employee grade.',
+    )
+    allowance_transport = fields.Float(
+        string='Transport Allowance (የመጓጓዣ አበል)',
+        compute='_compute_transport_allowance',
+        store=True,
+        readonly=False,
+        digits=(16, 2),
+        tracking=True,
+        help='Monthly transport or fuel allowance.',
+    )
+
+    allowance_electric_vehicle = fields.Float(
+        string='Electric Vehicle Allowance (የኤሌክትሪክ መኪና አበል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='ETB 5,000 per month for employees assigned electric company vehicles (operating expense).',
+    )
+    allowance_hardship = fields.Float(
+        string='Hardship Allowance (የአስቸጋሪ ቦታ / ስራ አበል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Additional payment for exceptional operational demands/high-workload harvesting periods.',
+    )
+    allowance_retroactive = fields.Float(
+        string='Back Payment / Retroactive Pay (የተከማቸ የደመወዝ ጭማሪ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Salary difference resulting from approved retroactive salary adjustments.',
+    )
+    allowance_overtime = fields.Float(
+        string='Approved Overtime Payment (የትርፍ ሰዓት ክፍያ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Payment for approved working hours exceeding normal work schedule.',
+    )
+    total_monthly_allowances = fields.Float(
+        string='Total Monthly Allowances (ጠቅላላ አበሎች)',
+        compute='_compute_all_allowances',
+        store=True,
+        digits=(16, 2),
+        help='Sum of all monthly allowances (Transport + EV + Hardship + Retroactive + Overtime).',
+    )
+    gross_monthly_wage = fields.Float(
+        string='Total Gross Monthly Wage (ጠቅላላ ወርሃዊ ገቢ)',
+        compute='_compute_all_allowances',
+        store=True,
+        digits=(16, 2),
+        help='Total gross monthly earnings: Basic Wage + Total Allowances.',
+    )
+
+    # =========================================================================
     # 1. Statutory & Mandatory Deductions
     # =========================================================================
     deduction_pension = fields.Float(
@@ -363,12 +441,97 @@ class HrContract(models.Model):
     @api.depends('company_id', 'company_country_id')
     def _compute_clean_country_code(self):
         for contract in self:
-            c_code = contract.company_country_id.code if contract.company_country_id else ''
             # Force country_code != 'US' so US pre-tax/post-tax benefits remain hidden
-            contract.country_code = 'ET' if c_code in ('US', '', False) else c_code
+            contract.country_code = 'ET'
+
+    @api.depends('salary_grade')
+    def _compute_transport_policy(self):
+        for c in self:
+            if not c.salary_grade:
+                c.transport_allowance_rule = 'fixed_4000'
+            else:
+                try:
+                    g = int(c.salary_grade)
+                    if g <= 17:
+                        c.transport_allowance_rule = 'fixed_4000'
+                    elif g == 18:
+                        c.transport_allowance_rule = 'fuel_50'
+                    else:
+                        c.transport_allowance_rule = 'fuel_60'
+                except Exception:
+                    c.transport_allowance_rule = 'fixed_4000'
+
+    @api.depends('transport_allowance_rule')
+    def _compute_fuel_liters(self):
+        for c in self:
+            if c.transport_allowance_rule == 'fuel_50':
+                c.fuel_liters = 50.0
+            elif c.transport_allowance_rule == 'fuel_60':
+                c.fuel_liters = 60.0
+            else:
+                c.fuel_liters = 0.0
+
+    @api.depends('transport_allowance_rule', 'fuel_price_per_liter', 'fuel_liters')
+    def _compute_transport_allowance(self):
+        for c in self:
+            if c.transport_allowance_rule == 'fixed_4000':
+                c.allowance_transport = 4000.0
+            elif c.transport_allowance_rule == 'fuel_50':
+                c.allowance_transport = 50.0 * (c.fuel_price_per_liter or 100.0)
+            elif c.transport_allowance_rule == 'fuel_60':
+                c.allowance_transport = 60.0 * (c.fuel_price_per_liter or 100.0)
+            elif c.transport_allowance_rule == 'none':
+                c.allowance_transport = 0.0
+            elif not c.allowance_transport:
+                c.allowance_transport = 0.0
+
+    @api.onchange('salary_grade')
+    def _onchange_salary_grade_transport(self):
+        if self.salary_grade:
+            try:
+                g = int(self.salary_grade)
+                if g <= 17:
+                    self.transport_allowance_rule = 'fixed_4000'
+                    self.allowance_transport = 4000.0
+                    self.fuel_liters = 0.0
+                elif g == 18:
+                    self.transport_allowance_rule = 'fuel_50'
+                    self.fuel_liters = 50.0
+                    self.allowance_transport = 50.0 * (self.fuel_price_per_liter or 100.0)
+                else:
+                    self.transport_allowance_rule = 'fuel_60'
+                    self.fuel_liters = 60.0
+                    self.allowance_transport = 60.0 * (self.fuel_price_per_liter or 100.0)
+            except Exception:
+                pass
+
+    @api.onchange('transport_allowance_rule', 'fuel_price_per_liter')
+    def _onchange_transport_allowance_rule(self):
+        if self.transport_allowance_rule == 'fixed_4000':
+            self.allowance_transport = 4000.0
+            self.fuel_liters = 0.0
+        elif self.transport_allowance_rule == 'fuel_50':
+            self.fuel_liters = 50.0
+            self.allowance_transport = 50.0 * (self.fuel_price_per_liter or 100.0)
+        elif self.transport_allowance_rule == 'fuel_60':
+            self.fuel_liters = 60.0
+            self.allowance_transport = 60.0 * (self.fuel_price_per_liter or 100.0)
+        elif self.transport_allowance_rule == 'none':
+            self.allowance_transport = 0.0
+            self.fuel_liters = 0.0
+
+    @api.depends('wage', 'allowance_transport', 'allowance_electric_vehicle', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime')
+    def _compute_all_allowances(self):
+        for c in self:
+            tot_allow = (c.allowance_transport or 0.0) + (c.allowance_electric_vehicle or 0.0) + \
+                        (c.allowance_hardship or 0.0) + (c.allowance_retroactive or 0.0) + \
+                        (c.allowance_overtime or 0.0)
+            c.total_monthly_allowances = tot_allow
+            c.gross_monthly_wage = (c.wage or 0.0) + tot_allow
 
     @api.depends(
         'wage',
+        'gross_monthly_wage',
         # Category 1
         'deduction_pension', 'deduction_income_tax', 'deduction_luc',
         'deduction_credit_assoc_mandatory', 'deduction_social_contribution',
@@ -410,7 +573,8 @@ class HrContract(models.Model):
 
             total = c1 + c2 + c3 + c4 + c5 + c6
             c.total_monthly_deductions = total
-            c.net_wage_after_deductions = max(0.0, (c.wage or 0.0) - total)
+            gross = c.gross_monthly_wage if c.gross_monthly_wage else (c.wage or 0.0)
+            c.net_wage_after_deductions = max(0.0, gross - total)
 
     @api.depends('salary_matrix_type', 'salary_grade', 'salary_level', 'company_id')
     def _compute_matrix_basic_wage(self):
@@ -454,5 +618,6 @@ class HrContract(models.Model):
                 self.salary_matrix_type = 'farm'
             elif not self.salary_matrix_type:
                 self.salary_matrix_type = 'head_office'
+
 
 
