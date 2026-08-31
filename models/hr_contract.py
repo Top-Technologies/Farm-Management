@@ -77,27 +77,25 @@ class HrContract(models.Model):
     ], string='Transport Policy', compute='_compute_transport_policy', store=True, readonly=False, tracking=True)
 
     fuel_price_per_liter = fields.Float(
-        string='Fuel Price / Liter (Birr)',
-        default=100.0,
+        string='Universal Fuel Price / Liter (Birr)',
+        related='company_id.fuel_price_per_liter',
+        readonly=True,
         digits=(16, 2),
-        tracking=True,
-        help='Applicable daily fuel price in Birr per liter (e.g. 100.00 Birr/L).',
+        help='Universal fuel price in Birr per liter configured in Company Settings.',
     )
     fuel_liters = fields.Float(
-        string='Fuel Liters (L)',
+        string='Fuel Liters (Litres)',
         compute='_compute_fuel_liters',
         store=True,
         digits=(16, 1),
-        help='Fuel entitlement in liters based on employee grade.',
+        help='Fuel entitlement in litres based on employee grade.',
     )
     allowance_transport = fields.Float(
         string='Transport Allowance (የመጓጓዣ አበል)',
-        compute='_compute_transport_allowance',
-        store=True,
-        readonly=False,
         digits=(16, 2),
+        default=0.0,
         tracking=True,
-        help='Monthly transport or fuel allowance.',
+        help='Monthly transport or fuel allowance. Auto-populated from grade/fuel price, but freely editable for custom rates.',
     )
 
     allowance_electric_vehicle = fields.Float(
@@ -471,51 +469,39 @@ class HrContract(models.Model):
             else:
                 c.fuel_liters = 0.0
 
-    @api.depends('transport_allowance_rule', 'fuel_price_per_liter', 'fuel_liters')
-    def _compute_transport_allowance(self):
-        for c in self:
-            if c.transport_allowance_rule == 'fixed_4000':
-                c.allowance_transport = 4000.0
-            elif c.transport_allowance_rule == 'fuel_50':
-                c.allowance_transport = 50.0 * (c.fuel_price_per_liter or 100.0)
-            elif c.transport_allowance_rule == 'fuel_60':
-                c.allowance_transport = 60.0 * (c.fuel_price_per_liter or 100.0)
-            elif c.transport_allowance_rule == 'none':
-                c.allowance_transport = 0.0
-            elif not c.allowance_transport:
-                c.allowance_transport = 0.0
-
     @api.onchange('salary_grade')
     def _onchange_salary_grade_transport(self):
         if self.salary_grade:
             try:
                 g = int(self.salary_grade)
+                fuel_price = self.fuel_price_per_liter or (self.company_id.fuel_price_per_liter if self.company_id else 165.0) or 165.0
                 if g <= 17:
                     self.transport_allowance_rule = 'fixed_4000'
-                    self.allowance_transport = 4000.0
                     self.fuel_liters = 0.0
+                    self.allowance_transport = 4000.0
                 elif g == 18:
                     self.transport_allowance_rule = 'fuel_50'
                     self.fuel_liters = 50.0
-                    self.allowance_transport = 50.0 * (self.fuel_price_per_liter or 100.0)
+                    self.allowance_transport = 50.0 * fuel_price
                 else:
                     self.transport_allowance_rule = 'fuel_60'
                     self.fuel_liters = 60.0
-                    self.allowance_transport = 60.0 * (self.fuel_price_per_liter or 100.0)
+                    self.allowance_transport = 60.0 * fuel_price
             except Exception:
                 pass
 
-    @api.onchange('transport_allowance_rule', 'fuel_price_per_liter')
+    @api.onchange('transport_allowance_rule')
     def _onchange_transport_allowance_rule(self):
+        fuel_price = self.fuel_price_per_liter or (self.company_id.fuel_price_per_liter if self.company_id else 165.0) or 165.0
         if self.transport_allowance_rule == 'fixed_4000':
             self.allowance_transport = 4000.0
             self.fuel_liters = 0.0
         elif self.transport_allowance_rule == 'fuel_50':
             self.fuel_liters = 50.0
-            self.allowance_transport = 50.0 * (self.fuel_price_per_liter or 100.0)
+            self.allowance_transport = 50.0 * fuel_price
         elif self.transport_allowance_rule == 'fuel_60':
             self.fuel_liters = 60.0
-            self.allowance_transport = 60.0 * (self.fuel_price_per_liter or 100.0)
+            self.allowance_transport = 60.0 * fuel_price
         elif self.transport_allowance_rule == 'none':
             self.allowance_transport = 0.0
             self.fuel_liters = 0.0

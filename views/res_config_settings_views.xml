@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Res Config Settings: Universal Fuel Price Configuration -->
+    <record id="res_config_settings_view_form_farm_inherit" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.farm.inherit</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority">50</field>
+        <field name="inherit_id" ref="hr_payroll.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='payroll_setting_container']" position="inside">
+                <setting id="fuel_price_setting" title="Universal Market Fuel Price" help="Universal daily market fuel price in Birr per liter used to calculate Grade 18 (50L) and Grade 19+ (60L) transport allowances across all contracts.">
+                    <div class="content-group">
+                        <div class="row mt16">
+                            <label for="fuel_price_per_liter" string="Fuel Price / Liter (Birr)" class="col-lg-5 o_light_label"/>
+                            <field name="fuel_price_per_liter" class="oe_inline"/>
+                        </div>
+                    </div>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -59,13 +59,15 @@
 
                                     <separator string="Transport &amp; Fuel Policy"/>
                                     <field name="transport_allowance_rule" widget="selection"/>
-                                    <field name="fuel_price_per_liter" invisible="transport_allowance_rule not in ('fuel_50', 'fuel_60')"/>
-                                    <label for="allowance_transport" string="Transport Allowance" invisible="transport_allowance_rule == 'none'"/>
-                                    <div class="d-flex align-items-center" invisible="transport_allowance_rule == 'none'">
-                                        <field name="allowance_transport" widget="monetary" class="me-2 fw-bold text-primary"/>
-                                        <span class="badge text-bg-info" invisible="transport_allowance_rule not in ('fuel_50', 'fuel_60')">
-                                            <field name="fuel_liters" readonly="1"/> L × <field name="fuel_price_per_liter" readonly="1"/> Birr
-                                        </span>
+                                    <field name="allowance_transport" widget="monetary" string="Transport Allowance" invisible="transport_allowance_rule == 'none'"/>
+                                    <field name="fuel_liters" invisible="1"/>
+                                    <field name="fuel_price_per_liter" invisible="1"/>
+                                    <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" invisible="transport_allowance_rule not in ('fuel_50', 'fuel_60')">
+                                        <i class="fa fa-tint me-2 fs-5 text-primary"/>
+                                        <div><strong>Fuel Entitlement:</strong> <field name="fuel_liters" readonly="1"/> Litres Fuel @ <field name="fuel_price_per_liter" readonly="1"/> Birr/Liter</div>
+                                    </div>
+                                    <div class="text-muted small my-1" invisible="transport_allowance_rule != 'fixed_4000'">
+                                        <i class="fa fa-bus me-1 text-primary"/>Standard Fixed Rate: ETB 4,000 / month (Grade ≤ 17).
                                     </div>
 
                                     <separator string="Other Approved Allowances"/>
@@ -102,9 +104,9 @@
                                     <div class="text-muted small">4. Total Monthly Deductions (ጠቅላላ ተቀናሾች)</div>
                                     <div class="fs-4 fw-bold text-danger">- <field name="total_monthly_deductions" widget="monetary" readonly="1"/></div>
                                 </div>
-                                <div class="p-3 border rounded border-success bg-success bg-opacity-10">
-                                    <div class="text-success small fw-bold">5. Estimated Net Take-Home (የተጣራ ተገማች ደመወዝ)</div>
-                                    <div class="fs-3 fw-bold text-success">= <field name="net_wage_after_deductions" widget="monetary" readonly="1"/></div>
+                                <div class="p-3 border border-success border-2 rounded bg-white shadow-sm">
+                                    <div class="text-success small fw-bold text-uppercase"><i class="fa fa-check-circle me-1"/>5. Estimated Net Take-Home (የተጣራ ተገማች ደመወዝ)</div>
+                                    <div class="fs-2 fw-bold text-success mt-1">= <field name="net_wage_after_deductions" widget="monetary" readonly="1"/></div>
                                 </div>
                             </div>
                         </div>

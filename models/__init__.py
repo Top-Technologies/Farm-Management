@@ -14,4 +14,5 @@ from . import hr_payslip_employees
 from . import salary_matrix
 from . import hr_contract
 from . import family_member
-
+from . import res_company
+from . import res_config_settings
