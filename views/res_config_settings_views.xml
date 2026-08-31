@@ -7,14 +7,9 @@
         <field name="priority">50</field>
         <field name="inherit_id" ref="hr_payroll.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//block[@name='payroll_setting_container']" position="inside">
-                <setting id="fuel_price_setting" title="Universal Market Fuel Price" help="Universal daily market fuel price in Birr per liter used to calculate Grade 18 (50L) and Grade 19+ (60L) transport allowances across all contracts.">
-                    <div class="content-group">
-                        <div class="row mt16">
-                            <label for="fuel_price_per_liter" string="Fuel Price / Liter (Birr)" class="col-lg-5 o_light_label"/>
-                            <field name="fuel_price_per_liter" class="oe_inline"/>
-                        </div>
-                    </div>
+            <xpath expr="//block[@id='hr_payroll_settings']" position="inside">
+                <setting id="fuel_price_setting" string="Universal Fuel Price / Liter" help="Universal daily market fuel price in Birr per liter used to calculate Grade 18 (50L) and Grade 19+ (60L) transport allowances across all contracts.">
+                    <field name="fuel_price_per_liter" class="w-25"/><span>Birr / Liter</span>
                 </setting>
             </xpath>
         </field>

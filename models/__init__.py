@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from . import res_company
+from . import res_config_settings
 from . import farm
 from . import sub_farm
 from . import sub_unit
@@ -12,7 +14,6 @@ from . import hr_payslip
 from . import hr_payslip_run
 from . import hr_payslip_employees
 from . import salary_matrix
-from . import hr_contract
 from . import family_member
-from . import res_company
-from . import res_config_settings
+from . import hr_contract
+
