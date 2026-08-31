@@ -164,6 +164,73 @@ class HrEmployee(models.Model):
         digits=(16, 2),
     )
 
+    # Employee Age & Mandatory Date of Birth (Minimum Legal Age: 18)
+    birthday = fields.Date(
+        string='Date of Birth',
+        tracking=True,
+        required=True,
+        help='Mandatory Date of Birth. Minimum legal employment age is 18 years.',
+    )
+    age = fields.Integer(
+        string='Age',
+        compute='_compute_employee_age',
+        store=True,
+        help='Calculated age in years from Date of Birth.',
+    )
+
+    @api.depends('birthday')
+    def _compute_employee_age(self):
+        today = fields.Date.today()
+        for emp in self:
+            if emp.birthday:
+                d_birth = emp.birthday
+                age = today.year - d_birth.year - ((today.month, today.day) < (d_birth.month, d_birth.day))
+                emp.age = max(0, age)
+            else:
+                emp.age = 0
+
+    @api.constrains('birthday')
+    def _check_employee_minimum_age(self):
+        today = fields.Date.today()
+        for emp in self:
+            if not emp.birthday:
+                raise ValidationError(_("Date of Birth is mandatory for employee registration."))
+            d_birth = emp.birthday
+            if d_birth > today:
+                raise ValidationError(_("Date of Birth cannot be in the future for employee '%s'.") % (emp.name or ''))
+            age = today.year - d_birth.year - ((today.month, today.day) < (d_birth.month, d_birth.day))
+            if age < 18:
+                raise ValidationError(_(
+                    "❌ Underage Employee Registration Prohibited!\n\n"
+                    "Employee '%s' is only %d years old (Date of Birth: %s).\n"
+                    "The minimum legal employment age is 18 years or above."
+                ) % (emp.name or 'New Employee', age, emp.birthday))
+
+    @api.onchange('birthday')
+    def _onchange_birthday_check(self):
+        if self.birthday:
+            today = fields.Date.today()
+            d_birth = self.birthday
+            if d_birth > today:
+                return {
+                    'warning': {
+                        'title': _("Invalid Date of Birth"),
+                        'message': _("Date of Birth cannot be in the future."),
+                        'type': 'notification',
+                    }
+                }
+            age = today.year - d_birth.year - ((today.month, today.day) < (d_birth.month, d_birth.day))
+            self.age = max(0, age)
+            if age < 18:
+                return {
+                    'warning': {
+                        'title': _("Underage Employee Alert (Age: %d)") % age,
+                        'message': _("⚠️ This employee is %d years old (< 18). Registration is legally prohibited and will be rejected upon saving.") % age,
+                        'type': 'notification',
+                    }
+                }
+
+
 
     # Current Assignment from Latest Active Transfer
     current_transfer_id = fields.Many2one(

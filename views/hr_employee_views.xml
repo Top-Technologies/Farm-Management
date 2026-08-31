@@ -54,6 +54,19 @@
                                     <div class="text-muted small" invisible="farm_employee_type != 'head_office'">Head Office format: <strong>HQ001, HQ002...</strong></div>
                                     <div class="text-muted small" invisible="farm_employee_type == 'head_office'">Farm format: <strong>[FarmCode][Type: P/T/Z][SequentialNumber]</strong></div>
                                 </div>
+                                <label for="birthday" string="Date of Birth (DOB)"/>
+                                <div>
+                                    <div class="d-flex align-items-center">
+                                        <field name="birthday" required="1" placeholder="Select Date of Birth..." class="me-2"/>
+                                        <span class="badge text-bg-success fs-6" invisible="not birthday or age &lt; 18">
+                                            Age: <field name="age" readonly="1"/> yrs
+                                        </span>
+                                        <span class="badge text-bg-danger fs-6" invisible="not birthday or age &gt;= 18">
+                                            <i class="fa fa-ban me-1"/>Underage (<field name="age" readonly="1"/> yrs &lt; 18)
+                                        </span>
+                                    </div>
+                                    <div class="text-muted small">Mandatory legal requirement (18+ years old).</div>
+                                </div>
                             </group>
                         </div>
                         <div class="col-md-6" invisible="farm_employee_type == 'head_office'">
@@ -203,6 +216,8 @@
             </field>
             <field name="work_email" position="after">
                 <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'head_office'" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'" optional="show"/>
+                <field name="birthday" optional="show"/>
+                <field name="age" string="Age" optional="show"/>
                 <field name="current_farm_id" string="Farm" optional="show"/>
                 <field name="current_sub_unit_id" string="Sub Unit" optional="show"/>
             </field>
