@@ -1,6 +1,6 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- HR Contract Form Inherit: Salary Matrix Placement & Clean UI -->
+    <!-- HR Contract Form Inherit: Salary Matrix Placement, 6 Deduction Categories & Clean UI -->
     <record id="hr_contract_view_form_salary_matrix" model="ir.ui.view">
         <field name="name">hr.contract.form.salary.matrix</field>
         <field name="model">hr.contract</field>
@@ -43,6 +43,171 @@
             <xpath expr="//group[@name='yearly_benefits']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
+
+            <!-- Add Deductions & Estimated Net Wage Summary in Salary Group -->
+            <xpath expr="//div[@name='wage']/parent::group" position="inside">
+                <field name="total_monthly_deductions" widget="monetary" readonly="1" string="Monthly Deductions" class="text-danger fw-bold"/>
+                <field name="net_wage_after_deductions" widget="monetary" readonly="1" string="Estimated Net Wage" class="text-success fw-bold"/>
+            </xpath>
+
+            <!-- Dedicated Monthly Deductions Notebook Page -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Monthly Deductions (ተቀናሾች)" name="monthly_deductions">
+                    <!-- Top Summary Banner -->
+                    <div class="card p-3 mb-4 border-primary bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="text-primary mb-1"><i class="fa fa-list-alt me-2"/>Contract Deductions Schedule</h5>
+                                <div class="text-muted small">Configure fixed monthly deductions applicable to this employee contract.</div>
+                            </div>
+                            <div class="d-flex gap-3 text-end">
+                                <div class="p-2 border rounded bg-white">
+                                    <div class="text-muted small">Basic Gross Wage</div>
+                                    <div class="fs-5 fw-bold text-dark"><field name="wage" widget="monetary" readonly="1"/></div>
+                                </div>
+                                <div class="p-2 border rounded bg-white">
+                                    <div class="text-muted small">Total Deductions</div>
+                                    <div class="fs-5 fw-bold text-danger"><field name="total_monthly_deductions" widget="monetary" readonly="1"/></div>
+                                </div>
+                                <div class="p-2 border rounded bg-white">
+                                    <div class="text-muted small">Estimated Net</div>
+                                    <div class="fs-5 fw-bold text-success"><field name="net_wage_after_deductions" widget="monetary" readonly="1"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Category 1: Statutory & Mandatory Deductions -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm border-secondary">
+                                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-university me-2"/>1. Statutory &amp; Mandatory Deductions</strong>
+                                    <span class="badge bg-light text-dark">Subtotal: <field name="total_statutory_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="deduction_pension"/>
+                                        <field name="deduction_income_tax"/>
+                                        <field name="deduction_luc"/>
+                                        <field name="deduction_credit_assoc_mandatory"/>
+                                        <field name="deduction_social_contribution"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category 2: Loans, Advances & Recoveries -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm border-warning">
+                                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-money me-2"/>2. Loans, Advances &amp; Recoveries</strong>
+                                    <span class="badge bg-dark text-white">Subtotal: <field name="total_loan_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="deduction_advance"/>
+                                        <field name="deduction_pre_payment"/>
+                                        <field name="deduction_credit_assoc_loan"/>
+                                        <field name="deduction_medical_recovery"/>
+                                        <field name="deduction_pension_receivable"/>
+                                        <field name="deduction_fine"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category 3: Employee Savings & Financial Contributions -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm border-info">
+                                <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-piggy-bank me-2"/>3. Employee Savings &amp; Contributions</strong>
+                                    <span class="badge bg-dark text-white">Subtotal: <field name="total_savings_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="deduction_saving_kossa"/>
+                                        <field name="deduction_saving_jimma"/>
+                                        <field name="deduction_suntu_saving"/>
+                                        <field name="deduction_family_allotment"/>
+                                        <field name="deduction_cost_sharing"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category 4: Employee Welfare & Services -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm border-success">
+                                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-heartbeat me-2"/>4. Employee Welfare &amp; Services</strong>
+                                    <span class="badge bg-light text-dark">Subtotal: <field name="total_welfare_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="deduction_ration"/>
+                                        <field name="deduction_service"/>
+                                        <field name="deduction_medical_8"/>
+                                        <field name="deduction_church_contribution"/>
+                                        <field name="deduction_kindergarten"/>
+                                        <field name="deduction_cafeteria"/>
+                                        <field name="deduction_school"/>
+                                        <field name="deduction_sport"/>
+                                        <field name="deduction_hiv"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category 5: Food, Meat & Consumable Deductions -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm border-danger">
+                                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-cutlery me-2"/>5. Meat &amp; Consumable Deductions</strong>
+                                    <span class="badge bg-light text-dark">Subtotal: <field name="total_food_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="deduction_meat_meredaja"/>
+                                        <field name="deduction_jimma_meat"/>
+                                        <field name="deduction_suntu_meat"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Category 6: Bank & Other Specific Deductions -->
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm border-primary">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-bank me-2"/>6. Bank &amp; Other Specific Deductions</strong>
+                                    <span class="badge bg-light text-dark">Subtotal: <field name="total_bank_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="deduction_dashen_bank"/>
+                                        <field name="deduction_awash"/>
+                                        <field name="deduction_meredaja"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- HR Contract Tree / List View Inherit: Show Deductions & Net Wage -->
+    <record id="hr_contract_view_tree_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.contract.list.farm.inherit</field>
+        <field name="model">hr.contract</field>
+        <field name="inherit_id" ref="hr_contract.hr_contract_view_tree"/>
+        <field name="arch" type="xml">
+            <field name="wage" position="after">
+                <field name="total_monthly_deductions" widget="monetary" optional="show" string="Total Deductions"/>
+                <field name="net_wage_after_deductions" widget="monetary" optional="show" string="Estimated Net Wage" decoration-bf="1"/>
+            </field>
         </field>
     </record>
 </odoo>
