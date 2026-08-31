@@ -247,4 +247,16 @@
             </filter>
         </field>
     </record>
+
+    <!-- Inherit Employee Print Badge QWeb Template: Add Farm ID & Age -->
+    <template id="print_employee_badge_farm_inherit" inherit_id="hr.print_employee_badge">
+        <xpath expr="//div[@t-if='employee.barcode']" position="before">
+            <div t-if="employee.fms_employee_id or employee.barcode" style="font-size: 11pt; font-weight: bold; color: #198754; margin-bottom: 2pt;">
+                <span t-out="employee.fms_employee_id or employee.barcode"/>
+            </div>
+            <div t-if="employee.age" style="font-size: 9pt; color: #495057; font-weight: 600; margin-bottom: 3pt;">
+                Age: <span t-out="employee.age"/> yrs
+            </div>
+        </xpath>
+    </template>
 </odoo>

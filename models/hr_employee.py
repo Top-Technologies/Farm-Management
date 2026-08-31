@@ -355,12 +355,26 @@ class HrEmployee(models.Model):
             new_id = self._generate_farm_employee_id(False, 'head_office')
             self.fms_employee_id = new_id
             self.employee_code = new_id
+            self.barcode = new_id
         else:
             farm = self.initial_farm_id or self.current_farm_id
             if farm and self.farm_employee_type:
                 new_id = self._generate_farm_employee_id(farm, self.farm_employee_type)
                 self.fms_employee_id = new_id
                 self.employee_code = new_id
+                self.barcode = new_id
+
+    def generate_random_barcode(self):
+        """Overrides barcode generation to ensure Badge ID is always identical to Farm ID / Employee ID."""
+        for employee in self:
+            if employee.fms_employee_id:
+                employee.barcode = employee.fms_employee_id
+            else:
+                farm = employee.initial_farm_id or employee.current_farm_id
+                new_id = employee._generate_farm_employee_id(farm, employee.farm_employee_type)
+                employee.fms_employee_id = new_id
+                employee.employee_code = new_id
+                employee.barcode = new_id
 
     def _generate_farm_employee_id(self, farm, emp_type):
         """Generates sequential ID:
@@ -424,6 +438,7 @@ class HrEmployee(models.Model):
                     new_id = self._generate_farm_employee_id(False, 'head_office')
                     vals['fms_employee_id'] = new_id
                     vals['employee_code'] = new_id
+                    vals['barcode'] = new_id
             else:
                 # Cascade hierarchy from initial_sub_unit_id if provided
                 sub_unit_id = vals.get('initial_sub_unit_id')
@@ -442,6 +457,10 @@ class HrEmployee(models.Model):
                     new_id = self._generate_farm_employee_id(farm, emp_type)
                     vals['fms_employee_id'] = new_id
                     vals['employee_code'] = new_id
+                    vals['barcode'] = new_id
+
+            if vals.get('fms_employee_id') and not vals.get('barcode'):
+                vals['barcode'] = vals['fms_employee_id']
 
         employees = super().create(vals_list)
 
@@ -490,6 +509,10 @@ class HrEmployee(models.Model):
                     new_id = employee._generate_farm_employee_id(new_farm, new_type)
                     vals['fms_employee_id'] = new_id
                     vals['employee_code'] = new_id
+                    vals['barcode'] = new_id
+
+        if vals.get('fms_employee_id') and not vals.get('barcode'):
+            vals['barcode'] = vals['fms_employee_id']
 
         res = super().write(vals)
 
@@ -498,6 +521,7 @@ class HrEmployee(models.Model):
                 emp._sync_sub_unit_assignment()
 
         return res
+
 
 
     def _sync_sub_unit_assignment(self):
