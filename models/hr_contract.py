@@ -98,13 +98,6 @@ class HrContract(models.Model):
         help='Monthly transport or fuel allowance. Auto-populated from grade/fuel price, but freely editable for custom rates.',
     )
 
-    allowance_electric_vehicle = fields.Float(
-        string='Electric Vehicle Allowance (የኤሌክትሪክ መኪና አበል)',
-        digits=(16, 2),
-        default=0.0,
-        tracking=True,
-        help='ETB 5,000 per month for employees assigned electric company vehicles (operating expense).',
-    )
     allowance_hardship = fields.Float(
         string='Hardship Allowance (የአስቸጋሪ ቦታ / ስራ አበል)',
         digits=(16, 2),
@@ -506,10 +499,10 @@ class HrContract(models.Model):
             self.allowance_transport = 0.0
             self.fuel_liters = 0.0
 
-    @api.depends('wage', 'allowance_transport', 'allowance_electric_vehicle', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime')
+    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime')
     def _compute_all_allowances(self):
         for c in self:
-            tot_allow = (c.allowance_transport or 0.0) + (c.allowance_electric_vehicle or 0.0) + \
+            tot_allow = (c.allowance_transport or 0.0) + \
                         (c.allowance_hardship or 0.0) + (c.allowance_retroactive or 0.0) + \
                         (c.allowance_overtime or 0.0)
             c.total_monthly_allowances = tot_allow

@@ -71,7 +71,6 @@
                                     </div>
 
                                     <separator string="Other Approved Allowances"/>
-                                    <field name="allowance_electric_vehicle"/>
                                     <field name="allowance_hardship"/>
                                     <field name="allowance_retroactive"/>
                                     <field name="allowance_overtime"/>
