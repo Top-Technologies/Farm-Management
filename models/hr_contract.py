@@ -383,19 +383,33 @@ class HrContract(models.Model):
     # =========================================================================
     # 6. Bank & Other Specific Deductions
     # =========================================================================
-    deduction_dashen_bank = fields.Float(
-        string='Dashen Bank (ዳሽን ባንክ)',
+    deduction_dashen_credit = fields.Float(
+        string='Dashen Bank – Loan / Credit (ዳሽን ባንክ ብድር)',
         digits=(16, 2),
         default=0.0,
         tracking=True,
-        help='Dashen bank loan or deduction.',
+        help='Monthly loan repayment installment for Dashen Bank.',
     )
-    deduction_awash = fields.Float(
-        string='Awash (አዋሽ ባንክ)',
+    deduction_dashen_saving = fields.Float(
+        string='Dashen Bank – Savings (ዳሽን ባንክ ቁጠባ)',
         digits=(16, 2),
         default=0.0,
         tracking=True,
-        help='Awash bank loan or deduction.',
+        help='Voluntary monthly savings deduction deposited to Dashen Bank.',
+    )
+    deduction_awash_credit = fields.Float(
+        string='Awash Bank – Loan / Credit (አዋሽ ባንክ ብድር)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly loan repayment installment for Awash Bank.',
+    )
+    deduction_awash_saving = fields.Float(
+        string='Awash Bank – Savings (አዋሽ ባንክ ቁጠባ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Voluntary monthly savings deduction deposited to Awash Bank.',
     )
     deduction_meredaja = fields.Float(
         string='Meredaja (መርጃ / እድር)',
@@ -527,7 +541,8 @@ class HrContract(models.Model):
         # Category 5
         'deduction_meat_meredaja', 'deduction_jimma_meat', 'deduction_suntu_meat',
         # Category 6
-        'deduction_dashen_bank', 'deduction_awash', 'deduction_meredaja',
+        'deduction_dashen_credit', 'deduction_dashen_saving',
+        'deduction_awash_credit', 'deduction_awash_saving', 'deduction_meredaja',
     )
     def _compute_all_deductions(self):
         for c in self:
@@ -541,7 +556,8 @@ class HrContract(models.Model):
                  (c.deduction_church_contribution or 0.0) + (c.deduction_kindergarten or 0.0) + (c.deduction_cafeteria or 0.0) + \
                  (c.deduction_school or 0.0) + (c.deduction_sport or 0.0) + (c.deduction_hiv or 0.0)
             c5 = (c.deduction_meat_meredaja or 0.0) + (c.deduction_jimma_meat or 0.0) + (c.deduction_suntu_meat or 0.0)
-            c6 = (c.deduction_dashen_bank or 0.0) + (c.deduction_awash or 0.0) + (c.deduction_meredaja or 0.0)
+            c6 = (c.deduction_dashen_credit or 0.0) + (c.deduction_dashen_saving or 0.0) + \
+                 (c.deduction_awash_credit or 0.0) + (c.deduction_awash_saving or 0.0) + (c.deduction_meredaja or 0.0)
 
             c.total_statutory_deductions = c1
             c.total_loan_deductions = c2

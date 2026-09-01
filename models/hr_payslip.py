@@ -1,6 +1,17 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api, _
+from odoo import models, fields, api, Command, _
 from odoo.exceptions import UserError, ValidationError
+
+LOAN_RULE_TO_ATTACHMENT_TYPE = {
+    'DED_DASHEN_CREDIT': 'dashen_credit',
+    'DED_AWASH_CREDIT': 'awash_credit',
+    'DED_CREDIT_LOAN': 'credit_assoc_loan',
+    'DED_ADVANCE': 'advance',
+    'DED_PRE_PAYMENT': 'pre_payment',
+    'DED_MEDICAL_RECOVERY': 'medical_recovery',
+    'DED_PENSION_RECEIVABLE': 'pension_receivable',
+    'DED_FINE': 'fine',
+}
 
 
 class HrPayslip(models.Model):
@@ -108,6 +119,37 @@ class HrPayslip(models.Model):
                         'payment_status': 'in_payroll',
                     })
 
+    def _compute_input_line_ids(self):
+        super()._compute_input_line_ids()
+        for slip in self:
+            # Prevent double deductions: If an attachment is linked to a contract deduction
+            # (e.g. Dashen/Awash credit, credit assoc loan, advance), suppress the generic ATTACH_SALARY input line
+            loan_attachments = slip.employee_id.salary_attachment_ids.filtered(
+                lambda a: a.state == 'open' and a.loan_deduction_type and a.loan_deduction_type != 'other'
+            )
+            if loan_attachments:
+                types_to_remove = loan_attachments.mapped('other_input_type_id').ids
+                lines_to_remove = slip.input_line_ids.filtered(lambda l: l.input_type_id.id in types_to_remove)
+                if lines_to_remove:
+                    slip.update({'input_line_ids': [Command.unlink(line.id) for line in lines_to_remove]})
+
+    def _record_loan_attachment_payments(self):
+        """Record loan deduction payments against open salary attachments when payslip is paid."""
+        for slip in self:
+            if not slip.employee_id:
+                continue
+            for line in slip.line_ids:
+                ded_type = LOAN_RULE_TO_ATTACHMENT_TYPE.get(line.code)
+                if not ded_type or line.total == 0:
+                    continue
+                amount_paid = abs(line.total)
+                attachments = slip.employee_id.salary_attachment_ids.filtered(
+                    lambda a: a.state == 'open' and a.loan_deduction_type == ded_type
+                )
+                for att in attachments:
+                    att.record_payment(amount_paid)
+                    att.write({'payslip_ids': [(4, slip.id)]})
+
     def compute_sheet(self):
         # Attach farm work entries before computing salary rules
         self._attach_farm_work_entries()
@@ -121,6 +163,7 @@ class HrPayslip(models.Model):
                     'payment_status': 'paid',
                     'paid_date': fields.Date.today(),
                 })
+        self._record_loan_attachment_payments()
         return res
 
     def action_payslip_paid(self):
@@ -131,6 +174,13 @@ class HrPayslip(models.Model):
                     'payment_status': 'paid',
                     'paid_date': fields.Date.today(),
                 })
+        self._record_loan_attachment_payments()
+        return res
+
+    def write(self, vals):
+        res = super().write(vals)
+        if vals.get('state') == 'paid':
+            self._record_loan_attachment_payments()
         return res
 
     def action_payslip_cancel(self):

@@ -16,4 +16,5 @@ from . import hr_payslip_employees
 from . import salary_matrix
 from . import family_member
 from . import hr_contract
+from . import hr_salary_attachment
 

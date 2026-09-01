@@ -590,30 +590,58 @@ result = -contract.deduction_suntu_meat
         </record>
 
         <!-- 3.9 Category 6: Bank & Other Specific Deductions -->
-        <record id="rule_ded_dashen_bank" model="hr.salary.rule">
+        <record id="rule_ded_dashen_credit" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.DED"/>
-            <field name="name">Dashen Bank (ዳሽን ባንክ)</field>
-            <field name="code">DED_DASHEN_BANK</field>
+            <field name="name">Dashen Bank Credit / Loan (ዳሽን ባንክ ብድር)</field>
+            <field name="code">DED_DASHEN_CREDIT</field>
             <field name="sequence">160</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_dashen_bank and contract.deduction_dashen_bank > 0)</field>
+            <field name="condition_python">result = bool(contract.deduction_dashen_credit and contract.deduction_dashen_credit > 0)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_dashen_bank
+result = -contract.deduction_dashen_credit
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
-        <record id="rule_ded_awash" model="hr.salary.rule">
+        <record id="rule_ded_dashen_saving" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.DED"/>
-            <field name="name">Awash (አዋሽ ባንክ)</field>
-            <field name="code">DED_AWASH</field>
+            <field name="name">Dashen Bank Savings (ዳሽን ባንክ ቁጠባ)</field>
+            <field name="code">DED_DASHEN_SAVING</field>
             <field name="sequence">161</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_awash and contract.deduction_awash > 0)</field>
+            <field name="condition_python">result = bool(contract.deduction_dashen_saving and contract.deduction_dashen_saving > 0)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_awash
+result = -contract.deduction_dashen_saving
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_awash_credit" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Awash Bank Credit / Loan (አዋሽ ባንክ ብድር)</field>
+            <field name="code">DED_AWASH_CREDIT</field>
+            <field name="sequence">162</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_awash_credit and contract.deduction_awash_credit > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_awash_credit
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_awash_saving" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Awash Bank Savings (አዋሽ ባንክ ቁጠባ)</field>
+            <field name="code">DED_AWASH_SAVING</field>
+            <field name="sequence">163</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_awash_saving and contract.deduction_awash_saving > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_awash_saving
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -622,7 +650,7 @@ result = -contract.deduction_awash
             <field name="category_id" ref="hr_payroll.DED"/>
             <field name="name">Meredaja (መርጃ / እድር)</field>
             <field name="code">DED_MEREDAJA</field>
-            <field name="sequence">162</field>
+            <field name="sequence">164</field>
             <field name="condition_select">python</field>
             <field name="condition_python">result = bool(contract.deduction_meredaja and contract.deduction_meredaja > 0)</field>
             <field name="amount_select">code</field>

@@ -248,8 +248,10 @@
                                 </div>
                                 <div class="card-body">
                                     <group class="mb-0">
-                                        <field name="deduction_dashen_bank"/>
-                                        <field name="deduction_awash"/>
+                                        <field name="deduction_dashen_credit"/>
+                                        <field name="deduction_dashen_saving"/>
+                                        <field name="deduction_awash_credit"/>
+                                        <field name="deduction_awash_saving"/>
                                         <field name="deduction_meredaja"/>
                                     </group>
                                 </div>

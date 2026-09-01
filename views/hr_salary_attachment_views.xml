@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Salary Attachment Form View Inherit: Add Contract Loan Deduction Link -->
+    <record id="hr_salary_attachment_view_form_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.salary.attachment.form.farm.inherit</field>
+        <field name="model">hr.salary.attachment</field>
+        <field name="inherit_id" ref="hr_payroll.hr_salary_attachment_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='other_input_type_id']" position="after">
+                <field name="loan_deduction_type" widget="selection" readonly="has_done_payslip"/>
+                <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" invisible="not loan_deduction_type or loan_deduction_type == 'other'">
+                    <i class="fa fa-link me-2 fs-5 text-primary" title="Connected Loan Link"/>
+                    <div>
+                        <strong>Connected to Contract Loan Deduction:</strong>
+                        Monthly installment automatically synchronizes with the employee's contract deduction and tracks loan repayment without double-deducting on the payslip.
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Salary Attachment List / Tree View Inherit: Show Loan Link Badge -->
+    <record id="hr_salary_attachment_view_tree_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.salary.attachment.list.farm.inherit</field>
+        <field name="model">hr.salary.attachment</field>
+        <field name="inherit_id" ref="hr_payroll.hr_salary_attachment_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='other_input_type_id']" position="after">
+                <field name="loan_deduction_type" widget="badge" optional="show"
+                       decoration-info="loan_deduction_type in ('dashen_credit', 'awash_credit')"
+                       decoration-warning="loan_deduction_type == 'credit_assoc_loan'"
+                       decoration-primary="loan_deduction_type in ('advance', 'pre_payment')"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
