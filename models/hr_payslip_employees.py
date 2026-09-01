@@ -48,8 +48,7 @@ class HrPayslipEmployees(models.TransientModel):
         return res
 
     def compute_sheet(self):
-        # Auto-ensure contract for temporary and zemach workers before standard compute_sheet
+        # Auto-ensure contract for all workers before standard compute_sheet
         for emp in self.employee_ids:
-            if emp.farm_employee_type in ('temporary', 'zemach'):
-                emp._get_or_create_farm_contract()
+            emp._get_or_create_farm_contract()
         return super().compute_sheet()

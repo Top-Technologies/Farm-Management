@@ -299,18 +299,6 @@ class EmployeeAPI(http.Controller):
             is_permanent     = (emp_type in ('permanent', 'head_office'))
 
 
-            # PERMANENT workers are on regular payroll — reject entirely
-            if is_permanent:
-                if cr: cr.close()
-                return self._json_response({
-                    "status": "error",
-                    "message": (
-                        f"Permanent employees are managed through regular payroll and do NOT submit "
-                        f"farm work entries via this API. "
-                        f"Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as 'Permanent'."
-                    )
-                }, status=400)
-
             # 2. Resolve Farm Location
             farm = emp.current_farm_id or emp.initial_farm_id
             sub_farm = emp.current_sub_farm_id or emp.initial_sub_farm_id
@@ -327,53 +315,14 @@ class EmployeeAPI(http.Controller):
                     "message": "No farm found in the system to calculate rates."
                 }, status=400)
 
-            # 3. Determine Entry Type & Enforce Rules
-            #    Temporary  → daily rate ONLY (score: 0.5 / 1.0 / 1.5)
-            #    Zemach     → piece rate ONLY (activity + quantity score)
+            # 3. Determine Entry Type (Piece Rate vs Temporary Daily Rate)
             is_temporary_rate = False
             if entry_type_req in ('temporary_rate', 'daily_rate', 'temporary'):
                 is_temporary_rate = True
             elif not activity_identifier:
-                if is_temp_worker:
-                    is_temporary_rate = True
-                elif is_zemach_worker:
-                    if cr: cr.close()
-                    return self._json_response({
-                        "status": "error",
-                        "message": (
-                            f"Zemach (seasonal) workers use piece-rate entries. "
-                            f"Please provide 'activity_id' (e.g. 'SP', 'CULT', 'HARV') and 'score' (quantity produced). "
-                            f"Employee: '{emp.name}' (ID: {emp.fms_employee_id or emp.id})."
-                        )
-                    }, status=400)
+                is_temporary_rate = True
             elif str(activity_identifier).upper() in ('TEMP', 'TEMPORARY', 'DAILY', 'ATTENDANCE'):
                 is_temporary_rate = True
-
-            # Daily rate requested → must be a Temporary worker
-            if is_temporary_rate and not is_temp_worker:
-                if cr: cr.close()
-                return self._json_response({
-                    "status": "error",
-                    "message": (
-                        f"Daily rate entries (attendance) are ONLY for Temporary workers. "
-                        f"Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as "
-                        f"'{emp_type}'. "
-                        f"{'Use piece-rate with an activity_id for Zemach workers.' if is_zemach_worker else ''}"
-                    )
-                }, status=400)
-
-            # Piece rate requested → must be a Zemach worker
-            if not is_temporary_rate and activity_identifier and not is_zemach_worker:
-                if cr: cr.close()
-                return self._json_response({
-                    "status": "error",
-                    "message": (
-                        f"Piece-rate (activity-based) entries are ONLY for Zemach (seasonal) workers. "
-                        f"Employee '{emp.name}' (ID: {emp.fms_employee_id or emp.id}) is classified as "
-                        f"'{emp_type}'. "
-                        f"{'Use a daily rate entry (score: 0.5/1.0/1.5) for Temporary workers.' if is_temp_worker else ''}"
-                    )
-                }, status=400)
 
             activity = False
             norm_rate = 0.0

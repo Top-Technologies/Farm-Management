@@ -195,28 +195,13 @@ class FarmWorkEntry(models.Model):
     )
     notes = fields.Text(string='Notes / Remarks')
 
-    @api.constrains('entry_type', 'employee_id', 'score_value', 'work_duration')
-    def _check_temporary_worker_restriction(self):
+    @api.constrains('entry_type', 'score_value')
+    def _check_work_entry_validity(self):
         for entry in self:
-            if entry.entry_type == 'temporary_rate':
-                emp = entry.employee_id
-                emp_code = (emp.fms_employee_id or emp.employee_code or '').upper()
-                is_temp_type = emp.farm_employee_type == 'temporary'
-                has_t_code = 'T' in emp_code if emp_code else is_temp_type
-
-                if not (is_temp_type and has_t_code):
-                    type_str = dict(emp._fields['farm_employee_type'].selection).get(emp.farm_employee_type, emp.farm_employee_type or 'Unknown')
-                    raise ValidationError(_(
-                        "Temporary Worker Daily Rate entries are ONLY permitted for Temporary Workers whose ID contains 'T'!\n\n"
-                        "Employee '%s' (ID: %s) is classified as '%s'. "
-                        "Please use Activity Piece Rate for Permanent and Zemach workers."
-                    ) % (emp.name, emp.fms_employee_id or emp.id, type_str))
-
-                if entry.score_value not in (0.5, 1.0, 1.5):
-                    raise ValidationError(_(
-                        "Temporary Worker work score must be strictly 0.5 (Half Day), 1.0 (Full Day), or 1.5 (Full + Half Day).\n"
-                        "Received score: %s. Custom scores are not permitted for temporary workers."
-                    ) % entry.score_value)
+            if entry.score_value <= 0:
+                raise ValidationError(_("Work score / days worked must be strictly greater than 0!"))
+            if entry.entry_type == 'piece_rate' and not entry.activity_id:
+                raise ValidationError(_("Please select an Activity for Piece Rate work entries."))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -381,16 +366,6 @@ class FarmWorkEntry(models.Model):
                 raise ValidationError(_("Score / Days worked must be greater than zero!"))
             if entry.entry_type == 'piece_rate' and not entry.activity_id:
                 raise ValidationError(_("Please select an Activity for Piece Rate work entry!"))
-            if entry.entry_type == 'temporary_rate':
-                emp = entry.employee_id
-                emp_code = (emp.fms_employee_id or emp.employee_code or '').upper()
-                if emp.farm_employee_type != 'temporary' or ('T' not in emp_code if emp_code else False):
-                    raise ValidationError(_(
-                        "Temporary Worker Daily Rate entries are ONLY permitted for Temporary Workers (IDs containing 'T')!\n\n"
-                        "Employee '%s' (ID: %s) is not a Temporary Worker."
-                    ) % (emp.name, emp.fms_employee_id or emp.id))
-                if entry.score_value not in (0.5, 1.0, 1.5):
-                    raise ValidationError(_("Temporary Worker work score must be strictly 0.5 (Half Day), 1.0 (Full Day), or 1.5 (Full + Half Day)."))
             entry.state = 'confirmed'
 
     def action_approve(self):

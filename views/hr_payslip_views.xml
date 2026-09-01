@@ -17,9 +17,9 @@
             </xpath>
 
             <notebook position="inside">
-                <page string="Farm Work Entries" name="farm_work_entries" invisible="farm_work_entries_count == 0 and farm_employee_type not in ('temporary', 'zemach')">
+                <page string="Farm Work Entries" name="farm_work_entries" invisible="farm_work_entries_count == 0">
                     <div class="alert alert-info d-flex align-items-center mb-3" role="alert" invisible="farm_work_entries_count == 0">
-                        <i class="fa fa-calculator fa-2x me-3"></i>
+                        <i class="fa fa-calculator fa-2x me-3" title="Work Breakdown Calculator"></i>
                         <div>
                             <strong>Agricultural Work Breakdown:</strong>
                             <span> <field name="farm_work_entries_count" class="fw-bold"/> work entries attached. Total Gross: <strong><field name="farm_work_total_amount" widget="monetary"/></strong></span>

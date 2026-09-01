@@ -107,7 +107,7 @@ result = categories['GROSS'] - categories['DED']
             <field name="country_id" eval="False"/>
         </record>
 
-        <!-- 3.1 Basic Wage -->
+        <!-- 3.1 Basic Wage & Untaxed Field Work Additions -->
         <record id="rule_perm_basic" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.BASIC"/>
             <field name="name">Basic Salary (መነሻ ደመወዝ)</field>
@@ -121,7 +121,22 @@ result = payslip.paid_amount or (contract.wage or 0.0)
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
-        <!-- 3.2 Allowances (ALW) -->
+        <!-- Untaxed Field Work Earnings Addition (Piece-Rate & Daily Rate Entries) -->
+        <record id="rule_perm_alw_field_work" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.ALW"/>
+            <field name="name">Untaxed Field Work Earnings (የእርሻ ስራ ተጨማሪ ክፍያ - ከግብር ነፃ)</field>
+            <field name="code">ALW_FIELD_WORK</field>
+            <field name="sequence">15</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(payslip.farm_work_total_amount and payslip.farm_work_total_amount > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.farm_work_total_amount
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <!-- 3.2 Standard Allowances (ALW) -->
         <record id="rule_perm_alw_transport" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.ALW"/>
             <field name="name">Transport Allowance (የመጓጓዣ አበል)</field>

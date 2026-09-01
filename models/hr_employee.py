@@ -761,10 +761,14 @@ class HrEmployee(models.Model):
             struct_type = self.env['hr.payroll.structure.type'].search([], limit=1)
 
         struct = False
+        wage = 0.0
         if self.farm_employee_type == 'temporary':
             struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
         elif self.farm_employee_type == 'zemach':
             struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
+        elif self.farm_employee_type in ('permanent', 'head_office'):
+            struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
+            wage = self.matrix_basic_wage or 0.0
 
         type_name = dict(self._fields['farm_employee_type'].selection).get(self.farm_employee_type, self.farm_employee_type or 'Worker')
         contract_vals = {
@@ -772,7 +776,7 @@ class HrEmployee(models.Model):
             'employee_id': self.id,
             'company_id': self.company_id.id,
             'structure_type_id': struct_type.id if struct_type else False,
-            'wage': 0.0,
+            'wage': wage,
             'state': 'open',
             'date_start': fields.Date.today(),
         }

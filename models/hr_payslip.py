@@ -97,27 +97,28 @@ class HrPayslip(models.Model):
             slip.farm_work_days_count = sum(entries.mapped('score_value'))
 
     def _attach_farm_work_entries(self):
-        """Finds and attaches unpaid non-cancelled work entries for Temporary & Zemach workers."""
+        """Finds and attaches unpaid non-cancelled work entries for all workers (Permanent, Seasonal, Temporary)."""
         for slip in self:
             emp = slip.employee_id
-            if emp.farm_employee_type in ('temporary', 'zemach'):
-                domain = [
-                    ('employee_id', '=', emp.id),
-                    ('date', '>=', slip.date_from),
-                    ('date', '<=', slip.date_to),
-                    ('state', '!=', 'cancelled'),
-                    ('payment_status', 'in', ('unpaid', 'in_payroll', False)),
-                    '|',
-                    ('payslip_id', '=', False),
-                    ('payslip_id', '=', slip.id),
-                ]
-                work_entries = self.env['farm.work.entry'].search(domain)
-                if work_entries:
-                    work_entries.write({
-                        'payslip_id': slip.id,
-                        'payslip_run_id': slip.payslip_run_id.id if slip.payslip_run_id else False,
-                        'payment_status': 'in_payroll',
-                    })
+            if not emp:
+                continue
+            domain = [
+                ('employee_id', '=', emp.id),
+                ('date', '>=', slip.date_from),
+                ('date', '<=', slip.date_to),
+                ('state', '!=', 'cancelled'),
+                ('payment_status', 'in', ('unpaid', 'in_payroll', False)),
+                '|',
+                ('payslip_id', '=', False),
+                ('payslip_id', '=', slip.id),
+            ]
+            work_entries = self.env['farm.work.entry'].search(domain)
+            if work_entries:
+                work_entries.write({
+                    'payslip_id': slip.id,
+                    'payslip_run_id': slip.payslip_run_id.id if slip.payslip_run_id else False,
+                    'payment_status': 'in_payroll',
+                })
 
     def _compute_input_line_ids(self):
         super()._compute_input_line_ids()

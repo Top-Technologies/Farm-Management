@@ -95,19 +95,25 @@ class HrPayslipRun(models.Model):
             if self.farm_id and self.worker_type == 'permanent':
                 emp_domain.extend(['|', ('current_farm_id', '=', self.farm_id.id), ('initial_farm_id', '=', self.farm_id.id)])
             eligible_employees = self.env['hr.employee'].search(emp_domain)
+        elif self.worker_type == 'all':
+            we_employees = unpaid_entries.mapped('employee_id')
+            perm_domain = [
+                ('farm_employee_type', 'in', ('permanent', 'head_office')),
+                '|', ('company_id', '=', False), ('company_id', '=', self.company_id.id)
+            ]
+            if self.farm_id:
+                perm_domain.extend(['|', ('current_farm_id', '=', self.farm_id.id), ('initial_farm_id', '=', self.farm_id.id)])
+            perm_employees = self.env['hr.employee'].search(perm_domain)
+            eligible_employees = we_employees | perm_employees
         else:
             eligible_employees = unpaid_entries.mapped('employee_id')
-
 
         if not eligible_employees:
             worker_label = dict(self._fields['worker_type'].selection).get(self.worker_type, self.worker_type)
             raise UserError(_(
-                "No unpaid work entries found for %s in period from %s to %s.\n\n"
-                "Please verify that:\n"
-                "1. Work entries have dates between %s and %s.\n"
-                "2. The employee classification is set to '%s'.\n"
-                "3. The work entries are not in 'Cancelled' or 'Paid' status."
-            ) % (worker_label, self.date_start, self.date_end, self.date_start, self.date_end, worker_label))
+                "No eligible employees or unpaid work entries found for %s in period from %s to %s.\n\n"
+                "Please verify that work entries exist and are approved, or that active employees are configured."
+            ) % (worker_label, self.date_start, self.date_end))
 
         # 3. Exclude employees already having a payslip in this batch
         existing_emp_ids = self.slip_ids.mapped('employee_id').ids
@@ -127,6 +133,8 @@ class HrPayslipRun(models.Model):
                 struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
             elif emp.farm_employee_type == 'zemach':
                 struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
+            elif emp.farm_employee_type in ('permanent', 'head_office'):
+                struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
 
             if not struct and contract:
                 struct = contract.structure_type_id.default_struct_id or contract.struct_id
