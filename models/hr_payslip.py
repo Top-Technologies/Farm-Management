@@ -217,3 +217,13 @@ class HrPayslip(models.Model):
                 'paid_date': False,
             })
         return super().unlink()
+
+    def init(self):
+        super().init()
+        # Clean up any legacy obsolete salary rules
+        try:
+            self.env.cr.execute("""
+                DELETE FROM hr_salary_rule WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH');
+            """)
+        except Exception:
+            pass
