@@ -231,5 +231,35 @@ class HrPayslip(models.Model):
             self.env.cr.execute("""
                 DELETE FROM hr_salary_rule WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH');
             """)
+            # Directly ensure DED_INCOME_TAX and DED_PENSION_7 rules compute dynamically
+            income_tax_code = """taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+
+if taxable <= 2000:
+    result = 0.0
+elif taxable <= 4000:
+    result = - 0.15 * taxable + 300.0
+elif taxable <= 7000:
+    result = - 0.20 * taxable + 500.0
+elif taxable <= 10000:
+    result = - 0.25 * taxable + 850.0
+elif taxable <= 14000:
+    result = - 0.30 * taxable + 1350.0
+else:
+    result = - 0.35 * taxable + 2050.0
+
+result = round(result, 2)"""
+            pension_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+result = -round(basic * 0.07, 2)"""
+
+            self.env.cr.execute("""
+                UPDATE hr_salary_rule
+                SET amount_python_compute = %s
+                WHERE code = 'DED_INCOME_TAX';
+            """, (income_tax_code,))
+            self.env.cr.execute("""
+                UPDATE hr_salary_rule
+                SET amount_python_compute = %s
+                WHERE code = 'DED_PENSION_7';
+            """, (pension_code,))
         except Exception:
             pass

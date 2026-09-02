@@ -194,18 +194,22 @@ class HrContract(models.Model):
     # 1. Statutory & Mandatory Deductions
     # =========================================================================
     deduction_pension = fields.Float(
-        string='Pension (የጡረታ መዋጮ)',
+        string='Pension 7% (የጡረታ መዋጮ)',
+        compute='_compute_statutory_taxes',
+        store=True,
+        readonly=False,
         digits=(16, 2),
-        default=0.0,
         tracking=True,
-        help='Legally required employee pension deduction.',
+        help='Legally required employee pension deduction (7% of Basic Salary).',
     )
     deduction_income_tax = fields.Float(
         string='Income Tax (የገቢ ግብር)',
+        compute='_compute_statutory_taxes',
+        store=True,
+        readonly=False,
         digits=(16, 2),
-        default=0.0,
         tracking=True,
-        help='Statutory employee income tax deduction.',
+        help='Statutory employee income tax calculated progressively from Taxable Salary.',
     )
     deduction_luc = fields.Float(
         string='L.U.C 1% (የሰራተኛ ማህበር 1%)',
@@ -680,6 +684,7 @@ class HrContract(models.Model):
             if wage > 0:
                 self.matrix_basic_wage = wage
                 self.wage = wage
+                self._compute_statutory_taxes()
 
     @api.onchange('employee_id')
     def _onchange_employee_matrix_default(self):
@@ -690,6 +695,40 @@ class HrContract(models.Model):
                 self.salary_matrix_type = 'farm'
             elif not self.salary_matrix_type:
                 self.salary_matrix_type = 'head_office'
+
+    # =========================================================================
+    # Statutory Taxes Dynamic Computation
+    # =========================================================================
+    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
+    def _compute_statutory_taxes(self):
+        for c in self:
+            wage = c.wage or 0.0
+            # 7% Employee Pension based on basic wage
+            c.deduction_pension = round(wage * 0.07, 2)
+
+            # Taxable Salary = Wage + Taxable Allowances (Transport, Hardship, Overtime)
+            taxable = wage + (c.allowance_transport or 0.0) + \
+                      (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
+
+            if taxable <= 2000:
+                tax = 0.0
+            elif taxable <= 4000:
+                tax = 0.15 * taxable - 300.0
+            elif taxable <= 7000:
+                tax = 0.20 * taxable - 500.0
+            elif taxable <= 10000:
+                tax = 0.25 * taxable - 850.0
+            elif taxable <= 14000:
+                tax = 0.30 * taxable - 1350.0
+            else:
+                tax = 0.35 * taxable - 2050.0
+
+            c.deduction_income_tax = round(max(0.0, tax), 2)
+
+    @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
+    def _onchange_wage_taxes_estimate(self):
+        for c in self:
+            c._compute_statutory_taxes()
 
     # =========================================================================
     # Back Pay / Retroactive Adjustment Computation & Logic
@@ -737,31 +776,6 @@ class HrContract(models.Model):
             self.back_pay_monthly_diff = monthly_diff
             self.back_pay_total = total_back_pay
             self.allowance_retroactive = total_back_pay
-
-    @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
-    def _onchange_wage_taxes_estimate(self):
-        if self.wage:
-            # 7% Employee Pension
-            if not self.deduction_pension:
-                self.deduction_pension = round(self.wage * 0.07, 2)
-
-            # Taxable Salary = Wage + Taxable Allowances (Transport, Hardship, Overtime)
-            taxable = (self.wage or 0.0) + (self.allowance_transport or 0.0) + \
-                      (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
-            if not self.deduction_income_tax:
-                if taxable <= 2000:
-                    tax = 0.0
-                elif taxable <= 4000:
-                    tax = 0.15 * taxable - 300.0
-                elif taxable <= 7000:
-                    tax = 0.20 * taxable - 500.0
-                elif taxable <= 10000:
-                    tax = 0.25 * taxable - 850.0
-                elif taxable <= 14000:
-                    tax = 0.30 * taxable - 1350.0
-                else:
-                    tax = 0.35 * taxable - 2050.0
-                self.deduction_income_tax = round(max(0.0, tax), 2)
 
     def action_approve_back_pay(self):
         for c in self:
