@@ -721,20 +721,18 @@ class HrContract(models.Model):
             taxable = (self.wage or 0.0) + (self.allowance_transport or 0.0) + \
                       (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
             if not self.deduction_income_tax:
-                if taxable <= 600:
+                if taxable <= 2000:
                     tax = 0.0
-                elif taxable <= 1650:
-                    tax = taxable * 0.10 - 60.0
-                elif taxable <= 3200:
-                    tax = taxable * 0.15 - 142.50
-                elif taxable <= 5250:
-                    tax = taxable * 0.20 - 302.50
-                elif taxable <= 7800:
-                    tax = taxable * 0.25 - 565.0
-                elif taxable <= 10900:
-                    tax = taxable * 0.30 - 955.0
+                elif taxable <= 4000:
+                    tax = 0.15 * taxable - 300.0
+                elif taxable <= 7000:
+                    tax = 0.20 * taxable - 500.0
+                elif taxable <= 10000:
+                    tax = 0.25 * taxable - 850.0
+                elif taxable <= 14000:
+                    tax = 0.30 * taxable - 1350.0
                 else:
-                    tax = taxable * 0.35 - 1500.0
+                    tax = 0.35 * taxable - 2050.0
                 self.deduction_income_tax = round(max(0.0, tax), 2)
 
     def action_approve_back_pay(self):

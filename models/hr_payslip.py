@@ -220,8 +220,14 @@ class HrPayslip(models.Model):
 
     def init(self):
         super().init()
-        # Clean up any legacy obsolete salary rules
         try:
+            # Set noupdate=False for farm_management data records so XML updates apply seamlessly
+            self.env.cr.execute("""
+                UPDATE ir_model_data 
+                SET noupdate = false 
+                WHERE module = 'farm_management';
+            """)
+            # Clean up any legacy obsolete salary rules
             self.env.cr.execute("""
                 DELETE FROM hr_salary_rule WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH');
             """)

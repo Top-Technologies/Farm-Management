@@ -7,6 +7,18 @@
             <field name="country_id" eval="False"/>
         </record>
 
+        <!-- Category for Company Contributions (Employer Pension 11%) -->
+        <record id="category_company_contributions" model="hr.salary.rule.category">
+            <field name="name">Company Contributions (የድርጅት መዋጮ)</field>
+            <field name="code">COMP</field>
+        </record>
+
+        <!-- Category for Informational Taxable Salary Base -->
+        <record id="category_taxable_salary" model="hr.salary.rule.category">
+            <field name="name">Taxable Salary Base (ግብር የሚሰላበት ደመወዝ)</field>
+            <field name="code">TAXABLE_BASE</field>
+        </record>
+
         <!-- 1. Salary Structure: Temporary Workers (Daily Wage) -->
         <record id="structure_farm_temporary" model="hr.payroll.structure">
             <field name="name">Temporary Worker (Daily Wage Structure)</field>
@@ -195,16 +207,16 @@ result = contract.allowance_overtime
 
         <!-- 3.3 Gross & Taxable Wage -->
         <record id="rule_perm_taxable" model="hr.salary.rule">
-            <field name="category_id" ref="hr_payroll.GROSS"/>
-            <field name="name">Taxable Salary (ግብር የሚከፈልበት ገቢ)</field>
-            <field name="code">TAXABLE</field>
+            <field name="category_id" ref="category_taxable_salary"/>
+            <field name="name">Taxable Salary (ግብር የሚከፈልበት ደመወዝ)</field>
+            <field name="code">TAXABLE_SALARY</field>
             <field name="sequence">90</field>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Taxable base: Basic wage + Taxable Allowances (Transport, Hardship, Overtime)
 # Untaxed Allowances strictly excluded: ALW_FIELD_WORK (Agricultural Field Entries) and ALW_RETROACTIVE (Back Pay Difference)
-basic = categories.get('BASIC', 0.0)
+basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
 alw_trans = contract.allowance_transport or 0.0
 alw_hard = contract.allowance_hardship or 0.0
 alw_ot = contract.allowance_overtime or 0.0
@@ -229,17 +241,17 @@ result = categories['BASIC'] + categories['ALW']
         <!-- 3.4 Category 1: Statutory & Mandatory Deductions -->
         <record id="rule_ded_pension" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.DED"/>
-            <field name="name">Pension (የጡረታ መዋጮ)</field>
-            <field name="code">DED_PENSION</field>
+            <field name="name">Pension 7% (የሰራተኛ ጡረታ 7%)</field>
+            <field name="code">DED_PENSION_7</field>
             <field name="sequence">110</field>
-            <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_pension or (categories.get('BASIC', 0.0) > 0))</field>
+            <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 if contract.deduction_pension:
     result = -contract.deduction_pension
 else:
-    result = -round(categories.get('BASIC', 0.0) * 0.07, 2)
+    basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+    result = -round(basic * 0.07, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -249,30 +261,26 @@ else:
             <field name="name">Income Tax (የገቢ ግብር)</field>
             <field name="code">DED_INCOME_TAX</field>
             <field name="sequence">111</field>
-            <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_income_tax or (categories.get('BASIC', 0.0) > 600))</field>
+            <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 if contract.deduction_income_tax:
     result = -contract.deduction_income_tax
 else:
-    # Taxable Salary strictly excludes ALW_FIELD_WORK and ALW_RETROACTIVE
-    taxable = categories.get('BASIC', 0.0) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0)
-    if taxable &lt;= 600:
-        tax = 0.0
-    elif taxable &lt;= 1650:
-        tax = taxable * 0.10 - 60.0
-    elif taxable &lt;= 3200:
-        tax = taxable * 0.15 - 142.50
-    elif taxable &lt;= 5250:
-        tax = taxable * 0.20 - 302.50
-    elif taxable &lt;= 7800:
-        tax = taxable * 0.25 - 565.0
-    elif taxable &lt;= 10900:
-        tax = taxable * 0.30 - 955.0
+    taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+    if taxable &lt;= 2000:
+        result = 0.0
+    elif taxable &lt;= 4000:
+        result = - 0.15 * taxable + 300.0
+    elif taxable &lt;= 7000:
+        result = - 0.20 * taxable + 500.0
+    elif taxable &lt;= 10000:
+        result = - 0.25 * taxable + 850.0
+    elif taxable &lt;= 14000:
+        result = - 0.30 * taxable + 1350.0
     else:
-        tax = taxable * 0.35 - 1500.0
-    result = -round(max(0.0, tax), 2)
+        result = - 0.35 * taxable + 2050.0
+    result = round(result, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -726,6 +734,22 @@ result = -contract.deduction_meredaja
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 result = categories['GROSS'] + categories['DED']
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <!-- 3.11 Company Contributions (COMP) - Displayed on Payslip, Not Deducted from Net -->
+        <record id="rule_comp_pension_11" model="hr.salary.rule">
+            <field name="category_id" ref="category_company_contributions"/>
+            <field name="name">Company Pension Contribution 11% (የድርጅት ጡረታ መዋጮ 11%)</field>
+            <field name="code">COMP_PENSION_11</field>
+            <field name="sequence">210</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# 11% Company Pension Contribution based on Basic Wage (Not deducted from employee net)
+basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+result = round(basic * 0.11, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
