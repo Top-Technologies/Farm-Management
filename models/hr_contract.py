@@ -38,9 +38,16 @@ class HrContract(models.Model):
         ('farm', 'Farm Permanent (የእርሻ ልማቶች - ቋሚ)'),
     ], string='Salary Scale Category', tracking=True, help='Select which Salary Matrix applies to this contract.')
 
+    salary_grade_id = fields.Many2one(
+        'hr.salary.matrix.grade',
+        string='Salary Grade (ደረጃ)',
+        tracking=True,
+        help='Employee grade dynamically filtered by the selected Salary Matrix Scale.',
+    )
+
     salary_grade = fields.Selection([
         (str(i), f'Grade {i} (ደረጃ {i})') for i in range(1, 23)
-    ], string='Salary Grade (ደረጃ)', tracking=True, help='Employee grade from Grade 1 to Grade 22.')
+    ], string='Salary Grade (Legacy Code)', tracking=True, help='Employee grade from Grade 1 to Grade 22.')
 
     salary_level = fields.Selection(
         LEVEL_SELECTION,
@@ -498,14 +505,15 @@ class HrContract(models.Model):
             # Force country_code != 'US' so US pre-tax/post-tax benefits remain hidden
             contract.country_code = 'ET'
 
-    @api.depends('salary_grade')
+    @api.depends('salary_grade_id', 'salary_grade')
     def _compute_transport_policy(self):
         for c in self:
-            if not c.salary_grade:
+            grade_val = c.salary_grade_id.grade if c.salary_grade_id else (int(c.salary_grade) if c.salary_grade else False)
+            if not grade_val:
                 c.transport_allowance_rule = 'fixed_4000'
             else:
                 try:
-                    g = int(c.salary_grade)
+                    g = int(grade_val)
                     if g <= 17:
                         c.transport_allowance_rule = 'fixed_4000'
                     elif g == 18:
@@ -525,11 +533,12 @@ class HrContract(models.Model):
             else:
                 c.fuel_liters = 0.0
 
-    @api.onchange('salary_grade')
+    @api.onchange('salary_grade_id', 'salary_grade')
     def _onchange_salary_grade_transport(self):
-        if self.salary_grade:
+        grade_val = self.salary_grade_id.grade if self.salary_grade_id else (int(self.salary_grade) if self.salary_grade else False)
+        if grade_val:
             try:
-                g = int(self.salary_grade)
+                g = int(grade_val)
                 fuel_price = self.fuel_price_per_liter or (self.company_id.fuel_price_per_liter if self.company_id else 165.0) or 165.0
                 if g <= 17:
                     self.transport_allowance_rule = 'fixed_4000'
@@ -620,14 +629,15 @@ class HrContract(models.Model):
             gross = c.gross_monthly_wage if c.gross_monthly_wage else (c.wage or 0.0)
             c.net_wage_after_deductions = max(0.0, gross - total)
 
-    @api.depends('salary_matrix_type', 'salary_grade', 'salary_level', 'company_id')
+    @api.depends('salary_matrix_type', 'salary_grade_id', 'salary_grade', 'salary_level', 'company_id')
     def _compute_matrix_basic_wage(self):
         for contract in self:
-            if contract.salary_matrix_type and contract.salary_grade and contract.salary_level:
+            grade_val = contract.salary_grade_id.grade if contract.salary_grade_id else (int(contract.salary_grade) if contract.salary_grade else False)
+            if contract.salary_matrix_type and grade_val and contract.salary_level:
                 try:
                     wage = self.env['hr.salary.matrix'].get_matrix_wage(
                         matrix_type=contract.salary_matrix_type,
-                        grade=int(contract.salary_grade),
+                        grade=int(grade_val),
                         level=contract.salary_level,
                         company_id=contract.company_id.id if contract.company_id else None,
                     )
@@ -640,12 +650,30 @@ class HrContract(models.Model):
             else:
                 contract.matrix_basic_wage = 0.0
 
-    @api.onchange('salary_matrix_type', 'salary_grade', 'salary_level')
+    @api.onchange('salary_matrix_type')
+    def _onchange_salary_matrix_type(self):
+        if self.salary_matrix_type:
+            if self.salary_grade_id and self.salary_grade_id.matrix_type != self.salary_matrix_type:
+                self.salary_grade_id = False
+                self.salary_grade = False
+                self.matrix_basic_wage = 0.0
+
+    @api.onchange('salary_grade_id')
+    def _onchange_salary_grade_id(self):
+        if self.salary_grade_id:
+            self.salary_grade = str(self.salary_grade_id.grade)
+            self._onchange_salary_grade_transport()
+        else:
+            self.salary_grade = False
+        self._onchange_salary_matrix_wage()
+
+    @api.onchange('salary_matrix_type', 'salary_grade_id', 'salary_grade', 'salary_level')
     def _onchange_salary_matrix_wage(self):
-        if self.salary_matrix_type and self.salary_grade and self.salary_level:
+        grade_val = self.salary_grade_id.grade if self.salary_grade_id else (int(self.salary_grade) if self.salary_grade else False)
+        if self.salary_matrix_type and grade_val and self.salary_level:
             wage = self.env['hr.salary.matrix'].get_matrix_wage(
                 matrix_type=self.salary_matrix_type,
-                grade=int(self.salary_grade),
+                grade=int(grade_val),
                 level=self.salary_level,
                 company_id=self.company_id.id if self.company_id else None,
             )

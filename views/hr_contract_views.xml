@@ -27,12 +27,17 @@
                         </div>
                         <div class="col-md-4">
                             <group>
-                                <field name="salary_grade" placeholder="Select Grade (1–22)..." invisible="not salary_matrix_type"/>
+                                <field name="salary_grade_id" 
+                                       options="{'no_create': True, 'no_open': True}" 
+                                       domain="[('matrix_type', '=', salary_matrix_type)]" 
+                                       placeholder="Select Grade..." 
+                                       invisible="not salary_matrix_type"/>
+                                <field name="salary_grade" invisible="1"/>
                             </group>
                         </div>
                         <div class="col-md-4">
                             <group>
-                                <field name="salary_level" placeholder="Select Step / Level..." invisible="not salary_grade"/>
+                                <field name="salary_level" placeholder="Select Step / Level..." invisible="not salary_grade_id and not salary_grade"/>
                             </group>
                         </div>
                     </div>

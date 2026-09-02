@@ -177,6 +177,23 @@ class HrEmployee(models.Model):
         store=True,
         help='Calculated age in years from Date of Birth.',
     )
+    has_medical_certificate = fields.Boolean(
+        string='Medical Check / Certificate (የህክምና ማስረጃ)',
+        default=False,
+        tracking=True,
+        help='Mandatory confirmation that the employee has undergone required medical examination and submitted a valid medical certificate.',
+    )
+
+    def init(self):
+        super().init()
+        try:
+            self.env.cr.execute("""
+                UPDATE hr_employee 
+                SET has_medical_certificate = true 
+                WHERE has_medical_certificate IS NULL;
+            """)
+        except Exception:
+            pass
 
     @api.depends('birthday')
     def _compute_employee_age(self):
@@ -188,6 +205,16 @@ class HrEmployee(models.Model):
                 emp.age = max(0, age)
             else:
                 emp.age = 0
+
+    @api.constrains('has_medical_certificate')
+    def _check_medical_certificate(self):
+        for emp in self:
+            if not emp.has_medical_certificate:
+                raise ValidationError(_(
+                    "❌ Medical Check / Certificate Mandatory!\n\n"
+                    "Employee '%s' cannot be registered without confirming their medical check / certificate.\n"
+                    "Please verify that the employee has passed the medical examination and check the Medical Certificate box."
+                ) % (emp.name or 'New Employee'))
 
     @api.constrains('birthday')
     def _check_employee_minimum_age(self):

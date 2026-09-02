@@ -329,3 +329,41 @@ class HrSalaryMatrixLine(models.Model):
                     "Duplicate Entry: Grade %s and Level '%s' already exists in this Salary Scale!"
                 ) % (line.grade, line.level))
 
+
+class HrSalaryMatrixGrade(models.Model):
+    _name = 'hr.salary.matrix.grade'
+    _description = 'Salary Matrix Scale Grade'
+    _order = 'matrix_type asc, grade asc'
+
+    name = fields.Char(
+        string='Grade',
+        compute='_compute_name',
+        store=True,
+    )
+    grade = fields.Integer(
+        string='Grade Number',
+        required=True,
+    )
+    matrix_type = fields.Selection([
+        ('head_office', 'Head Office (ዋና መ/ቤት)'),
+        ('cpw', 'CPW'),
+        ('farm', 'Farm Permanent (የእርሻ ልማቶች - ቋሚ)'),
+    ], string='Scale Type / Category', required=True, default='head_office')
+
+    @api.depends('grade')
+    def _compute_name(self):
+        for rec in self:
+            rec.name = f"Grade {rec.grade} (ደረጃ {rec.grade})"
+
+    def init(self):
+        super().init()
+        for m_type, max_g in [('head_office', 22), ('cpw', 22), ('farm', 21)]:
+            for g in range(1, max_g + 1):
+                existing = self.search([('matrix_type', '=', m_type), ('grade', '=', g)], limit=1)
+                if not existing:
+                    self.create({
+                        'matrix_type': m_type,
+                        'grade': g,
+                        'name': f"Grade {g} (ደረጃ {g})"
+                    })
+

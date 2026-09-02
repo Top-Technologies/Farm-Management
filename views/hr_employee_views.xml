@@ -67,6 +67,19 @@
                                     </div>
                                     <div class="text-muted small">Mandatory legal requirement (18+ years old).</div>
                                 </div>
+                                <label for="has_medical_certificate" string="Medical Check"/>
+                                <div>
+                                    <div class="d-flex align-items-center">
+                                        <field name="has_medical_certificate" required="1" class="me-2"/>
+                                        <span class="badge text-bg-success fs-6" invisible="not has_medical_certificate">
+                                            <i class="fa fa-check-circle me-1"/>Passed / Verified
+                                        </span>
+                                        <span class="badge text-bg-danger fs-6" invisible="has_medical_certificate">
+                                            <i class="fa fa-exclamation-triangle me-1"/>Certificate Required
+                                        </span>
+                                    </div>
+                                    <div class="text-muted small">Mandatory medical check / certificate confirmation.</div>
+                                </div>
                             </group>
                         </div>
                         <div class="col-md-6" invisible="farm_employee_type == 'head_office'">
@@ -248,15 +261,28 @@
         </field>
     </record>
 
-    <!-- Inherit Employee Print Badge QWeb Template: Add Farm ID & Age -->
+    <!-- Inherit Employee Print Badge QWeb Template: ID and Age above, vertical gap in middle, barcode at bottom -->
     <template id="print_employee_badge_farm_inherit" inherit_id="hr.print_employee_badge">
-        <xpath expr="//div[@t-if='employee.barcode']" position="before">
-            <div t-if="employee.fms_employee_id or employee.barcode" style="font-size: 11pt; font-weight: bold; color: #198754; margin-bottom: 2pt;">
-                <span t-out="employee.fms_employee_id or employee.barcode"/>
-            </div>
-            <div t-if="employee.age" style="font-size: 9pt; color: #495057; font-weight: 600; margin-bottom: 3pt;">
-                Age: <span t-out="employee.age"/> yrs
-            </div>
+        <xpath expr="//td[@style='width:67%; height:100%; vertical-align: top;']/table" position="replace">
+            <table style="width: 100%; height: 100%; text-align: center;" class="table-borderless">
+                <tr><th><span style="font-size: 15pt; font-weight: bold;" t-out="employee.name" data-oe-demo="Marc Demo"></span></th></tr>
+                <tr><td><span style="font-size: 10pt; color: #212529;" t-out="employee.job_id.name" data-oe-demo="Software Developer"></span></td></tr>
+                <tr>
+                    <td style="padding-top: 6pt;">
+                        <div t-if="employee.fms_employee_id or employee.barcode" style="font-size: 12pt; font-weight: bold; color: #198754; margin-bottom: 2pt;">
+                            <span t-out="employee.fms_employee_id or employee.barcode"/>
+                        </div>
+                        <div t-if="employee.age" style="font-size: 9.5pt; color: #495057; font-weight: 600;">
+                            Age: <span t-out="employee.age"/> yrs
+                        </div>
+                    </td>
+                </tr>
+                <tr style="height: 100%;">
+                    <td style="vertical-align: bottom; padding-bottom: 4pt;">
+                        <div t-if="employee.barcode" t-field="employee.barcode" t-options="{'widget': 'barcode', 'width': 600, 'height': 120, 'img_style': 'max-width:100%;', 'img_align': 'center'}" data-oe-demo="12345678901"></div>
+                    </td>
+                </tr>
+            </table>
         </xpath>
     </template>
 </odoo>
