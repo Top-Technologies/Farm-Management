@@ -167,11 +167,11 @@ result = contract.allowance_hardship
 
         <record id="rule_perm_alw_retroactive" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.ALW"/>
-            <field name="name">Back Payment / Retroactive Pay (የተከማቸ የደመወዝ ጭማሪ)</field>
+            <field name="name">Back Payment / Retroactive Pay (የተከማቸ የደመወዝ ጭማሪ - ከግብር ነፃ)</field>
             <field name="code">ALW_RETROACTIVE</field>
             <field name="sequence">30</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.allowance_retroactive and contract.allowance_retroactive > 0)</field>
+            <field name="condition_python">result = bool(contract.allowance_retroactive and contract.allowance_retroactive > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 result = contract.allowance_retroactive
@@ -193,7 +193,26 @@ result = contract.allowance_overtime
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
-        <!-- 3.3 Gross Wage -->
+        <!-- 3.3 Gross & Taxable Wage -->
+        <record id="rule_perm_taxable" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.GROSS"/>
+            <field name="name">Taxable Salary (ግብር የሚከፈልበት ገቢ)</field>
+            <field name="code">TAXABLE</field>
+            <field name="sequence">90</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# Taxable base: Basic wage + Taxable Allowances (Transport, Hardship, Overtime)
+# Untaxed Allowances strictly excluded: ALW_FIELD_WORK (Agricultural Field Entries) and ALW_RETROACTIVE (Back Pay Difference)
+basic = categories.get('BASIC', 0.0)
+alw_trans = contract.allowance_transport or 0.0
+alw_hard = contract.allowance_hardship or 0.0
+alw_ot = contract.allowance_overtime or 0.0
+result = basic + alw_trans + alw_hard + alw_ot
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
         <record id="rule_perm_gross" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.GROSS"/>
             <field name="name">Gross Wage (ጠቅላላ ወርሃዊ ገቢ)</field>
@@ -214,10 +233,13 @@ result = categories['BASIC'] + categories['ALW']
             <field name="code">DED_PENSION</field>
             <field name="sequence">110</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_pension and contract.deduction_pension > 0)</field>
+            <field name="condition_python">result = bool(contract.deduction_pension or (categories.get('BASIC', 0.0) > 0))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_pension
+if contract.deduction_pension:
+    result = -contract.deduction_pension
+else:
+    result = -round(categories.get('BASIC', 0.0) * 0.07, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -228,10 +250,29 @@ result = -contract.deduction_pension
             <field name="code">DED_INCOME_TAX</field>
             <field name="sequence">111</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_income_tax and contract.deduction_income_tax > 0)</field>
+            <field name="condition_python">result = bool(contract.deduction_income_tax or (categories.get('BASIC', 0.0) > 600))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_income_tax
+if contract.deduction_income_tax:
+    result = -contract.deduction_income_tax
+else:
+    # Taxable Salary strictly excludes ALW_FIELD_WORK and ALW_RETROACTIVE
+    taxable = categories.get('BASIC', 0.0) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0)
+    if taxable &lt;= 600:
+        tax = 0.0
+    elif taxable &lt;= 1650:
+        tax = taxable * 0.10 - 60.0
+    elif taxable &lt;= 3200:
+        tax = taxable * 0.15 - 142.50
+    elif taxable &lt;= 5250:
+        tax = taxable * 0.20 - 302.50
+    elif taxable &lt;= 7800:
+        tax = taxable * 0.25 - 565.0
+    elif taxable &lt;= 10900:
+        tax = taxable * 0.30 - 955.0
+    else:
+        tax = taxable * 0.35 - 1500.0
+    result = -round(max(0.0, tax), 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>

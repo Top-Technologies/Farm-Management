@@ -112,6 +112,55 @@ class HrContract(models.Model):
         tracking=True,
         help='Salary difference resulting from approved retroactive salary adjustments.',
     )
+
+    # Back Pay / Retroactive Salary Adjustment Management
+    back_pay_months = fields.Integer(
+        string='Retroactive Months (የወራት ብዛት)',
+        default=0,
+        tracking=True,
+        help='Number of retroactive months to calculate and pay the salary difference for.',
+    )
+    back_pay_previous_net = fields.Float(
+        string='Previous Monthly Net Salary (የቀድሞ የተጣራ ደመወዝ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='The actual net monthly take-home salary the employee received prior to the approved raise.',
+    )
+    back_pay_new_net = fields.Float(
+        string='Corrected Monthly Net Salary (አዲሱ የተጣራ ደመወዝ)',
+        compute='_compute_back_pay',
+        store=True,
+        readonly=False,
+        digits=(16, 2),
+        tracking=True,
+        help='The corrected monthly net salary with the approved raise (Regular Net Wage).',
+    )
+    back_pay_monthly_diff = fields.Float(
+        string='Monthly Back Pay Difference (ወርሃዊ ልዩነት)',
+        compute='_compute_back_pay',
+        store=True,
+        digits=(16, 2),
+        help='Monthly Back Pay = Corrected Net Salary - Previous Net Salary.',
+    )
+    back_pay_total = fields.Float(
+        string='Total Back Pay Amount (ጠቅላላ የተከማቸ ክፍያ)',
+        compute='_compute_back_pay',
+        store=True,
+        digits=(16, 2),
+        help='Total Back Pay = Monthly Difference × Number of Months.',
+    )
+    is_back_pay_approved = fields.Boolean(
+        string='Finance Manager Approval (የፋይናንስ ማረጋገጫ)',
+        default=False,
+        tracking=True,
+        help='Finance Manager approval is required before retroactive back pay is included on payslips.',
+    )
+    back_pay_justification = fields.Char(
+        string='Back Pay Reason / Period Note',
+        tracking=True,
+        help='e.g. Retroactive promotion approved from Tir to Megabit.',
+    )
     allowance_overtime = fields.Float(
         string='Approved Overtime Payment (የትርፍ ሰዓት ክፍያ)',
         digits=(16, 2),
@@ -613,6 +662,96 @@ class HrContract(models.Model):
                 self.salary_matrix_type = 'farm'
             elif not self.salary_matrix_type:
                 self.salary_matrix_type = 'head_office'
+
+    # =========================================================================
+    # Back Pay / Retroactive Adjustment Computation & Logic
+    # =========================================================================
+    @api.depends(
+        'back_pay_months',
+        'back_pay_previous_net',
+        'wage',
+        'allowance_transport',
+        'allowance_hardship',
+        'allowance_overtime',
+        'total_monthly_deductions',
+    )
+    def _compute_back_pay(self):
+        for c in self:
+            # Regular monthly net without retroactive addition
+            regular_gross = (c.wage or 0.0) + (c.allowance_transport or 0.0) + \
+                            (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
+            regular_net = max(0.0, regular_gross - (c.total_monthly_deductions or 0.0))
+            c.back_pay_new_net = regular_net
+
+            if c.back_pay_months > 0 and c.back_pay_previous_net > 0:
+                monthly_diff = max(0.0, round(regular_net - c.back_pay_previous_net, 2))
+                total_back_pay = round(monthly_diff * c.back_pay_months, 2)
+                c.back_pay_monthly_diff = monthly_diff
+                c.back_pay_total = total_back_pay
+                c.allowance_retroactive = total_back_pay
+            elif c.back_pay_months > 0 and c.allowance_retroactive > 0:
+                c.back_pay_total = c.allowance_retroactive
+                c.back_pay_monthly_diff = round(c.allowance_retroactive / c.back_pay_months, 2)
+            else:
+                c.back_pay_monthly_diff = 0.0
+                c.back_pay_total = c.allowance_retroactive or 0.0
+
+    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'total_monthly_deductions')
+    def _onchange_back_pay_calculator(self):
+        regular_gross = (self.wage or 0.0) + (self.allowance_transport or 0.0) + \
+                        (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
+        regular_net = max(0.0, regular_gross - (self.total_monthly_deductions or 0.0))
+        self.back_pay_new_net = regular_net
+
+        if self.back_pay_months > 0 and self.back_pay_previous_net > 0:
+            monthly_diff = max(0.0, round(regular_net - self.back_pay_previous_net, 2))
+            total_back_pay = round(monthly_diff * self.back_pay_months, 2)
+            self.back_pay_monthly_diff = monthly_diff
+            self.back_pay_total = total_back_pay
+            self.allowance_retroactive = total_back_pay
+
+    @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
+    def _onchange_wage_taxes_estimate(self):
+        if self.wage:
+            # 7% Employee Pension
+            if not self.deduction_pension:
+                self.deduction_pension = round(self.wage * 0.07, 2)
+
+            # Taxable Salary = Wage + Taxable Allowances (Transport, Hardship, Overtime)
+            taxable = (self.wage or 0.0) + (self.allowance_transport or 0.0) + \
+                      (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
+            if not self.deduction_income_tax:
+                if taxable <= 600:
+                    tax = 0.0
+                elif taxable <= 1650:
+                    tax = taxable * 0.10 - 60.0
+                elif taxable <= 3200:
+                    tax = taxable * 0.15 - 142.50
+                elif taxable <= 5250:
+                    tax = taxable * 0.20 - 302.50
+                elif taxable <= 7800:
+                    tax = taxable * 0.25 - 565.0
+                elif taxable <= 10900:
+                    tax = taxable * 0.30 - 955.0
+                else:
+                    tax = taxable * 0.35 - 1500.0
+                self.deduction_income_tax = round(max(0.0, tax), 2)
+
+    def action_approve_back_pay(self):
+        for c in self:
+            c.is_back_pay_approved = True
+
+    def action_reset_back_pay(self):
+        for c in self:
+            c.write({
+                'back_pay_months': 0,
+                'back_pay_previous_net': 0.0,
+                'back_pay_monthly_diff': 0.0,
+                'back_pay_total': 0.0,
+                'allowance_retroactive': 0.0,
+                'is_back_pay_approved': False,
+                'back_pay_justification': False,
+            })
 
 
 

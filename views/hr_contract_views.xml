@@ -72,8 +72,45 @@
 
                                     <separator string="Other Approved Allowances"/>
                                     <field name="allowance_hardship"/>
-                                    <field name="allowance_retroactive"/>
                                     <field name="allowance_overtime"/>
+
+                                    <separator string="Back Pay &amp; Retroactive Adjustments (የተከማቸ ጭማሪ)"/>
+                                    <div class="border rounded p-2 bg-white mb-2 shadow-sm">
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-6">
+                                                <label for="back_pay_months" string="Retroactive Months" class="small fw-bold"/>
+                                                <field name="back_pay_months" class="form-control form-control-sm"/>
+                                            </div>
+                                            <div class="col-6">
+                                                <label for="back_pay_previous_net" string="Previous Net / Month" class="small fw-bold"/>
+                                                <field name="back_pay_previous_net" widget="monetary" class="form-control form-control-sm"/>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mb-2" invisible="back_pay_months == 0">
+                                            <div class="col-6">
+                                                <div class="text-muted small">New Corrected Net</div>
+                                                <div class="fw-bold text-dark"><field name="back_pay_new_net" widget="monetary" readonly="1"/></div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-muted small">Monthly Difference</div>
+                                                <div class="fw-bold text-primary">+ <field name="back_pay_monthly_diff" widget="monetary" readonly="1"/></div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                            <div>
+                                                <label for="allowance_retroactive" string="Total Back Pay (Non-Taxable)" class="small fw-bold text-success"/>
+                                                <div class="fs-5 fw-bold text-success"><field name="allowance_retroactive" widget="monetary"/></div>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <field name="is_back_pay_approved" widget="boolean_toggle" options="{'autosave': true}"/>
+                                                <span class="small fw-bold text-muted me-2" invisible="is_back_pay_approved">Pending Approval</span>
+                                                <span class="badge text-bg-success" invisible="not is_back_pay_approved"><i class="fa fa-check me-1" title="Approved"/>Approved</span>
+                                                <button name="action_approve_back_pay" type="object" string="Approve" class="btn btn-sm btn-outline-success" invisible="is_back_pay_approved or allowance_retroactive == 0"/>
+                                                <button name="action_reset_back_pay" type="object" string="Reset" class="btn btn-sm btn-outline-secondary" invisible="allowance_retroactive == 0 and back_pay_months == 0"/>
+                                            </div>
+                                        </div>
+                                        <field name="back_pay_justification" placeholder="Reason / justification (e.g. Promotion approved from Tir to Megabit)..." class="mt-2"/>
+                                    </div>
                                     <field name="total_monthly_allowances" widget="monetary" readonly="1" class="fw-bold text-success"/>
                                 </group>
                             </div>
