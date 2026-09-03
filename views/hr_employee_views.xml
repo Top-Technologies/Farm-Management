@@ -56,29 +56,42 @@
                                 </div>
                                 <label for="birthday" string="Date of Birth (DOB)"/>
                                 <div>
-                                    <div class="d-flex align-items-center">
-                                        <field name="birthday" required="1" placeholder="Select Date of Birth..." class="me-2"/>
-                                        <span class="badge text-bg-success fs-6" invisible="not birthday or age &lt; 18">
-                                            Age: <field name="age" readonly="1"/> yrs
+                                    <div class="d-flex align-items-center gap-2">
+                                        <field name="birthday" required="1" placeholder="Select Date of Birth..." class="oe_inline me-1" style="max-width: 170px !important; min-width: 140px !important;"/>
+                                        <span class="badge text-bg-success px-2 py-1 d-inline-flex align-items-center gap-1"
+                                              style="white-space: nowrap !important; flex-shrink: 0 !important; font-size: 0.85rem;"
+                                              invisible="not birthday or age &lt; 18">
+                                            <span>Age:</span>
+                                            <field name="age" readonly="1" class="oe_inline fw-bold text-white"/>
+                                            <span>yrs</span>
                                         </span>
-                                        <span class="badge text-bg-danger fs-6" invisible="not birthday or age &gt;= 18">
-                                            <i class="fa fa-ban me-1"/>Underage (<field name="age" readonly="1"/> yrs &lt; 18)
+                                        <span class="badge text-bg-danger px-2 py-1 d-inline-flex align-items-center gap-1"
+                                              style="white-space: nowrap !important; flex-shrink: 0 !important; font-size: 0.85rem;"
+                                              invisible="not birthday or age &gt;= 18">
+                                            <i class="fa fa-ban me-1"/>
+                                            <span>Underage (</span>
+                                            <field name="age" readonly="1" class="oe_inline fw-bold text-white"/>
+                                            <span>yrs &lt; 18)</span>
                                         </span>
                                     </div>
-                                    <div class="text-muted small">Mandatory legal requirement (18+ years old).</div>
+                                    <div class="text-muted small mt-1">Mandatory legal requirement (18+ years old).</div>
                                 </div>
                                 <label for="has_medical_certificate" string="Medical Check"/>
                                 <div>
-                                    <div class="d-flex align-items-center">
-                                        <field name="has_medical_certificate" required="1" class="me-2"/>
-                                        <span class="badge text-bg-success fs-6" invisible="not has_medical_certificate">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <field name="has_medical_certificate" required="1" class="oe_inline me-1"/>
+                                        <span class="badge text-bg-success px-2 py-1 d-inline-flex align-items-center"
+                                              style="white-space: nowrap !important; flex-shrink: 0 !important; font-size: 0.85rem;"
+                                              invisible="not has_medical_certificate">
                                             <i class="fa fa-check-circle me-1"/>Passed / Verified
                                         </span>
-                                        <span class="badge text-bg-danger fs-6" invisible="has_medical_certificate">
+                                        <span class="badge text-bg-danger px-2 py-1 d-inline-flex align-items-center"
+                                              style="white-space: nowrap !important; flex-shrink: 0 !important; font-size: 0.85rem;"
+                                              invisible="has_medical_certificate">
                                             <i class="fa fa-exclamation-triangle me-1"/>Certificate Required
                                         </span>
                                     </div>
-                                    <div class="text-muted small">Mandatory medical check / certificate confirmation.</div>
+                                    <div class="text-muted small mt-1">Mandatory medical check / certificate confirmation.</div>
                                 </div>
                             </group>
                         </div>
