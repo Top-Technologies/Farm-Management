@@ -146,6 +146,60 @@ class FarmWorkEntry(models.Model):
         related='company_id.currency_id',
     )
 
+    # Analytical & Reporting Fields (for Pivot, Graph & Summary Reports)
+    work_done_qty = fields.Float(
+        string='Work Done (Qty/Score)',
+        compute='_compute_report_metrics',
+        store=True,
+        digits=(16, 2),
+        aggregator='sum',
+        help='Volume of work output achieved.',
+    )
+    work_days = fields.Float(
+        string='Days Worked',
+        compute='_compute_report_metrics',
+        store=True,
+        digits=(16, 2),
+        aggregator='sum',
+        help='Normalized days worked (1.0 for full day, 0.5 for half day, 1.5 for 1.5 days).',
+    )
+    amount_paid = fields.Float(
+        string='Amount Paid (Birr)',
+        compute='_compute_report_metrics',
+        store=True,
+        digits=(16, 2),
+        aggregator='sum',
+        help='Labor payment already settled in paid payslips.',
+    )
+    amount_in_payroll = fields.Float(
+        string='Amount In Payroll (Birr)',
+        compute='_compute_report_metrics',
+        store=True,
+        digits=(16, 2),
+        aggregator='sum',
+        help='Labor payment currently queued in an open payslip batch.',
+    )
+    amount_unpaid = fields.Float(
+        string='Amount Unpaid (Birr)',
+        compute='_compute_report_metrics',
+        store=True,
+        digits=(16, 2),
+        aggregator='sum',
+        help='Unpaid labor liability pending payroll processing.',
+    )
+    entry_count = fields.Integer(
+        string='Entries Count',
+        default=1,
+        aggregator='sum',
+        help='Count of work entries for aggregation in reports.',
+    )
+    employee_gender = fields.Selection(
+        related='employee_id.gender',
+        string='Worker Gender',
+        store=True,
+        readonly=True,
+    )
+
     # Status Workflow
     state = fields.Selection([
         ('draft', 'Draft'),
@@ -328,6 +382,38 @@ class FarmWorkEntry(models.Model):
                     entry.total_amount = (entry.score_value or 0.0) * (entry.norm_rate or 0.0)
             else:
                 entry.total_amount = (entry.score_value or 0.0) * (entry.norm_rate or 0.0)
+
+    @api.depends('score_value', 'total_amount', 'payment_status', 'entry_type', 'work_duration')
+    def _compute_report_metrics(self):
+        for entry in self:
+            entry.work_done_qty = entry.score_value or 0.0
+            entry.entry_count = 1
+
+            # Days worked normalization
+            if entry.entry_type == 'temporary_rate':
+                if entry.work_duration == 'half_day':
+                    entry.work_days = 0.5
+                elif entry.work_duration == 'one_and_half_day':
+                    entry.work_days = 1.5
+                else:
+                    entry.work_days = 1.0
+            else:
+                entry.work_days = 1.0 if entry.score_value > 0 else 0.0
+
+            # Financial status breakdown
+            tot = entry.total_amount or 0.0
+            if entry.payment_status == 'paid':
+                entry.amount_paid = tot
+                entry.amount_in_payroll = 0.0
+                entry.amount_unpaid = 0.0
+            elif entry.payment_status == 'in_payroll':
+                entry.amount_paid = 0.0
+                entry.amount_in_payroll = tot
+                entry.amount_unpaid = 0.0
+            else:
+                entry.amount_paid = 0.0
+                entry.amount_in_payroll = 0.0
+                entry.amount_unpaid = tot
 
     @api.onchange('farm_id')
     def _onchange_farm_id(self):

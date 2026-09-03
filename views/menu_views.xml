@@ -76,6 +76,22 @@
               action="action_farm_work_entry_unpaid"
               sequence="20"/>
 
+    <menuitem id="menu_farm_work_entry_sub_reporting"
+              name="Reporting &amp; Analysis"
+              parent="menu_farm_work_entry_root"
+              action="action_farm_work_entry_report"
+              sequence="30"/>
+
+    <!-- ================================================================= -->
+    <!-- HR MODULE REPORTING INTEGRATION: Work Entries Analysis            -->
+    <!-- ================================================================= -->
+    <menuitem id="menu_hr_report_farm_work_entries"
+              name="Work Entries Analysis"
+              parent="hr.hr_menu_hr_reports"
+              action="action_farm_work_entry_report"
+              sequence="25"
+              groups="hr.group_hr_user"/>
+
     <!-- ================================================================= -->
     <!-- PAYROLL MENU INTEGRATION: Salary Matrix Scales                    -->
     <!-- ================================================================= -->
