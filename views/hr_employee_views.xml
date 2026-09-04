@@ -274,7 +274,7 @@
         </field>
     </record>
 
-    <!-- Inherit Employee Print Badge QWeb Template: ID and Age above, vertical gap in middle, barcode at bottom -->
+    <!-- Inherit Employee Print Badge QWeb Template: ID, DOB and Gender above, vertical gap in middle, barcode at bottom -->
     <template id="print_employee_badge_farm_inherit" inherit_id="hr.print_employee_badge">
         <xpath expr="//td[@style='width:67%; height:100%; vertical-align: top;']/table" position="replace">
             <table style="width: 100%; height: 100%; text-align: center;" class="table-borderless">
@@ -285,8 +285,13 @@
                         <div t-if="employee.fms_employee_id or employee.barcode" style="font-size: 12pt; font-weight: bold; color: #198754; margin-bottom: 2pt;">
                             <span t-out="employee.fms_employee_id or employee.barcode"/>
                         </div>
-                        <div t-if="employee.age" style="font-size: 9.5pt; color: #495057; font-weight: 600;">
-                            Age: <span t-out="employee.age"/> yrs
+                        <div t-if="employee.birthday or employee.gender" style="font-size: 9pt; color: #495057; font-weight: 600; line-height: 1.35; margin-top: 2pt;">
+                            <div t-if="employee.birthday">
+                                DOB: <span t-field="employee.birthday"/>
+                            </div>
+                            <div t-if="employee.gender">
+                                Gender: <span t-field="employee.gender"/>
+                            </div>
                         </div>
                     </td>
                 </tr>

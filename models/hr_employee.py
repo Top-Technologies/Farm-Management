@@ -168,7 +168,6 @@ class HrEmployee(models.Model):
     birthday = fields.Date(
         string='Date of Birth',
         tracking=True,
-        required=True,
         help='Mandatory Date of Birth. Minimum legal employment age is 18 years.',
     )
     age = fields.Integer(
@@ -209,6 +208,9 @@ class HrEmployee(models.Model):
     @api.constrains('has_medical_certificate')
     def _check_medical_certificate(self):
         for emp in self:
+            # Skip check when creating employee from recruitment applicant or candidate
+            if emp.candidate_id or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
+                continue
             if not emp.has_medical_certificate:
                 raise ValidationError(_(
                     "❌ Medical Check / Certificate Mandatory!\n\n"
@@ -221,6 +223,9 @@ class HrEmployee(models.Model):
         today = fields.Date.today()
         for emp in self:
             if not emp.birthday:
+                # Allow employee record creation from recruitment candidate so HR can complete profile onboarding
+                if emp.candidate_id or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
+                    continue
                 raise ValidationError(_("Date of Birth is mandatory for employee registration."))
             d_birth = emp.birthday
             if d_birth > today:
@@ -453,6 +458,10 @@ class HrEmployee(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            # When creating employee from recruitment, medical clearance has been completed during hiring
+            if vals.get('candidate_id') or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
+                vals.setdefault('has_medical_certificate', True)
+
             emp_type = vals.get('farm_employee_type', 'temporary')
             vals['farm_employee_type'] = emp_type
 
