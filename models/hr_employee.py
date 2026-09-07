@@ -13,11 +13,18 @@ class HrEmployee(models.Model):
 
     # Agricultural Employee Classification (Mandatory)
     farm_employee_type = fields.Selection([
-        ('head_office', 'Head Office Permanent (ዋና መ/ቤት ቋሚ)'),
-        ('permanent', 'Farm Permanent (የእርሻ ልማቶች ቋሚ)'),
+        ('head_office', 'Head Office (ዋና መ/ቤት)'),
+        ('permanent', 'Farm (የእርሻ)'),
         ('temporary', 'Temporary (ጊዜያዊ)'),
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
     ], string='Employee Classification', default='temporary', required=True, tracking=True)
+
+    # Employment Term: Contract vs Permanent (Applicable for Head Office and Farm employees)
+    employment_term = fields.Selection([
+        ('permanent', 'Permanent (ቋሚ)'),
+        ('contract', 'Contract (ኮንትራት)'),
+    ], string='Employment Type', default='permanent', tracking=True,
+       help='Specifies whether this Head Office or Farm employee is on a Permanent or Contract term.')
 
 
     # Agricultural Placement Fields
@@ -190,6 +197,9 @@ class HrEmployee(models.Model):
                 UPDATE hr_employee 
                 SET has_medical_certificate = true 
                 WHERE has_medical_certificate IS NULL;
+                UPDATE hr_employee
+                SET employment_term = 'permanent'
+                WHERE farm_employee_type IN ('head_office', 'permanent') AND employment_term IS NULL;
             """)
         except Exception:
             pass
@@ -380,6 +390,10 @@ class HrEmployee(models.Model):
             self.initial_sub_farm_id = False
             self.initial_sub_unit_id = False
             self.initial_block_id = False
+        if self.farm_employee_type not in ('head_office', 'permanent'):
+            self.employment_term = False
+        elif not self.employment_term:
+            self.employment_term = 'permanent'
         self._update_preview_id()
 
     def _update_preview_id(self):
@@ -410,7 +424,7 @@ class HrEmployee(models.Model):
 
     def _generate_farm_employee_id(self, farm, emp_type):
         """Generates sequential ID:
-        - Head Office Permanent: HQ001, HQ002, HQ003...
+        - Head Office Staff: HQ001, HQ002, HQ003...
         - Farm Employees: [FarmCode][TypeCode][SequentialNumber] e.g. FM01T0001, FM01P0001, FM01Z0001.
         """
         if emp_type == 'head_office':
@@ -464,6 +478,10 @@ class HrEmployee(models.Model):
 
             emp_type = vals.get('farm_employee_type', 'temporary')
             vals['farm_employee_type'] = emp_type
+            if emp_type in ('head_office', 'permanent'):
+                vals.setdefault('employment_term', 'permanent')
+            else:
+                vals['employment_term'] = False
 
             if emp_type == 'head_office':
                 vals['initial_farm_id'] = False
@@ -517,11 +535,19 @@ class HrEmployee(models.Model):
         return employees
 
     def write(self, vals):
-        if 'farm_employee_type' in vals and vals['farm_employee_type'] == 'head_office':
-            vals['initial_farm_id'] = False
-            vals['initial_sub_farm_id'] = False
-            vals['initial_sub_unit_id'] = False
-            vals['initial_block_id'] = False
+        if 'farm_employee_type' in vals:
+            if vals['farm_employee_type'] == 'head_office':
+                vals['initial_farm_id'] = False
+                vals['initial_sub_farm_id'] = False
+                vals['initial_sub_unit_id'] = False
+                vals['initial_block_id'] = False
+            if vals['farm_employee_type'] not in ('head_office', 'permanent'):
+                vals['employment_term'] = False
+            elif 'employment_term' not in vals:
+                for emp in self:
+                    if not emp.employment_term:
+                        vals['employment_term'] = 'permanent'
+                        break
 
         # Cascade hierarchy if initial_sub_unit_id is modified
         if 'initial_sub_unit_id' in vals and vals['initial_sub_unit_id']:

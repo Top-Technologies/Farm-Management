@@ -92,7 +92,7 @@ class HrSalaryMatrix(models.Model):
     matrix_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('cpw', 'CPW'),
-        ('farm', 'Farm Permanent (የእርሻ ልማቶች - ቋሚ)'),
+        ('farm', 'Farm (የእርሻ ልማቶች)'),
     ], string='Scale Type / Category', required=True, tracking=True, default='head_office')
 
     effective_date = fields.Date(
@@ -347,7 +347,7 @@ class HrSalaryMatrixGrade(models.Model):
     matrix_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('cpw', 'CPW'),
-        ('farm', 'Farm Permanent (የእርሻ ልማቶች - ቋሚ)'),
+        ('farm', 'Farm (የእርሻ ልማቶች)'),
     ], string='Scale Type / Category', required=True, default='head_office')
 
     @api.depends('grade')

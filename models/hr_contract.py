@@ -30,12 +30,17 @@ class HrContract(models.Model):
         string='Employee Classification',
         readonly=True,
     )
+    employment_term = fields.Selection(
+        related='employee_id.employment_term',
+        string='Employment Type',
+        readonly=True,
+    )
 
-    # Permanent Employee Salary Matrix Placement (Grade & Level Scale)
+    # Salary Matrix Placement (Grade & Level Scale)
     salary_matrix_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('cpw', 'CPW'),
-        ('farm', 'Farm Permanent (የእርሻ ልማቶች - ቋሚ)'),
+        ('farm', 'Farm (የእርሻ ልማቶች)'),
     ], string='Salary Scale Category', tracking=True, help='Select which Salary Matrix applies to this contract.')
 
     salary_grade_id = fields.Many2one(

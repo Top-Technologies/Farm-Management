@@ -9,8 +9,8 @@ class HrPayslipRun(models.Model):
     worker_type = fields.Selection([
         ('temporary', 'Temporary Workers (Daily Wage)'),
         ('zemach', 'Seasonal / Zemach Workers (Piece Rate)'),
-        ('permanent', 'Farm Permanent Employees (Standard Salary)'),
-        ('head_office', 'Head Office Permanent Employees (Standard Salary)'),
+        ('permanent', 'Farm Staff (Standard Salary)'),
+        ('head_office', 'Head Office Staff (Standard Salary)'),
         ('all', 'All Workers'),
     ], string='Worker Classification', default='temporary', required=True,
        help='Select which category of workers this payroll batch is targeting.')

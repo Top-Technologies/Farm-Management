@@ -48,6 +48,9 @@
                         <div class="col-md-6">
                             <group>
                                 <field name="farm_employee_type" widget="radio" options="{'horizontal': false}" required="1"/>
+                                <field name="employment_term" widget="radio" options="{'horizontal': true}"
+                                       invisible="farm_employee_type not in ('head_office', 'permanent')"
+                                       required="farm_employee_type in ('head_office', 'permanent')"/>
                                 <label for="fms_employee_id" string="Employee ID"/>
                                 <div>
                                     <field name="fms_employee_id" readonly="1" class="fw-bold fs-4 text-primary font-monospace"/>
@@ -107,8 +110,8 @@
                             <div class="alert alert-info d-flex align-items-center mt-3 p-3">
                                 <i class="fa fa-building fs-2 me-3 text-info"/>
                                 <div>
-                                    <h6 class="mb-1 fw-bold">Head Office Permanent Staff</h6>
-                                    <p class="mb-0 small text-muted">Stationed permanently at Head Office (ዋና መ/ቤት). No agricultural farm placement or field transfer is required.</p>
+                                    <h6 class="mb-1 fw-bold">Head Office Staff</h6>
+                                    <p class="mb-0 small text-muted">Stationed at Head Office (ዋና መ/ቤት). No agricultural farm placement or field transfer is required.</p>
                                 </div>
                             </div>
                         </div>
@@ -242,6 +245,7 @@
             </field>
             <field name="work_email" position="after">
                 <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'head_office'" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'" optional="show"/>
+                <field name="employment_term" widget="badge" decoration-success="employment_term == 'permanent'" decoration-info="employment_term == 'contract'" optional="show"/>
                 <field name="birthday" optional="show"/>
                 <field name="age" string="Age" optional="show"/>
                 <field name="current_farm_id" string="Farm" optional="show"/>
@@ -261,12 +265,16 @@
             </field>
             <filter name="group_job" position="after">
                 <separator/>
-                <filter string="Head Office Permanent" name="filter_head_office" domain="[('farm_employee_type', '=', 'head_office')]"/>
-                <filter string="Farm Permanent" name="filter_permanent" domain="[('farm_employee_type', '=', 'permanent')]"/>
+                <filter string="Head Office" name="filter_head_office" domain="[('farm_employee_type', '=', 'head_office')]"/>
+                <filter string="Farm" name="filter_permanent" domain="[('farm_employee_type', '=', 'permanent')]"/>
                 <filter string="Temporary Employees" name="filter_temporary" domain="[('farm_employee_type', '=', 'temporary')]"/>
                 <filter string="Zemach Employees" name="filter_zemach" domain="[('farm_employee_type', '=', 'zemach')]"/>
+                <separator/>
+                <filter string="Permanent Staff" name="filter_term_permanent" domain="[('employment_term', '=', 'permanent')]"/>
+                <filter string="Contract Staff" name="filter_term_contract" domain="[('employment_term', '=', 'contract')]"/>
                 <group expand="0" string="Farm Group By">
                     <filter string="Employee Classification" name="group_farm_employee_type" context="{'group_by': 'farm_employee_type'}"/>
+                    <filter string="Employment Type (Permanent / Contract)" name="group_employment_term" context="{'group_by': 'employment_term'}"/>
                     <filter string="Current Farm" name="group_current_farm" context="{'group_by': 'current_farm_id'}"/>
                     <filter string="Sub Unit" name="group_current_sub_unit" context="{'group_by': 'current_sub_unit_id'}"/>
                 </group>

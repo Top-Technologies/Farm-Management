@@ -87,7 +87,7 @@
                 <field name="matrix_type"/>
                 <filter string="Head Office" name="head_office" domain="[('matrix_type', '=', 'head_office')]"/>
                 <filter string="CPW" name="cpw" domain="[('matrix_type', '=', 'cpw')]"/>
-                <filter string="Farm Permanent" name="farm" domain="[('matrix_type', '=', 'farm')]"/>
+                <filter string="Farm" name="farm" domain="[('matrix_type', '=', 'farm')]"/>
                 <separator/>
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
                 <group>
@@ -109,7 +109,7 @@
                 Define and configure company-wide Salary Scales (Grade × Level Matrices)
             </p>
             <p>
-                Set up Grade (1–22) and Level (Base, 1–12, Max) salary matrices for Head Office, CPW, and Farm Permanent staff.
+                Set up Grade (1–22) and Level (Base, 1–12, Max) salary matrices for Head Office, CPW, and Farm staff.
             </p>
         </field>
     </record>
