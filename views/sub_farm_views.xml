@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <list string="Sub Farms">
                 <field name="name"/>
-                <field name="code"/>
+                <field name="code" class="fw-bold text-primary font-monospace"/>
                 <field name="farm_id"/>
                 <field name="manager_id" widget="many2one_avatar_employee"/>
                 <field name="area" sum="Total Area"/>
@@ -42,7 +42,7 @@
                         </h1>
                         <div class="d-flex align-items-baseline">
                             <label for="code" class="me-2 text-muted"/>
-                            <field name="code" placeholder="e.g. SF-01" style="max-width: 200px;"/>
+                            <field name="code" readonly="1" force_save="1" class="fw-bold fs-4 text-primary font-monospace" style="max-width: 250px;"/>
                         </div>
                     </div>
                     <group>
@@ -61,7 +61,7 @@
                             <field name="sub_unit_ids" context="{'default_sub_farm_id': id, 'default_farm_id': farm_id}">
                                 <list editable="bottom">
                                     <field name="name"/>
-                                    <field name="code"/>
+                                    <field name="code" readonly="1" force_save="1" class="fw-bold text-primary font-monospace"/>
                                     <field name="manager_id" widget="many2one_avatar_employee"/>
                                     <field name="area"/>
                                     <field name="block_count" string="Blocks"/>

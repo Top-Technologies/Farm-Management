@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <list string="Blocks">
                 <field name="name"/>
-                <field name="code"/>
+                <field name="code" class="fw-bold text-primary font-monospace"/>
                 <field name="sub_unit_id"/>
                 <field name="sub_farm_id"/>
                 <field name="farm_id"/>
@@ -39,7 +39,7 @@
                         </h1>
                         <div class="d-flex align-items-baseline">
                             <label for="code" class="me-2 text-muted"/>
-                            <field name="code" placeholder="e.g. BLK-001" style="max-width: 200px;"/>
+                            <field name="code" readonly="1" force_save="1" class="fw-bold fs-4 text-primary font-monospace" style="max-width: 250px;"/>
                         </div>
                     </div>
                     <group>

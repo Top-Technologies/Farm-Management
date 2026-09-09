@@ -9,7 +9,13 @@ class Block(models.Model):
     _order = 'name asc'
 
     name = fields.Char(string='Block Name', required=True, tracking=True)
-    code = fields.Char(string='Block Code', copy=False, tracking=True)
+    code = fields.Char(
+        string='Block ID',
+        copy=False,
+        readonly=True,
+        tracking=True,
+        help='System-generated ID based on parent Sub Unit: [SubUnitCode]BK01, [SubUnitCode]BK02...',
+    )
     active = fields.Boolean(default=True, tracking=True)
     color = fields.Integer(string='Color Index')
 
@@ -59,3 +65,67 @@ class Block(models.Model):
     ], string='Status', default='active', tracking=True)
 
     description = fields.Html(string='Notes / Description')
+
+    def _generate_block_code(self, sub_unit):
+        if not sub_unit:
+            return False
+        sub_unit_code = sub_unit.code
+        if not sub_unit_code and sub_unit.sub_farm_id:
+            sub_unit.code = sub_unit._generate_sub_unit_code(sub_unit.sub_farm_id)
+            sub_unit_code = sub_unit.code
+        if not sub_unit_code:
+            sub_unit_code = f"SU{sub_unit.id:02d}"
+
+        prefix = f"{sub_unit_code}BK"
+        existing_domain = [('sub_unit_id', '=', sub_unit.id), ('code', '=like', f"{prefix}%")]
+        if self.id:
+            existing_domain.append(('id', '!=', self.id))
+        records = self.sudo().search(existing_domain)
+        max_num = 0
+        for rec in records:
+            code_val = rec.code or ''
+            num_part = code_val[len(prefix):]
+            if num_part.isdigit():
+                num = int(num_part)
+                if num > max_num:
+                    max_num = num
+        return f"{prefix}{max_num + 1:02d}"
+
+    @api.onchange('sub_unit_id')
+    def _onchange_sub_unit_id(self):
+        if self.sub_unit_id:
+            self.code = self._generate_block_code(self.sub_unit_id)
+        else:
+            self.code = False
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            sub_unit_id = vals.get('sub_unit_id')
+            sub_unit = self.env['farm.sub.unit'].browse(sub_unit_id) if sub_unit_id else False
+            if sub_unit and (not vals.get('code') or vals.get('code') == '/'):
+                vals['code'] = self._generate_block_code(sub_unit)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'sub_unit_id' in vals:
+            for rec in self:
+                if rec.sub_unit_id:
+                    rec.code = rec._generate_block_code(rec.sub_unit_id)
+        return res
+
+    def init(self):
+        super().init()
+        # Automatically migrate existing blocks to match hierarchical [SubUnitCode]BK0X format
+        sub_units = self.env['farm.sub.unit'].search([], order='id asc')
+        for su in sub_units:
+            su_code = su.code or f"SU{su.id:02d}"
+            prefix = f"{su_code}BK"
+            blocks = self.search([('sub_unit_id', '=', su.id)], order='id asc')
+            seq = 1
+            for bk in blocks:
+                expected_code = f"{prefix}{seq:02d}"
+                if bk.code != expected_code:
+                    bk.code = expected_code
+                seq += 1

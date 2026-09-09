@@ -128,3 +128,30 @@ class Farm(models.Model):
             'domain': [('farm_id', '=', self.id)],
             'context': {'default_farm_id': self.id},
         }
+
+    def _generate_farm_code(self):
+        prefix = 'FM'
+        records = self.sudo().search([('code', '=like', f"{prefix}%")])
+        max_num = 0
+        for rec in records:
+            code_val = rec.code or ''
+            num_part = code_val[len(prefix):]
+            if num_part.isdigit():
+                num = int(num_part)
+                if num > max_num:
+                    max_num = num
+        return f"{prefix}{max_num + 1:02d}"
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get('code') or vals.get('code') == '/':
+                vals['code'] = self._generate_farm_code()
+        return super().create(vals_list)
+
+    def init(self):
+        super().init()
+        # Ensure any farm without code gets a valid FM0X code
+        farms_without_code = self.search([('code', 'in', (False, ''))], order='id asc')
+        for farm in farms_without_code:
+            farm.code = farm._generate_farm_code()

@@ -15,7 +15,7 @@
                 <field name="activity_norm_count" string="Activities"/>
                 <field name="temporary_rate_count" string="Temporary Rates"/>
                 <field name="total_area" sum="Total Area"/>
-                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="company_id" options="{'no_create': True}"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
         </field>
@@ -47,13 +47,13 @@
                         </h1>
                         <div class="d-flex align-items-baseline">
                             <label for="code" class="me-2 text-muted"/>
-                            <field name="code" placeholder="e.g. FARM-001" style="max-width: 200px;"/>
+                            <field name="code" placeholder="e.g. FM01" style="max-width: 200px;"/>
                         </div>
                     </div>
                     <group>
                         <group name="general_info" string="Management">
                             <field name="manager_id" widget="many2one_avatar_employee"/>
-                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="company_id" options="{'no_create': True}"/>
                             <field name="active" invisible="1"/>
                         </group>
                         <group name="geographic_info" string="Land &amp; Geography">
@@ -66,7 +66,7 @@
                             <field name="sub_farm_ids" context="{'default_farm_id': id}">
                                 <list editable="bottom">
                                     <field name="name"/>
-                                    <field name="code"/>
+                                    <field name="code" readonly="1" force_save="1" class="fw-bold text-primary font-monospace"/>
                                     <field name="manager_id" widget="many2one_avatar_employee"/>
                                     <field name="area"/>
                                     <field name="sub_unit_count" string="Sub Units"/>

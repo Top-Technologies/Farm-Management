@@ -9,7 +9,13 @@ class SubUnit(models.Model):
     _order = 'name asc'
 
     name = fields.Char(string='Sub Unit Name', required=True, tracking=True)
-    code = fields.Char(string='Sub Unit Code', copy=False, tracking=True)
+    code = fields.Char(
+        string='Sub Unit ID',
+        copy=False,
+        readonly=True,
+        tracking=True,
+        help='System-generated ID based on parent Sub Farm: [SubFarmCode]SU01, [SubFarmCode]SU02...',
+    )
     active = fields.Boolean(default=True, tracking=True)
     color = fields.Integer(string='Color Index')
 
@@ -171,3 +177,70 @@ class SubUnit(models.Model):
             'domain': [('id', 'in', self.assigned_employee_ids.ids)],
             'context': {'default_current_sub_unit_id': self.id},
         }
+
+    def _generate_sub_unit_code(self, sub_farm):
+        if not sub_farm:
+            return False
+        sub_farm_code = sub_farm.code
+        if not sub_farm_code and sub_farm.farm_id:
+            sub_farm.code = sub_farm._generate_sub_farm_code(sub_farm.farm_id)
+            sub_farm_code = sub_farm.code
+        if not sub_farm_code:
+            sub_farm_code = f"SF{sub_farm.id:02d}"
+
+        prefix = f"{sub_farm_code}SU"
+        existing_domain = [('sub_farm_id', '=', sub_farm.id), ('code', '=like', f"{prefix}%")]
+        if self.id:
+            existing_domain.append(('id', '!=', self.id))
+        records = self.sudo().search(existing_domain)
+        max_num = 0
+        for rec in records:
+            code_val = rec.code or ''
+            num_part = code_val[len(prefix):]
+            if num_part.isdigit():
+                num = int(num_part)
+                if num > max_num:
+                    max_num = num
+        return f"{prefix}{max_num + 1:02d}"
+
+    @api.onchange('sub_farm_id')
+    def _onchange_sub_farm_id(self):
+        if self.sub_farm_id:
+            self.code = self._generate_sub_unit_code(self.sub_farm_id)
+        else:
+            self.code = False
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            sub_farm_id = vals.get('sub_farm_id')
+            sub_farm = self.env['farm.sub.farm'].browse(sub_farm_id) if sub_farm_id else False
+            if sub_farm and (not vals.get('code') or vals.get('code') == '/'):
+                vals['code'] = self._generate_sub_unit_code(sub_farm)
+        return super().create(vals_list)
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'sub_farm_id' in vals:
+            for rec in self:
+                if rec.sub_farm_id:
+                    new_code = rec._generate_sub_unit_code(rec.sub_farm_id)
+                    rec.code = new_code
+                    for bk in rec.block_ids:
+                        bk.code = bk._generate_block_code(rec)
+        return res
+
+    def init(self):
+        super().init()
+        # Automatically migrate existing sub units to match hierarchical [SubFarmCode]SU0X format
+        sub_farms = self.env['farm.sub.farm'].search([], order='id asc')
+        for sf in sub_farms:
+            sf_code = sf.code or (f"{sf.farm_id.code}SF01" if sf.farm_id and sf.farm_id.code else f"SF{sf.id:02d}")
+            prefix = f"{sf_code}SU"
+            sub_units = self.search([('sub_farm_id', '=', sf.id)], order='id asc')
+            seq = 1
+            for su in sub_units:
+                expected_code = f"{prefix}{seq:02d}"
+                if su.code != expected_code:
+                    su.code = expected_code
+                seq += 1

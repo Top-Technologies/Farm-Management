@@ -7,13 +7,13 @@
         <field name="arch" type="xml">
             <list string="Sub Units">
                 <field name="name"/>
-                <field name="code"/>
+                <field name="code" class="fw-bold text-primary font-monospace"/>
                 <field name="sub_farm_id"/>
                 <field name="farm_id"/>
                 <field name="manager_id" widget="many2one_avatar_employee"/>
-                <field name="worker_count" string="Workers"/>
-                <field name="block_count" string="Blocks"/>
                 <field name="area" sum="Total Area"/>
+                <field name="block_count" string="Blocks"/>
+                <field name="worker_count" string="Workers"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active" widget="boolean_toggle"/>
             </list>
@@ -29,7 +29,7 @@
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_view_workers" type="object" class="oe_stat_button" icon="fa-users">
-                            <field name="worker_count" widget="statinfo" string="Field Workers"/>
+                            <field name="worker_count" widget="statinfo" string="Workers"/>
                         </button>
                         <button name="action_view_blocks" type="object" class="oe_stat_button" icon="fa-cubes">
                             <field name="block_count" widget="statinfo" string="Blocks"/>
@@ -43,7 +43,7 @@
                         </h1>
                         <div class="d-flex align-items-baseline">
                             <label for="code" class="me-2 text-muted"/>
-                            <field name="code" placeholder="e.g. SU-101" style="max-width: 200px;"/>
+                            <field name="code" readonly="1" force_save="1" class="fw-bold fs-4 text-primary font-monospace" style="max-width: 250px;"/>
                         </div>
                     </div>
                     <group>
@@ -75,7 +75,7 @@
                             <field name="block_ids" context="{'default_sub_unit_id': id, 'default_sub_farm_id': sub_farm_id, 'default_farm_id': farm_id}">
                                 <list editable="bottom">
                                     <field name="name"/>
-                                    <field name="code"/>
+                                    <field name="code" readonly="1" force_save="1" class="fw-bold text-primary font-monospace"/>
                                     <field name="supervisor_id" widget="many2one_avatar_employee"/>
                                     <field name="crop_type"/>
                                     <field name="area"/>
