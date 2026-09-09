@@ -573,3 +573,137 @@ class EmployeeAPI(http.Controller):
         finally:
             if cr:
                 cr.close()
+
+    # -------------------------------------------------------------------------
+    # GET /api/farms & /odoo/api/farms & /api/fms/farms
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/farms',
+        '/odoo/api/farms',
+        '/api/fms/farms',
+        '/odoo/api/fms/farms'
+    ], type='http', auth='none', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
+    def get_farms(self, farm_id=None, code=None, company_id=None, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found or could not connect."}, status=500)
+
+        try:
+            domain = [('active', '=', True)]
+            target_id = farm_id or kwargs.get('id')
+            target_code = code or kwargs.get('farm_code')
+            target_company = company_id or kwargs.get('company')
+
+            if target_id:
+                domain.append(('id', '=', int(target_id)))
+            if target_code:
+                domain.append(('code', '=ilike', str(target_code).strip()))
+            if target_company:
+                domain.append(('company_id', '=', int(target_company)))
+
+            farms = env['farm.farm'].search(domain, order='code asc, id asc')
+
+            data = []
+            for farm in farms:
+                sub_farms_data = []
+                for sf in farm.sub_farm_ids.filtered(lambda s: s.active):
+                    sub_units_data = []
+                    for su in sf.sub_unit_ids.filtered(lambda u: u.active):
+                        blocks_data = []
+                        for bk in su.block_ids.filtered(lambda b: b.active):
+                            blocks_data.append({
+                                "id": bk.id,
+                                "name": bk.name,
+                                "code": bk.code or "",
+                                "sub_unit_id": su.id,
+                                "sub_unit_code": su.code or "",
+                                "sub_farm_id": sf.id,
+                                "sub_farm_code": sf.code or "",
+                                "farm_id": farm.id,
+                                "farm_code": farm.code or "",
+                                "supervisor": {
+                                    "id": bk.supervisor_id.id,
+                                    "name": bk.supervisor_id.name,
+                                    "employee_id": bk.supervisor_id.fms_employee_id or ""
+                                } if bk.supervisor_id else None,
+                                "area": bk.area,
+                                "crop_type": bk.crop_type or "",
+                                "soil_type": bk.soil_type or "",
+                                "status": bk.status or "active"
+                            })
+
+                        sub_units_data.append({
+                            "id": su.id,
+                            "name": su.name,
+                            "code": su.code or "",
+                            "sub_farm_id": sf.id,
+                            "sub_farm_code": sf.code or "",
+                            "farm_id": farm.id,
+                            "farm_code": farm.code or "",
+                            "manager": {
+                                "id": su.manager_id.id,
+                                "name": su.manager_id.name,
+                                "employee_id": su.manager_id.fms_employee_id or ""
+                            } if su.manager_id else None,
+                            "area": su.area,
+                            "blocks_count": len(blocks_data),
+                            "assigned_workers_count": len(su.assigned_employee_ids),
+                            "blocks": blocks_data
+                        })
+
+                    sub_farms_data.append({
+                        "id": sf.id,
+                        "name": sf.name,
+                        "code": sf.code or "",
+                        "farm_id": farm.id,
+                        "farm_code": farm.code or "",
+                        "manager": {
+                            "id": sf.manager_id.id,
+                            "name": sf.manager_id.name,
+                            "employee_id": sf.manager_id.fms_employee_id or ""
+                        } if sf.manager_id else None,
+                        "area": sf.area,
+                        "sub_units_count": len(sub_units_data),
+                        "blocks_count": sum(len(u["blocks"]) for u in sub_units_data),
+                        "sub_units": sub_units_data
+                    })
+
+                data.append({
+                    "id": farm.id,
+                    "name": farm.name,
+                    "code": farm.code or "",
+                    "company": {
+                        "id": farm.company_id.id,
+                        "name": farm.company_id.name
+                    } if farm.company_id else None,
+                    "manager": {
+                        "id": farm.manager_id.id,
+                        "name": farm.manager_id.name,
+                        "employee_id": farm.manager_id.fms_employee_id or ""
+                    } if farm.manager_id else None,
+                    "location": farm.location or "",
+                    "address": farm.address or "",
+                    "total_area": farm.total_area,
+                    "sub_farms_count": len(sub_farms_data),
+                    "sub_units_count": sum(len(s["sub_units"]) for s in sub_farms_data),
+                    "blocks_count": sum(s["blocks_count"] for s in sub_farms_data),
+                    "sub_farms": sub_farms_data
+                })
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "count": len(data),
+                "data": data
+            }, status=200)
+
+        except Exception as e:
+            _logger.error("Error retrieving farms in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Server error: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
