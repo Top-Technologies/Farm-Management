@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Salary Structure Form Inherit: Add Copy / Import Rules Button -->
+    <record id="view_hr_payroll_structure_form_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payroll.structure.form.farm.inherit</field>
+        <field name="model">hr.payroll.structure</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_employee_grade_form"/>
+        <field name="arch" type="xml">
+            <!-- Add header if none exists -->
+            <sheet position="before">
+                <header>
+                    <button name="action_open_copy_rules_wizard" type="object" string="📋 Copy / Import Salary Rules" class="btn-primary"/>
+                </header>
+            </sheet>
+        </field>
+    </record>
+
+    <!-- Wizard Form View: Copy / Import Rules -->
+    <record id="view_hr_payroll_structure_copy_rules_form" model="ir.ui.view">
+        <field name="name">hr.payroll.structure.copy.rules.form</field>
+        <field name="model">hr.payroll.structure.copy.rules</field>
+        <field name="arch" type="xml">
+            <form string="Copy / Import Salary Rules">
+                <div class="alert alert-info py-2 mb-3" role="alert">
+                    <i class="fa fa-info-circle me-2"/>
+                    <span>Select a source salary structure to import rules into <strong><field name="target_structure_id" readonly="1" class="fw-bold"/></strong>. You can import all standard rules at once or pick and choose individual rules.</span>
+                </div>
+                <group>
+                    <group>
+                        <field name="source_structure_id" options="{'no_create': True}"/>
+                        <field name="copy_mode" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="rules_count" string="Selected Rules to Import" readonly="1" class="fs-5 fw-bold text-primary"/>
+                    </group>
+                </group>
+                <div class="d-flex gap-2 my-2">
+                    <button name="action_select_all" type="object" string="✓ Select All Rules" class="btn btn-sm btn-outline-primary"/>
+                    <button name="action_unselect_all" type="object" string="✗ Unselect All" class="btn btn-sm btn-outline-secondary"/>
+                </div>
+                <notebook>
+                    <page string="Available Rules to Copy" name="rules_selection">
+                        <field name="rule_ids" nolabel="1" domain="[('struct_id', '=', source_structure_id)]">
+                            <list string="Salary Rules">
+                                <field name="sequence" widget="handle"/>
+                                <field name="code"/>
+                                <field name="name"/>
+                                <field name="category_id"/>
+                                <field name="condition_select"/>
+                                <field name="amount_select"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
+                <footer>
+                    <button string="Import Selected Rules" name="action_copy_rules" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

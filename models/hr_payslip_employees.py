@@ -9,12 +9,72 @@ class HrPayslipEmployees(models.TransientModel):
     worker_type = fields.Selection([
         ('temporary', 'Temporary Workers (Daily Wage)'),
         ('zemach', 'Seasonal / Zemach Workers (Piece Rate)'),
-        ('permanent', 'Permanent Employees (Standard Salary)'),
+        ('permanent', 'Farm Staff (Standard Salary)'),
+        ('head_office', 'Head Office Staff (Standard Salary)'),
         ('all', 'All Workers'),
     ], string='Worker Classification Filter', default='all')
 
     farm_id = fields.Many2one('farm.farm', string='Farm')
+    sub_farm_id = fields.Many2one('farm.sub.farm', string='Sub Farm')
     sub_unit_id = fields.Many2one('farm.sub.unit', string='Sub Unit')
+
+    @api.onchange('farm_id')
+    def _onchange_farm_id(self):
+        if self.farm_id:
+            if self.sub_farm_id and self.sub_farm_id.farm_id != self.farm_id:
+                self.sub_farm_id = False
+            if self.sub_unit_id and self.sub_unit_id.farm_id != self.farm_id:
+                self.sub_unit_id = False
+        return self._recompute_wizard_employees()
+
+    @api.onchange('sub_farm_id')
+    def _onchange_sub_farm_id(self):
+        if self.sub_farm_id:
+            self.farm_id = self.sub_farm_id.farm_id
+            if self.sub_unit_id and self.sub_unit_id.sub_farm_id != self.sub_farm_id:
+                self.sub_unit_id = False
+        return self._recompute_wizard_employees()
+
+    @api.onchange('sub_unit_id')
+    def _onchange_sub_unit_id(self):
+        if self.sub_unit_id:
+            self.sub_farm_id = self.sub_unit_id.sub_farm_id
+            self.farm_id = self.sub_unit_id.farm_id
+        return self._recompute_wizard_employees()
+
+    @api.onchange('worker_type', 'structure_id')
+    def _onchange_worker_type_or_structure(self):
+        return self._recompute_wizard_employees()
+
+    def _recompute_wizard_employees(self):
+        active_id = self.env.context.get('active_id')
+        batch = False
+        if active_id and self.env.context.get('active_model') == 'hr.payslip.run':
+            batch = self.env['hr.payslip.run'].browse(active_id)
+
+        date_start = batch.date_start if batch else fields.Date.today()
+        date_end = batch.date_end if batch else fields.Date.today()
+
+        domain = [('active', '=', True)]
+        if self.farm_id:
+            domain.extend(['|', ('current_farm_id', '=', self.farm_id.id), ('initial_farm_id', '=', self.farm_id.id)])
+        if self.sub_farm_id:
+            domain.extend(['|', ('current_sub_farm_id', '=', self.sub_farm_id.id), ('initial_sub_farm_id', '=', self.sub_farm_id.id)])
+        if self.sub_unit_id:
+            domain.extend(['|', ('current_sub_unit_id', '=', self.sub_unit_id.id), ('initial_sub_unit_id', '=', self.sub_unit_id.id)])
+        if self.worker_type and self.worker_type != 'all':
+            domain.append(('farm_employee_type', '=', self.worker_type))
+
+        employees = self.env['hr.employee'].search(domain)
+        if self.structure_id:
+            employees = employees.filtered(
+                lambda e: e.contract_id and (
+                    e.contract_id.struct_id == self.structure_id or
+                    e.contract_id.structure_type_id.default_struct_id == self.structure_id
+                )
+            )
+
+        self.employee_ids = [(6, 0, employees.ids)]
 
     @api.model
     def default_get(self, fields_list):
@@ -25,9 +85,32 @@ class HrPayslipEmployees(models.TransientModel):
             if batch:
                 res['worker_type'] = batch.worker_type or 'all'
                 res['farm_id'] = batch.farm_id.id if batch.farm_id else False
+                res['sub_farm_id'] = batch.sub_farm_id.id if batch.sub_farm_id else False
                 res['sub_unit_id'] = batch.sub_unit_id.id if batch.sub_unit_id else False
+                if batch.structure_id:
+                    res['structure_id'] = batch.structure_id.id
 
-                if batch.date_start and batch.date_end:
+                # Find eligible employees
+                emp_domain = [('active', '=', True)]
+                if batch.farm_id:
+                    emp_domain.extend(['|', ('current_farm_id', '=', batch.farm_id.id), ('initial_farm_id', '=', batch.farm_id.id)])
+                if batch.sub_farm_id:
+                    emp_domain.extend(['|', ('current_sub_farm_id', '=', batch.sub_farm_id.id), ('initial_sub_farm_id', '=', batch.sub_farm_id.id)])
+                if batch.sub_unit_id:
+                    emp_domain.extend(['|', ('current_sub_unit_id', '=', batch.sub_unit_id.id), ('initial_sub_unit_id', '=', batch.sub_unit_id.id)])
+                if batch.worker_type != 'all':
+                    emp_domain.append(('farm_employee_type', '=', batch.worker_type))
+
+                employees = self.env['hr.employee'].search(emp_domain)
+                if batch.structure_id:
+                    employees = employees.filtered(
+                        lambda e: e.contract_id and (
+                            e.contract_id.struct_id == batch.structure_id or
+                            e.contract_id.structure_type_id.default_struct_id == batch.structure_id
+                        )
+                    )
+
+                if batch.date_start and batch.date_end and batch.worker_type in ('temporary', 'zemach'):
                     we_domain = [
                         ('date', '>=', batch.date_start),
                         ('date', '<=', batch.date_end),
@@ -36,19 +119,32 @@ class HrPayslipEmployees(models.TransientModel):
                     ]
                     if batch.farm_id:
                         we_domain.append(('farm_id', '=', batch.farm_id.id))
+                    if batch.sub_farm_id:
+                        we_domain.append(('sub_farm_id', '=', batch.sub_farm_id.id))
                     if batch.sub_unit_id:
                         we_domain.append(('sub_unit_id', '=', batch.sub_unit_id.id))
                     if batch.worker_type != 'all':
                         we_domain.append(('employee_id.farm_employee_type', '=', batch.worker_type))
 
                     unpaid_entries = self.env['farm.work.entry'].search(we_domain)
-                    worker_ids = unpaid_entries.mapped('employee_id').ids
-                    if worker_ids:
-                        res['employee_ids'] = [(6, 0, worker_ids)]
+                    we_employee_ids = unpaid_entries.mapped('employee_id').ids
+                    employees = employees.filtered(lambda e: e.id in we_employee_ids)
+
+                if employees:
+                    res['employee_ids'] = [(6, 0, employees.ids)]
         return res
 
     def compute_sheet(self):
         # Auto-ensure contract for all workers before standard compute_sheet
         for emp in self.employee_ids:
             emp._get_or_create_farm_contract()
-        return super().compute_sheet()
+        res = super().compute_sheet()
+        # If wizard had a specific structure_id, update slips in this run that were just created
+        active_id = self.env.context.get('active_id')
+        if self.structure_id and active_id and self.env.context.get('active_model') == 'hr.payslip.run':
+            batch = self.env['hr.payslip.run'].browse(active_id)
+            for slip in batch.slip_ids.filtered(lambda s: s.employee_id in self.employee_ids):
+                if slip.struct_id != self.structure_id:
+                    slip.struct_id = self.structure_id
+                    slip.compute_sheet()
+        return res

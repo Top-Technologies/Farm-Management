@@ -42,6 +42,7 @@ This module structures agricultural operations directly integrated into the HR E
         'views/hr_employee_views.xml',
         'views/hr_contract_views.xml',
         'views/hr_payslip_views.xml',
+        'views/hr_payroll_structure_views.xml',
         'views/salary_matrix_views.xml',
         'views/hr_salary_attachment_views.xml',
         'views/res_config_settings_views.xml',

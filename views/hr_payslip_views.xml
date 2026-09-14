@@ -61,10 +61,12 @@
                 <group string="Workforce &amp; Location Filters">
                     <group>
                         <field name="worker_type" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
+                        <field name="structure_id" options="{'no_create': True}" placeholder="All / Any Structure (Optional)" readonly="state != 'draft'"/>
                     </group>
                     <group>
                         <field name="farm_id" placeholder="All Farms (Optional)" readonly="state != 'draft'"/>
-                        <field name="sub_unit_id" placeholder="All Sub Units (Optional)" readonly="state != 'draft'" invisible="not farm_id"/>
+                        <field name="sub_farm_id" placeholder="All Sub Farms (Optional)" readonly="state != 'draft'" invisible="not farm_id"/>
+                        <field name="sub_unit_id" placeholder="All Sub Units (Optional)" readonly="state != 'draft'" invisible="not farm_id and not sub_farm_id"/>
                     </group>
                 </group>
                 <group string="Agricultural Payout Summary" invisible="farm_work_entry_count == 0">
@@ -79,4 +81,41 @@
             </group>
         </field>
     </record>
+
+    <!-- HR Payslip Batch List View Inherit -->
+    <record id="hr_payslip_run_tree_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payslip.run.list.farm.inherit</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="structure_id" optional="show"/>
+                <field name="farm_id" optional="show"/>
+                <field name="sub_farm_id" optional="hide"/>
+                <field name="sub_unit_id" optional="show"/>
+                <field name="worker_type" optional="show" widget="badge"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- HR Payslip Batch Search View Inherit -->
+    <record id="hr_payslip_run_filter_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payslip.run.filter.farm.inherit</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="inherit_id" ref="hr_payroll.hr_payslip_run_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="structure_id"/>
+                <field name="farm_id"/>
+                <field name="sub_farm_id"/>
+                <field name="sub_unit_id"/>
+            </xpath>
+            <xpath expr="//filter[@name='state']" position="after">
+                <filter string="Salary Structure" name="group_by_structure" context="{'group_by': 'structure_id'}"/>
+                <filter string="Farm" name="group_by_farm" context="{'group_by': 'farm_id'}"/>
+                <filter string="Sub Unit" name="group_by_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>
+

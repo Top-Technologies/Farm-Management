@@ -15,15 +15,26 @@ class HrPayslipRun(models.Model):
     ], string='Worker Classification', default='temporary', required=True,
        help='Select which category of workers this payroll batch is targeting.')
 
+    structure_id = fields.Many2one(
+        'hr.payroll.structure',
+        string='Salary Structure',
+        help='Optional: Divide and generate payslips targeting a specific salary structure.',
+    )
     farm_id = fields.Many2one(
         'farm.farm',
         string='Farm Filter',
         help='Optional: Filter payroll batch to employees stationed at a specific farm.',
     )
+    sub_farm_id = fields.Many2one(
+        'farm.sub.farm',
+        string='Sub Farm Filter',
+        domain="[('farm_id', '=', farm_id)] if farm_id else []",
+        help='Optional: Restrict batch to a specific sub farm.',
+    )
     sub_unit_id = fields.Many2one(
         'farm.sub.unit',
         string='Sub Unit Filter',
-        domain="[('farm_id', '=', farm_id)]",
+        domain="[('sub_farm_id', '=', sub_farm_id)] if sub_farm_id else ([('farm_id', '=', farm_id)] if farm_id else [])",
         help='Optional: Further restrict batch to a specific sub unit.',
     )
 
@@ -52,6 +63,94 @@ class HrPayslipRun(models.Model):
         string='All Included Work Entries',
     )
 
+    @api.onchange('farm_id')
+    def _onchange_farm_id(self):
+        if self.farm_id:
+            if self.sub_farm_id and self.sub_farm_id.farm_id != self.farm_id:
+                self.sub_farm_id = False
+            if self.sub_unit_id and self.sub_unit_id.farm_id != self.farm_id:
+                self.sub_unit_id = False
+        self._update_batch_name()
+
+    @api.onchange('sub_farm_id')
+    def _onchange_sub_farm_id(self):
+        if self.sub_farm_id:
+            self.farm_id = self.sub_farm_id.farm_id
+            if self.sub_unit_id and self.sub_unit_id.sub_farm_id != self.sub_farm_id:
+                self.sub_unit_id = False
+        self._update_batch_name()
+
+    @api.onchange('sub_unit_id')
+    def _onchange_sub_unit_id(self):
+        if self.sub_unit_id:
+            self.sub_farm_id = self.sub_unit_id.sub_farm_id
+            self.farm_id = self.sub_unit_id.farm_id
+        self._update_batch_name()
+
+    @api.onchange('date_start', 'structure_id')
+    def _onchange_batch_dates_or_structure(self):
+        self._update_batch_name()
+
+    def _update_batch_name(self):
+        """Auto-generates payslip batch name based on sub unit / sub farm / farm and month."""
+        month_str = ''
+        if self.date_start:
+            month_str = self.date_start.strftime('%B %Y')
+
+        loc_label = ''
+        if self.sub_unit_id:
+            loc_label = f"{self.sub_unit_id.code} - {self.sub_unit_id.name}" if self.sub_unit_id.code else self.sub_unit_id.name
+        elif self.sub_farm_id:
+            loc_label = f"{self.sub_farm_id.code} - {self.sub_farm_id.name}" if self.sub_farm_id.code else self.sub_farm_id.name
+        elif self.farm_id:
+            loc_label = f"{self.farm_id.code} - {self.farm_id.name}" if self.farm_id.code else self.farm_id.name
+
+        parts = []
+        if loc_label:
+            parts.append(loc_label)
+        if month_str:
+            parts.append(month_str)
+
+        if parts:
+            self.name = " - ".join(parts)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            name = vals.get('name')
+            if not name or name.startswith('From ') or name in ('New', '/'):
+                sub_unit_id = vals.get('sub_unit_id')
+                sub_farm_id = vals.get('sub_farm_id')
+                farm_id = vals.get('farm_id')
+                date_start = vals.get('date_start')
+
+                month_str = ''
+                if date_start:
+                    if isinstance(date_start, str):
+                        date_start = fields.Date.from_string(date_start)
+                    month_str = date_start.strftime('%B %Y')
+
+                loc_label = ''
+                if sub_unit_id:
+                    su = self.env['farm.sub.unit'].browse(sub_unit_id)
+                    loc_label = f"{su.code} - {su.name}" if su.code else su.name
+                elif sub_farm_id:
+                    sf = self.env['farm.sub.farm'].browse(sub_farm_id)
+                    loc_label = f"{sf.code} - {sf.name}" if sf.code else sf.name
+                elif farm_id:
+                    f = self.env['farm.farm'].browse(farm_id)
+                    loc_label = f"{f.code} - {f.name}" if f.code else f.name
+
+                parts = []
+                if loc_label:
+                    parts.append(loc_label)
+                if month_str:
+                    parts.append(month_str)
+                if parts:
+                    vals['name'] = " - ".join(parts)
+
+        return super().create(vals_list)
+
     @api.depends('slip_ids', 'slip_ids.farm_work_entry_ids', 'slip_ids.farm_work_total_amount')
     def _compute_farm_batch_stats(self):
         for batch in self:
@@ -78,6 +177,8 @@ class HrPayslipRun(models.Model):
         ]
         if self.farm_id:
             we_domain.append(('farm_id', '=', self.farm_id.id))
+        if self.sub_farm_id:
+            we_domain.append(('sub_farm_id', '=', self.sub_farm_id.id))
         if self.sub_unit_id:
             we_domain.append(('sub_unit_id', '=', self.sub_unit_id.id))
 
@@ -94,6 +195,10 @@ class HrPayslipRun(models.Model):
             ]
             if self.farm_id and self.worker_type == 'permanent':
                 emp_domain.extend(['|', ('current_farm_id', '=', self.farm_id.id), ('initial_farm_id', '=', self.farm_id.id)])
+            if self.sub_farm_id and self.worker_type == 'permanent':
+                emp_domain.extend(['|', ('current_sub_farm_id', '=', self.sub_farm_id.id), ('initial_sub_farm_id', '=', self.sub_farm_id.id)])
+            if self.sub_unit_id and self.worker_type == 'permanent':
+                emp_domain.extend(['|', ('current_sub_unit_id', '=', self.sub_unit_id.id), ('initial_sub_unit_id', '=', self.sub_unit_id.id)])
             eligible_employees = self.env['hr.employee'].search(emp_domain)
         elif self.worker_type == 'all':
             we_employees = unpaid_entries.mapped('employee_id')
@@ -103,17 +208,31 @@ class HrPayslipRun(models.Model):
             ]
             if self.farm_id:
                 perm_domain.extend(['|', ('current_farm_id', '=', self.farm_id.id), ('initial_farm_id', '=', self.farm_id.id)])
+            if self.sub_farm_id:
+                perm_domain.extend(['|', ('current_sub_farm_id', '=', self.sub_farm_id.id), ('initial_sub_farm_id', '=', self.sub_farm_id.id)])
+            if self.sub_unit_id:
+                perm_domain.extend(['|', ('current_sub_unit_id', '=', self.sub_unit_id.id), ('initial_sub_unit_id', '=', self.sub_unit_id.id)])
             perm_employees = self.env['hr.employee'].search(perm_domain)
             eligible_employees = we_employees | perm_employees
         else:
             eligible_employees = unpaid_entries.mapped('employee_id')
 
+        # Filter by structure_id if specified on batch
+        if self.structure_id:
+            eligible_employees = eligible_employees.filtered(
+                lambda e: e.contract_id and (
+                    e.contract_id.struct_id == self.structure_id or 
+                    e.contract_id.structure_type_id.default_struct_id == self.structure_id
+                )
+            )
+
         if not eligible_employees:
             worker_label = dict(self._fields['worker_type'].selection).get(self.worker_type, self.worker_type)
+            struct_info = f" with structure '{self.structure_id.name}'" if self.structure_id else ""
             raise UserError(_(
-                "No eligible employees or unpaid work entries found for %s in period from %s to %s.\n\n"
+                "No eligible employees or unpaid work entries found for %s%s in period from %s to %s.\n\n"
                 "Please verify that work entries exist and are approved, or that active employees are configured."
-            ) % (worker_label, self.date_start, self.date_end))
+            ) % (worker_label, struct_info, self.date_start, self.date_end))
 
         # 3. Exclude employees already having a payslip in this batch
         existing_emp_ids = self.slip_ids.mapped('employee_id').ids
@@ -128,16 +247,17 @@ class HrPayslipRun(models.Model):
 
         for emp in employees_to_process:
             contract = emp._get_or_create_farm_contract()
-            struct = False
-            if emp.farm_employee_type == 'temporary':
-                struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
-            elif emp.farm_employee_type == 'zemach':
-                struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
-            elif emp.farm_employee_type in ('permanent', 'head_office'):
-                struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
+            struct = self.structure_id
+            if not struct:
+                if emp.farm_employee_type == 'temporary':
+                    struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
+                elif emp.farm_employee_type == 'zemach':
+                    struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
+                elif emp.farm_employee_type in ('permanent', 'head_office'):
+                    struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
 
-            if not struct and contract:
-                struct = contract.structure_type_id.default_struct_id or contract.struct_id
+                if not struct and contract:
+                    struct = contract.structure_type_id.default_struct_id or contract.struct_id
 
             slip_name = _('Payslip - %s - %s', emp.name, self.name or '')
             vals = {
