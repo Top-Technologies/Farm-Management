@@ -66,7 +66,11 @@ class HrPayrollStructureCopyRules(models.TransientModel):
             res['target_structure_id'] = active_id
 
             # Find default source structure: master permanent structure or one with highest rule count
-            source_struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
+            source_struct = (
+                self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
+                self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or
+                self.env.ref('Farm_Management.structure_farm_permanent', raise_if_not_found=False)
+            )
             if not source_struct or source_struct.id == active_id:
                 source_struct = self.env['hr.payroll.structure'].search([
                     ('id', '!=', active_id),

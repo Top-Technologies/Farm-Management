@@ -152,7 +152,7 @@
 
             <!-- Dedicated Notebook Page for Agricultural Assignments & Transfer History -->
             <xpath expr="//notebook" position="inside">
-                <page name="farm_assignments" string="Farm Assignments" groups="farm_management.group_farm_user" invisible="farm_employee_type == 'head_office'">
+                <page name="farm_assignments" string="Farm Assignments" groups="group_farm_user" invisible="farm_employee_type == 'head_office'">
                     <!-- Live Structural Hierarchy Banner -->
                     <div class="mb-4">
                         <h4 class="text-primary mb-2"><i class="fa fa-sitemap me-2"/>Current Placement &amp; Management Roles</h4>
@@ -189,7 +189,7 @@
                 </page>
 
                 <!-- Dedicated Page for Work Entries -->
-                <page name="farm_work_entries" string="Work Entries" groups="farm_management.group_farm_user" invisible="farm_employee_type == 'head_office'">
+                <page name="farm_work_entries" string="Work Entries" groups="group_farm_user" invisible="farm_employee_type == 'head_office'">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <span class="text-muted">Total Calculated Earnings: </span>

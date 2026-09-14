@@ -84,6 +84,7 @@ class HrPayslip(models.Model):
     farm_work_days_count = fields.Float(
         string='Total Work Days',
         compute='_compute_farm_work_entry_stats',
+        store=True,
         digits=(16, 2),
         help='Total full days and half days worked by temporary worker.',
     )
@@ -225,7 +226,7 @@ class HrPayslip(models.Model):
             self.env.cr.execute("""
                 UPDATE ir_model_data 
                 SET noupdate = false 
-                WHERE module = 'farm_management';
+                WHERE module IN ('farm_management', 'Farm-Management', 'Farm_Management');
             """)
             # Clean up any legacy obsolete salary rules
             self.env.cr.execute("""

@@ -250,11 +250,23 @@ class HrPayslipRun(models.Model):
             struct = self.structure_id
             if not struct:
                 if emp.farm_employee_type == 'temporary':
-                    struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
+                    struct = (
+                        self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False) or
+                        self.env.ref('Farm-Management.structure_farm_temporary', raise_if_not_found=False) or
+                        self.env.ref('Farm_Management.structure_farm_temporary', raise_if_not_found=False)
+                    )
                 elif emp.farm_employee_type == 'zemach':
-                    struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
+                    struct = (
+                        self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False) or
+                        self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
+                        self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
+                    )
                 elif emp.farm_employee_type in ('permanent', 'head_office'):
-                    struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
+                    struct = (
+                        self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
+                        self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or
+                        self.env.ref('Farm_Management.structure_farm_permanent', raise_if_not_found=False)
+                    )
 
                 if not struct and contract:
                     struct = contract.structure_type_id.default_struct_id or contract.struct_id

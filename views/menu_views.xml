@@ -5,7 +5,7 @@
               name="Farm Management"
               parent="hr.menu_hr_root"
               sequence="15"
-              groups="farm_management.group_farm_user"/>
+              groups="group_farm_user"/>
 
     <!-- 1st Tier: Farms -->
     <menuitem id="menu_farm_farm"
@@ -41,7 +41,7 @@
               name="Activities"
               parent="hr.menu_hr_root"
               sequence="16"
-              groups="farm_management.group_farm_user"/>
+              groups="group_farm_user"/>
 
     <!-- Sub-menu 1: Farm Activities -->
     <menuitem id="menu_farm_activity_list"
@@ -62,7 +62,7 @@
               name="Work Entries"
               parent="hr.menu_hr_root"
               sequence="17"
-              groups="farm_management.group_farm_user"/>
+              groups="group_farm_user"/>
 
     <menuitem id="menu_farm_work_entry_sub_all"
               name="All Work Entries"

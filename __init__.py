@@ -9,7 +9,12 @@ def post_init_hook(env):
     Farm Management / Administrator group so they have immediate access.
     Also reset noupdate flags so future upgrades can re-apply group data.
     """
-    farm_manager_group = env.ref('Farm_Management.group_farm_manager', raise_if_not_found=False)
+    group_data = env['ir.model.data'].search([
+        ('name', '=', 'group_farm_manager'),
+        ('model', '=', 'res.groups'),
+        ('module', 'in', ['farm_management', 'Farm_Management', 'Farm-Management'])
+    ], limit=1)
+    farm_manager_group = env['res.groups'].browse(group_data.res_id) if group_data else False
     if not farm_manager_group:
         return
 
@@ -30,7 +35,7 @@ def post_init_hook(env):
     env.cr.execute("""
         UPDATE ir_model_data
         SET noupdate = false
-        WHERE module = 'Farm_Management'
+        WHERE module IN ('Farm_Management', 'farm_management', 'Farm-Management')
         AND name IN ('group_farm_user', 'group_farm_manager', 'module_category_farm')
     """)
 

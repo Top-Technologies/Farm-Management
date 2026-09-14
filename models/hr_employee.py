@@ -818,18 +818,34 @@ class HrEmployee(models.Model):
         if existing:
             return existing
 
-        struct_type = self.env.ref('farm_management.structure_type_farm_worker', raise_if_not_found=False)
+        struct_type = (
+            self.env.ref('farm_management.structure_type_farm_worker', raise_if_not_found=False) or
+            self.env.ref('Farm-Management.structure_type_farm_worker', raise_if_not_found=False) or
+            self.env.ref('Farm_Management.structure_type_farm_worker', raise_if_not_found=False)
+        )
         if not struct_type:
             struct_type = self.env['hr.payroll.structure.type'].search([], limit=1)
 
         struct = False
         wage = 0.0
         if self.farm_employee_type == 'temporary':
-            struct = self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False)
+            struct = (
+                self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False) or
+                self.env.ref('Farm-Management.structure_farm_temporary', raise_if_not_found=False) or
+                self.env.ref('Farm_Management.structure_farm_temporary', raise_if_not_found=False)
+            )
         elif self.farm_employee_type == 'zemach':
-            struct = self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False)
+            struct = (
+                self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False) or
+                self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
+                self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
+            )
         elif self.farm_employee_type in ('permanent', 'head_office'):
-            struct = self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False)
+            struct = (
+                self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
+                self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or
+                self.env.ref('Farm_Management.structure_farm_permanent', raise_if_not_found=False)
+            )
             wage = self.matrix_basic_wage or 0.0
 
         type_name = dict(self._fields['farm_employee_type'].selection).get(self.farm_employee_type, self.farm_employee_type or 'Worker')
