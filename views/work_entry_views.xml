@@ -21,10 +21,10 @@
                 <field name="date"/>
                 <field name="employee_id" widget="many2one_avatar_employee"/>
                 <field name="fms_employee_id" optional="show"/>
-                <field name="entry_type" widget="badge" decoration-info="entry_type == 'piece_rate'" decoration-warning="entry_type == 'temporary_rate'"/>
+                <field name="entry_type" widget="badge" decoration-info="entry_type == 'piece_rate'" decoration-success="entry_type == 'fixed'"/>
                 <field name="farm_id"/>
                 <field name="sub_unit_id"/>
-                <field name="activity_id" invisible="entry_type == 'temporary_rate'"/>
+                <field name="activity_id"/>
                 <field name="score_value" string="Score / Days" sum="Total Score"/>
                 <field name="norm_rate" string="Applied Rate"/>
                 <field name="uom_name" string="Unit"/>
@@ -58,15 +58,17 @@
                         </h1>
                     </div>
                     <group>
-                        <group name="entry_type_grp" string="Payment Category &amp; Date">
-                            <field name="entry_type" widget="radio" options="{'horizontal': true}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                        <group name="entry_activity_grp" string="Activity &amp; Deployment Date">
                             <field name="date" readonly="state == 'approved' or payment_status == 'paid'"/>
                             <field name="employee_id" widget="many2one_avatar_employee" readonly="state == 'approved' or payment_status == 'paid'"/>
                             <field name="fms_employee_id"/>
                             <field name="employee_type" widget="badge" decoration-primary="employee_type == 'permanent'" decoration-warning="employee_type == 'temporary'" decoration-info="employee_type == 'zemach'"/>
+                            <field name="activity_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="activity_code"/>
+                            <field name="entry_type" widget="badge" decoration-info="entry_type == 'piece_rate'" decoration-success="entry_type == 'fixed'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
-                        <group name="location_details" string="Farm Deployment Location (Autofilled from Employee ID)">
+                        <group name="location_details" string="Farm Deployment Location (Autofilled from Employee)">
                             <field name="farm_id" readonly="1"/>
                             <field name="sub_farm_id" readonly="1"/>
                             <field name="sub_unit_id" readonly="1"/>
@@ -74,48 +76,28 @@
                         </group>
                     </group>
 
-                    <!-- Piece Rate Section -->
-                    <group invisible="entry_type != 'piece_rate'">
-                        <group name="activity_calculation" string="Activity &amp; Productivity Score">
-                            <field name="activity_id" options="{'no_create': True}" required="entry_type == 'piece_rate'" readonly="state == 'approved' or payment_status == 'paid'"/>
-                            <field name="activity_code"/>
-                            <field name="score_value" string="Score / Quantity" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                    <!-- Work Done & Payment Calculation Section -->
+                    <group name="work_calculation_section" string="Work Done &amp; Payment Calculation">
+                        <group name="score_duration_grp">
+                            <!-- Fixed Rate Activities: Show Duration Picker & Allowed Days (0.5, 1.0, 1.5, 2.0) -->
+                            <field name="work_duration" widget="radio" options="{'horizontal': true}" invisible="entry_type != 'fixed'" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="score_value" string="Days Worked (0.5 / 1.0 / 1.5 / 2.0)" invisible="entry_type != 'fixed'" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                            <!-- Piece Rate Activities: Show Quantity / Score Input -->
+                            <field name="score_value" string="Quantity / Output Score" invisible="entry_type == 'fixed'" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                         </group>
-                        <group name="payment_calculation" string="Norm Rate &amp; Deserved Payment">
-                            <label for="norm_rate" string="Norm Rate"/>
+                        <group name="payment_summary_grp">
+                            <label for="norm_rate" string="Applied Rate"/>
                             <div class="d-flex align-items-baseline">
-                                <field name="norm_rate" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                                <field name="norm_rate" readonly="1" class="oe_inline fw-bold" style="max-width: 150px;"/>
                                 <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
                             </div>
-                            <div class="d-flex flex-column mt-2 p-3 bg-light rounded border">
+                            <div class="d-flex flex-column mt-2 p-3 bg-light rounded border border-success">
                                 <span class="text-muted small">Total Calculated Payment:</span>
                                 <h2 class="text-success fw-bold mb-0">
                                     <field name="total_amount"/> <span class="fs-5">Birr</span>
                                 </h2>
-                                <span class="text-muted small mt-1">(Score × Norm Rate)</span>
-                            </div>
-                        </group>
-                    </group>
-
-                    <!-- Temporary Worker Daily Wage Section -->
-                    <group invisible="entry_type != 'temporary_rate'">
-                        <group name="temp_work_calculation" string="Temporary Attendance Duration">
-                            <field name="work_duration" widget="radio" options="{'horizontal': true}" readonly="state == 'approved' or payment_status == 'paid'"/>
-                            <field name="score_value" string="Days (0.5 / 1.0 / 1.5)" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
-                            <field name="temporary_rate_id" readonly="1"/>
-                        </group>
-                        <group name="temp_payment_calculation" string="Daily Wage Rate &amp; Payment">
-                            <label for="norm_rate" string="Applied Rate"/>
-                            <div class="d-flex align-items-baseline">
-                                <field name="norm_rate" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
-                                <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
-                            </div>
-                            <div class="d-flex flex-column mt-2 p-3 bg-light rounded border border-primary">
-                                <span class="text-muted small">Total Temporary Worker Payment:</span>
-                                <h2 class="text-success fw-bold mb-0">
-                                    <field name="total_amount"/> <span class="fs-5">Birr</span>
-                                </h2>
-                                <span class="text-muted small mt-1">(Calculated via Farm Temporary Rate: 1.0 Day / 0.5 Day / 1.5 Days)</span>
+                                <span class="text-muted small mt-1" invisible="entry_type != 'fixed'">(Daily Rate × Days Worked)</span>
+                                <span class="text-muted small mt-1" invisible="entry_type == 'fixed'">(Quantity × Norm Rate)</span>
                             </div>
                         </group>
                     </group>
@@ -248,8 +230,8 @@
 
                 <!-- Payment & Worker Type Filters -->
                 <separator/>
+                <filter string="Fixed (Daily Rates)" name="filter_fixed" domain="[('entry_type', '=', 'fixed')]"/>
                 <filter string="Piece Rate (Norms)" name="filter_piece_rate" domain="[('entry_type', '=', 'piece_rate')]"/>
-                <filter string="Temporary (Daily Rates)" name="filter_temporary_rate" domain="[('entry_type', '=', 'temporary_rate')]"/>
                 <separator/>
                 <filter string="Permanent Workers" name="filter_perm_workers" domain="[('employee_type', '=', 'permanent')]"/>
                 <filter string="Seasonal Workers (Zemach)" name="filter_zemach_workers" domain="[('employee_type', '=', 'zemach')]"/>

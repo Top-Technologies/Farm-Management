@@ -36,7 +36,6 @@ This module structures agricultural operations directly integrated into the HR E
         'views/sub_unit_views.xml',
         'views/block_views.xml',
         'views/activity_views.xml',
-        'views/temporary_rate_views.xml',
         'views/transfer_views.xml',
         'views/work_entry_views.xml',
         'views/hr_employee_views.xml',

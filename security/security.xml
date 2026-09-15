@@ -61,12 +61,6 @@
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
 
-        <record id="farm_temporary_rate_company_rule" model="ir.rule">
-            <field name="name">Farm Temporary Rate Multi-Company Rule</field>
-            <field name="model_id" ref="model_farm_temporary_rate"/>
-            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
-        </record>
-
         <record id="farm_employee_transfer_company_rule" model="ir.rule">
             <field name="name">Farm Employee Transfer Multi-Company Rule</field>
             <field name="model_id" ref="model_farm_employee_transfer"/>

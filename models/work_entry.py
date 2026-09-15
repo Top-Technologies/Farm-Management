@@ -27,15 +27,16 @@ class FarmWorkEntry(models.Model):
 
     # Payment / Calculation Type
     entry_type = fields.Selection([
-        ('piece_rate', 'Activity Piece Rate (Norm)'),
-        ('temporary_rate', 'Temporary Worker (Daily Rate)'),
-    ], string='Payment Type', default='piece_rate', required=True, tracking=True)
+        ('piece_rate', 'Piece Rate'),
+        ('fixed', 'Fixed (Daily Rate)'),
+    ], string='Payment Type', compute='_compute_entry_type', store=True, readonly=False, tracking=True)
 
     work_duration = fields.Selection([
         ('half_day', 'Half Day (0.5)'),
         ('full_day', 'Full Day (1.0)'),
-        ('one_and_half_day', 'Full Day + Half Day (1.5)'),
-    ], string='Work Duration', default='full_day', tracking=True)
+        ('one_and_half_day', 'Day and a Half (1.5)'),
+        ('two_days', 'Two Days (2.0)'),
+    ], string='Work Duration', tracking=True)
 
     # Employee & FMS Identifiers
     employee_id = fields.Many2one(
@@ -87,10 +88,11 @@ class FarmWorkEntry(models.Model):
         tracking=True,
     )
 
-    # Activity & Piece-Rate Linkage
+    # Activity Linkage
     activity_id = fields.Many2one(
         'farm.activity',
         string='Activity',
+        required=True,
         tracking=True,
         index=True,
     )
@@ -98,14 +100,6 @@ class FarmWorkEntry(models.Model):
         string='Activity Code',
         related='activity_id.code',
         readonly=True,
-    )
-
-    # Temporary Worker Rate Linkage
-    temporary_rate_id = fields.Many2one(
-        'farm.temporary.rate',
-        string='Temporary Rate Rule',
-        compute='_compute_temporary_rate',
-        store=True,
     )
 
     # Rates & Units
@@ -249,13 +243,26 @@ class FarmWorkEntry(models.Model):
     )
     notes = fields.Text(string='Notes / Remarks')
 
-    @api.constrains('entry_type', 'score_value')
+    @api.constrains('activity_id', 'score_value')
     def _check_work_entry_validity(self):
         for entry in self:
+            if not entry.activity_id:
+                raise ValidationError(_("An Activity is required for every work entry!"))
             if entry.score_value <= 0:
                 raise ValidationError(_("Work score / days worked must be strictly greater than 0!"))
-            if entry.entry_type == 'piece_rate' and not entry.activity_id:
-                raise ValidationError(_("Please select an Activity for Piece Rate work entries."))
+            if entry.activity_id.type == 'fixed':
+                if entry.score_value not in (0.5, 1.0, 1.5, 2.0):
+                    raise ValidationError(_(
+                        "For fixed rate activities (%s), the score must be strictly 0.5 (Half Day), 1.0 (Full Day), 1.5 (Day and a Half), or 2.0 (Two Days). Received: %s"
+                    ) % (entry.activity_id.name, entry.score_value))
+
+    @api.depends('activity_id', 'activity_id.type')
+    def _compute_entry_type(self):
+        for entry in self:
+            if entry.activity_id and entry.activity_id.type:
+                entry.entry_type = entry.activity_id.type
+            elif not entry.entry_type:
+                entry.entry_type = 'piece_rate'
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -296,109 +303,95 @@ class FarmWorkEntry(models.Model):
             self.sub_unit_id = target_sub_unit
             self.block_id = target_block
 
-            # Auto-suggest payment type: Temporary worker defaults to temporary rate; others default to piece rate
-            if emp.farm_employee_type == 'temporary':
-                self.entry_type = 'temporary_rate'
-            else:
-                self.entry_type = 'piece_rate'
+            # For temporary workers, suggest the default fixed attendance activity if none selected
+            if emp.farm_employee_type == 'temporary' and not self.activity_id:
+                daily_act = self.env['farm.activity'].search([('type', '=', 'fixed')], limit=1)
+                if daily_act:
+                    self.activity_id = daily_act
+                    self.entry_type = 'fixed'
 
+    @api.onchange('activity_id')
+    def _onchange_activity_id(self):
+        if self.activity_id:
+            self.entry_type = self.activity_id.type
+            if self.activity_id.type == 'fixed':
+                if self.score_value not in (0.5, 1.0, 1.5, 2.0):
+                    self.score_value = 1.0
+                duration_inv = {0.5: 'half_day', 1.0: 'full_day', 1.5: 'one_and_half_day', 2.0: 'two_days'}
+                self.work_duration = duration_inv.get(self.score_value, 'full_day')
 
     @api.onchange('work_duration')
     def _onchange_work_duration(self):
-        if self.entry_type == 'temporary_rate':
-            if self.work_duration == 'half_day':
-                self.score_value = 0.5
-            elif self.work_duration == 'one_and_half_day':
-                self.score_value = 1.5
-            else:
-                self.score_value = 1.0
+        if self.activity_id and self.activity_id.type == 'fixed':
+            duration_map = {
+                'half_day': 0.5,
+                'full_day': 1.0,
+                'one_and_half_day': 1.5,
+                'two_days': 2.0,
+            }
+            if self.work_duration in duration_map:
+                self.score_value = duration_map[self.work_duration]
 
     @api.onchange('score_value')
     def _onchange_score_value(self):
-        if self.entry_type == 'temporary_rate':
-            if self.score_value == 0.5:
-                self.work_duration = 'half_day'
-            elif self.score_value == 1.5:
-                self.work_duration = 'one_and_half_day'
-            else:
-                self.score_value = 1.0
-                self.work_duration = 'full_day'
+        if self.activity_id and self.activity_id.type == 'fixed':
+            score_map = {
+                0.5: 'half_day',
+                1.0: 'full_day',
+                1.5: 'one_and_half_day',
+                2.0: 'two_days',
+            }
+            if self.score_value in score_map:
+                self.work_duration = score_map[self.score_value]
 
-    @api.depends('farm_id', 'entry_type')
-    def _compute_temporary_rate(self):
-        for entry in self:
-            if entry.entry_type == 'temporary_rate' and entry.farm_id:
-                rate_rec = self.env['farm.temporary.rate'].search([
-                    ('farm_id', '=', entry.farm_id.id),
-                    ('active', '=', True),
-                ], limit=1)
-                entry.temporary_rate_id = rate_rec
-            else:
-                entry.temporary_rate_id = False
-
-    @api.depends('entry_type', 'activity_id', 'farm_id', 'temporary_rate_id', 'score_value', 'work_duration')
+    @api.depends('activity_id', 'farm_id')
     def _compute_rates(self):
         for entry in self:
-            if entry.entry_type == 'piece_rate':
-                if entry.activity_id and entry.farm_id:
-                    norm_rec = self.env['farm.activity.norm'].search([
-                        ('activity_id', '=', entry.activity_id.id),
-                        ('farm_id', '=', entry.farm_id.id),
-                    ], limit=1)
-                    entry.norm_rate = norm_rec.norm_value if norm_rec else 0.0
+            if entry.activity_id and entry.farm_id:
+                norm_rec = self.env['farm.activity.norm'].search([
+                    ('activity_id', '=', entry.activity_id.id),
+                    ('farm_id', '=', entry.farm_id.id),
+                ], limit=1)
+                entry.norm_rate = norm_rec.norm_value if norm_rec else 0.0
+                if entry.activity_id.type == 'fixed':
+                    entry.uom_name = entry.activity_id.uom_name or 'Birr/Day'
+                else:
                     entry.uom_name = entry.activity_id.uom_name or 'Birr/Kg'
-                else:
-                    entry.norm_rate = 0.0
-                    entry.uom_name = 'Birr/Kg'
-            elif entry.entry_type == 'temporary_rate':
-                temp_rate = entry.temporary_rate_id
-                if temp_rate:
-                    if entry.score_value == 0.5 or entry.work_duration == 'half_day':
-                        entry.norm_rate = temp_rate.half_day_rate
-                        entry.uom_name = _('Birr/Half-Day')
-                    elif entry.score_value == 1.5 or entry.work_duration == 'one_and_half_day':
-                        entry.norm_rate = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
-                        entry.uom_name = _('Birr/1.5-Day')
-                    else:
-                        entry.norm_rate = temp_rate.full_day_rate
-                        entry.uom_name = _('Birr/Day')
-                else:
-                    entry.norm_rate = 0.0
-                    entry.uom_name = _('Birr/Day')
+            else:
+                entry.norm_rate = 0.0
+                entry.uom_name = 'Birr/Day' if (entry.activity_id and entry.activity_id.type == 'fixed') else 'Birr/Kg'
 
-    @api.depends('score_value', 'norm_rate', 'entry_type', 'temporary_rate_id', 'work_duration')
+    @api.depends('score_value', 'norm_rate')
     def _compute_total_amount(self):
         for entry in self:
-            if entry.entry_type == 'temporary_rate':
-                temp_rate = entry.temporary_rate_id
-                if temp_rate:
-                    if entry.score_value == 0.5 or entry.work_duration == 'half_day':
-                        entry.total_amount = temp_rate.half_day_rate
-                    elif entry.score_value == 1.5 or entry.work_duration == 'one_and_half_day':
-                        entry.total_amount = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
-                    else:
-                        entry.total_amount = temp_rate.full_day_rate
-                else:
-                    entry.total_amount = (entry.score_value or 0.0) * (entry.norm_rate or 0.0)
-            else:
-                entry.total_amount = (entry.score_value or 0.0) * (entry.norm_rate or 0.0)
+            entry.total_amount = round((entry.score_value or 0.0) * (entry.norm_rate or 0.0), 2)
 
-    @api.depends('score_value', 'total_amount', 'payment_status', 'entry_type', 'work_duration')
+    @api.depends('score_value', 'total_amount', 'payment_status', 'entry_type', 'activity_id.type')
     def _compute_report_metrics(self):
         for entry in self:
             entry.work_done_qty = entry.score_value or 0.0
             entry.entry_count = 1
 
             # Days worked normalization
-            if entry.entry_type == 'temporary_rate':
-                if entry.work_duration == 'half_day':
-                    entry.work_days = 0.5
-                elif entry.work_duration == 'one_and_half_day':
-                    entry.work_days = 1.5
-                else:
-                    entry.work_days = 1.0
+            if (entry.activity_id and entry.activity_id.type == 'fixed') or entry.entry_type == 'fixed':
+                entry.work_days = entry.score_value or 0.0
             else:
-                entry.work_days = 1.0 if entry.score_value > 0 else 0.0
+                entry.work_days = 1.0 if (entry.score_value or 0.0) > 0 else 0.0
+
+            # Financial status breakdown
+            tot = entry.total_amount or 0.0
+            if entry.payment_status == 'paid':
+                entry.amount_paid = tot
+                entry.amount_in_payroll = 0.0
+                entry.amount_unpaid = 0.0
+            elif entry.payment_status == 'in_payroll':
+                entry.amount_paid = 0.0
+                entry.amount_in_payroll = tot
+                entry.amount_unpaid = 0.0
+            else:
+                entry.amount_paid = 0.0
+                entry.amount_in_payroll = 0.0
+                entry.amount_unpaid = tot
 
             # Financial status breakdown
             tot = entry.total_amount or 0.0
@@ -448,10 +441,14 @@ class FarmWorkEntry(models.Model):
     # State Workflow Actions
     def action_confirm(self):
         for entry in self:
+            if not entry.activity_id:
+                raise ValidationError(_("Please select an Activity for this work entry!"))
             if entry.score_value <= 0:
                 raise ValidationError(_("Score / Days worked must be greater than zero!"))
-            if entry.entry_type == 'piece_rate' and not entry.activity_id:
-                raise ValidationError(_("Please select an Activity for Piece Rate work entry!"))
+            if entry.activity_id.type == 'fixed' and entry.score_value not in (0.5, 1.0, 1.5, 2.0):
+                raise ValidationError(_(
+                    "For fixed rate activities (%s), the score must be strictly 0.5 (Half Day), 1.0 (Full Day), 1.5 (Day and a Half), or 2.0 (Two Days). Received: %s"
+                ) % (entry.activity_id.name, entry.score_value))
             entry.state = 'confirmed'
 
     def action_approve(self):
@@ -493,6 +490,7 @@ class FarmWorkEntry(models.Model):
         super().init()
         # 1. Backfill any existing records without payment_status
         # 2. Fix any orphaned records that are 'in_payroll' but have no payslip_id and no payslip_run_id
+        # 3. Update any old temporary_rate entry_type to fixed
         try:
             self.env.cr.execute("""
                 UPDATE farm_work_entry
@@ -502,6 +500,10 @@ class FarmWorkEntry(models.Model):
                     paid_date = NULL
                 WHERE payment_status IS NULL 
                    OR (payment_status = 'in_payroll' AND (payslip_id IS NULL AND payslip_run_id IS NULL));
+
+                UPDATE farm_work_entry
+                SET entry_type = 'fixed'
+                WHERE entry_type = 'temporary_rate';
             """)
         except Exception:
             pass

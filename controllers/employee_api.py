@@ -14,7 +14,7 @@ class EmployeeAPI(http.Controller):
     def _get_db(self):
         """Resolves target database dynamically from URL query param, header, session, odoo.conf, or active DB list."""
         # 1. URL Query Parameter: ?db=your_db_name
-        db_name = request.httprequest.args.get('db') or request.params.get('db')
+        db_name = request.httprequest.args.get('db') or getattr(request, 'params', {}).get('db')
         # 2. HTTP Custom Header: X-Odoo-Db or X-Database
         if not db_name:
             db_name = request.httprequest.headers.get('X-Odoo-Db') or request.httprequest.headers.get('X-Database')
@@ -129,14 +129,20 @@ class EmployeeAPI(http.Controller):
                 classification_labels = dict(emp._fields['farm_employee_type'].selection) if 'farm_employee_type' in emp._fields else {}
                 class_label = classification_labels.get(emp.farm_employee_type, emp.farm_employee_type or 'Temporary')
 
-                # Only temporary workers get the temporary wage rate
+                # Look up daily wage rate from active fixed farm activity
                 temp_rate = False
                 is_temp_worker = (emp.farm_employee_type == 'temporary') or ('T' in (emp.fms_employee_id or '').upper())
                 if farm and is_temp_worker:
-                    temp_rate = env['farm.temporary.rate'].search([
+                    norm_rec = env['farm.activity.norm'].search([
+                        ('activity_id.type', '=', 'fixed'),
                         ('farm_id', '=', farm.id),
-                        ('active', '=', True)
                     ], limit=1)
+                    if norm_rec:
+                        temp_rate = {
+                            "full_day_rate": norm_rec.norm_value,
+                            "half_day_rate": round(norm_rec.norm_value / 2.0, 2),
+                            "uom": norm_rec.uom_name or "Birr/Day",
+                        }
 
                 data.append({
                     "id": emp.id,
@@ -164,11 +170,7 @@ class EmployeeAPI(http.Controller):
                         "code": block.code if block else "",
                         "name": block.name if block else ""
                     } if block else None,
-                    "temporary_wage_rate": {
-                        "full_day_rate": temp_rate.full_day_rate if temp_rate else None,
-                        "half_day_rate": temp_rate.half_day_rate if temp_rate else None,
-                        "uom": temp_rate.uom_name if temp_rate else "Birr/Day"
-                    } if temp_rate else None,
+                    "temporary_wage_rate": temp_rate,
                     "job_title": emp.job_title or (emp.job_id.name if emp.job_id else ""),
                     "department": emp.department_id.name if emp.department_id else "",
                     "work_phone": emp.work_phone or emp.mobile_phone or "",
@@ -245,6 +247,13 @@ class EmployeeAPI(http.Controller):
                 "message": "Missing required field: 'employee_id' (e.g. 'FM01T0001')."
             }, status=400)
 
+        if not activity_identifier:
+            if cr: cr.close()
+            return self._json_response({
+                "status": "error",
+                "message": "Missing required field: 'activity_code' (e.g. 'HARV01', 'DAILY'). Activity code is mandatory for all work entries."
+            }, status=400)
+
         if score_val is None:
             if cr: cr.close()
             return self._json_response({
@@ -260,7 +269,7 @@ class EmployeeAPI(http.Controller):
             if cr: cr.close()
             return self._json_response({
                 "status": "error",
-                "message": "Field 'score' must be a positive number (e.g. 1.0, 0.5, 6.0)."
+                "message": "Field 'score' must be a positive number (e.g. 1.0, 0.5, 52.5)."
             }, status=400)
 
         work_date = fields.Date.today()
@@ -285,19 +294,10 @@ class EmployeeAPI(http.Controller):
                 emp = env['hr.employee'].browse(int(emp_identifier)).exists()
 
             if not emp:
-                if cr: cr.close()
                 return self._json_response({
                     "status": "error",
                     "message": f"Employee with ID '{emp_identifier}' not found in database '{db_name}'."
                 }, status=404)
-
-            emp_code = (emp.fms_employee_id or emp.employee_code or '').upper()
-            emp_type = emp.farm_employee_type or ''
-
-            is_temp_worker   = (emp_type == 'temporary')
-            is_zemach_worker = (emp_type == 'zemach')
-            is_permanent     = (emp_type in ('permanent', 'head_office'))
-
 
             # 2. Resolve Farm Location
             farm = emp.current_farm_id or emp.initial_farm_id
@@ -309,96 +309,53 @@ class EmployeeAPI(http.Controller):
                 farm = env['farm.farm'].search([], limit=1)
 
             if not farm:
-                if cr: cr.close()
                 return self._json_response({
                     "status": "error",
                     "message": "No farm found in the system to calculate rates."
                 }, status=400)
 
-            # 3. Determine Entry Type (Piece Rate vs Temporary Daily Rate)
-            is_temporary_rate = False
-            if entry_type_req in ('temporary_rate', 'daily_rate', 'temporary'):
-                is_temporary_rate = True
-            elif not activity_identifier:
-                is_temporary_rate = True
-            elif str(activity_identifier).upper() in ('TEMP', 'TEMPORARY', 'DAILY', 'ATTENDANCE'):
-                is_temporary_rate = True
+            # 3. Resolve Activity
+            activity = env['farm.activity'].search([
+                ('code', '=ilike', str(activity_identifier).strip())
+            ], limit=1)
 
-            activity = False
-            norm_rate = 0.0
-            total_payment = 0.0
-            uom_name = 'Birr/Day'
-            work_duration = 'full_day'  # default; overridden for temporary rate entries
+            if not activity and str(activity_identifier).isdigit():
+                activity = env['farm.activity'].browse(int(activity_identifier)).exists()
 
-            if is_temporary_rate:
-                if score_float not in (0.5, 1.0, 1.5):
-                    if cr: cr.close()
+            if not activity:
+                return self._json_response({
+                    "status": "error",
+                    "message": f"Activity with code '{activity_identifier}' not found. Use GET /api/activities to see all available activities and their codes."
+                }, status=404)
+
+            # 4. Check Activity Type (Fixed vs. Piece Rate) & Validate Score
+            is_fixed = (activity.type == 'fixed')
+            if is_fixed:
+                if score_float not in (0.5, 1.0, 1.5, 2.0):
                     return self._json_response({
                         "status": "error",
-                        "message": f"Score for temporary worker attendance must be strictly 0.5 (Half Day), 1.0 (Full Day), or 1.5 (Full + Half Day). Received: {score_float}. Custom scores are not permitted."
+                        "message": f"For fixed rate activity '{activity.code}' ({activity.name}), score must be strictly 0.5 (Half Day), 1.0 (Full Day), 1.5 (Day and a Half), or 2.0 (Two Days). Received: {score_float}. Custom scores are not permitted."
                     }, status=400)
 
-                entry_type = 'temporary_rate'
-                if score_float == 0.5:
-                    work_duration = 'half_day'
-                elif score_float == 1.5:
-                    work_duration = 'one_and_half_day'
-                else:
-                    work_duration = 'full_day'
-
-                # Look up temporary rate for farm
-                temp_rate = env['farm.temporary.rate'].search([
-                    ('farm_id', '=', farm.id),
-                    ('active', '=', True)
-                ], limit=1)
-
-                if temp_rate:
-                    if score_float == 0.5:
-                        norm_rate = temp_rate.half_day_rate
-                        total_payment = round(temp_rate.half_day_rate, 2)
-                        uom_name = 'Birr/Half-Day'
-                    elif score_float == 1.5:
-                        norm_rate = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
-                        total_payment = round(temp_rate.full_day_rate + temp_rate.half_day_rate, 2)
-                        uom_name = 'Birr/1.5-Day'
-                    else:
-                        norm_rate = temp_rate.full_day_rate
-                        total_payment = round(temp_rate.full_day_rate, 2)
-                        uom_name = 'Birr/Day'
-                else:
-                    norm_rate = 0.0
-                    total_payment = 0.0
-                    uom_name = 'Birr/Day'
-
+                duration_map = {0.5: 'half_day', 1.0: 'full_day', 1.5: 'one_and_half_day', 2.0: 'two_days'}
+                work_duration = duration_map.get(score_float, 'full_day')
+                entry_type = 'fixed'
+                uom_name = activity.uom_name or 'Birr/Day'
             else:
-                # Piece-rate — Zemach (seasonal) workers only
                 entry_type = 'piece_rate'
-                work_duration = 'full_day'  # not applicable for piece-rate but required by model
-
-                activity = env['farm.activity'].search([
-                    ('code', '=ilike', str(activity_identifier).strip())
-                ], limit=1)
-
-                if not activity and str(activity_identifier).isdigit():
-                    activity = env['farm.activity'].browse(int(activity_identifier)).exists()
-
-                if not activity:
-                    if cr: cr.close()
-                    return self._json_response({
-                        "status": "error",
-                        "message": f"Activity '{activity_identifier}' not found. Use GET /api/fms/activities to see valid activity codes."
-                    }, status=404)
-
-                norm_rec = env['farm.activity.norm'].search([
-                    ('activity_id', '=', activity.id),
-                    ('farm_id', '=', farm.id)
-                ], limit=1)
-
-                norm_rate = norm_rec.norm_value if norm_rec else 0.0
+                work_duration = False
                 uom_name = activity.uom_name or 'Birr/Kg'
-                total_payment = round(score_float * norm_rate, 2)
 
-            # 4. Create Work Entry Record
+            # 5. Resolve Activity Norm / Daily Rate for Farm
+            norm_rec = env['farm.activity.norm'].search([
+                ('activity_id', '=', activity.id),
+                ('farm_id', '=', farm.id)
+            ], limit=1)
+
+            norm_rate = norm_rec.norm_value if norm_rec else 0.0
+            total_payment = round(score_float * norm_rate, 2)
+
+            # 6. Create Work Entry Record
             vals = {
                 'date': work_date,
                 'employee_id': emp.id,
@@ -408,7 +365,7 @@ class EmployeeAPI(http.Controller):
                 'sub_farm_id': sub_farm.id if sub_farm else False,
                 'sub_unit_id': sub_unit.id if sub_unit else False,
                 'block_id': block.id if block else False,
-                'activity_id': activity.id if activity else False,
+                'activity_id': activity.id,
                 'norm_rate': norm_rate,
                 'score_value': score_float,
                 'total_amount': total_payment,
@@ -426,7 +383,6 @@ class EmployeeAPI(http.Controller):
                     "id": work_entry.id,
                     "reference": work_entry.name,
                     "date": str(work_entry.date),
-                    "payment_type": "Temporary Worker Daily Rate" if entry_type == 'temporary_rate' else "Activity Piece Rate (Norm)",
                     "employee": {
                         "id": emp.id,
                         "employee_id": emp.fms_employee_id or emp.employee_code,
@@ -444,14 +400,16 @@ class EmployeeAPI(http.Controller):
                     "activity": {
                         "id": activity.id,
                         "code": activity.code,
-                        "name": activity.name
-                    } if activity else None,
+                        "name": activity.name,
+                        "type": activity.type,
+                        "type_label": "Fixed (Daily Rate)" if activity.type == 'fixed' else "Piece Rate"
+                    },
                     "calculation": {
-                        "score_or_days": score_float,
-                        "duration": work_duration,
-                        "applied_rate": norm_rate,
+                        "score": score_float,
+                        "norm_rate": norm_rate,
                         "uom": uom_name,
-                        "total_payment_birr": total_payment
+                        "total_payment_birr": total_payment,
+                        "formula": f"{score_float} days × {norm_rate} Birr/Day" if is_fixed else f"{score_float} × {norm_rate} {uom_name}"
                     },
                     "state": work_entry.state,
                     "payment_status": work_entry.payment_status
@@ -504,6 +462,8 @@ class EmployeeAPI(http.Controller):
                     "id": act.id,
                     "code": act.code,
                     "name": act.name,
+                    "type": act.type,
+                    "type_label": "Fixed (Daily Rate)" if act.type == 'fixed' else "Piece Rate",
                     "category": act.category,
                     "uom_name": act.uom_name,
                     "norms": norms
@@ -541,24 +501,29 @@ class EmployeeAPI(http.Controller):
             return self._json_response({"status": "error", "message": "Database not found."}, status=500)
 
         try:
-            domain = [('active', '=', True)]
-            rates = env['farm.temporary.rate'].search(domain, order='farm_id asc')
+            fixed_acts = env['farm.activity'].search([('type', '=', 'fixed'), ('active', '=', True)])
             data = []
-            for r in rates:
-                if farm_code and r.farm_id.code and r.farm_id.code.lower() != farm_code.lower():
-                    continue
-                data.append({
-                    "id": r.id,
-                    "farm": {
-                        "id": r.farm_id.id,
-                        "code": r.farm_id.code or "",
-                        "name": r.farm_id.name
-                    },
-                    "full_day_rate": r.full_day_rate,
-                    "half_day_rate": r.half_day_rate,
-                    "uom": r.uom_name or "Birr/Day",
-                    "remarks": r.notes or ""
-                })
+            for act in fixed_acts:
+                for n in act.farm_norm_ids:
+                    if farm_code and n.farm_id.code and n.farm_id.code.lower() != farm_code.lower():
+                        continue
+                    data.append({
+                        "id": n.id,
+                        "activity": {
+                            "id": act.id,
+                            "code": act.code,
+                            "name": act.name,
+                        },
+                        "farm": {
+                            "id": n.farm_id.id,
+                            "code": n.farm_id.code or "",
+                            "name": n.farm_id.name
+                        },
+                        "full_day_rate": n.norm_value,
+                        "half_day_rate": round(n.norm_value / 2.0, 2),
+                        "uom": n.uom_name or "Birr/Day",
+                        "remarks": f"Unified Fixed Activity Rate ({act.name})"
+                    })
 
             return self._json_response({
                 "status": "success",

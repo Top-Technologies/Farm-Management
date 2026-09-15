@@ -13,7 +13,6 @@
                 <field name="sub_unit_count" string="Sub Units"/>
                 <field name="block_count" string="Blocks"/>
                 <field name="activity_norm_count" string="Activities"/>
-                <field name="temporary_rate_count" string="Temporary Rates"/>
                 <field name="total_area" sum="Total Area"/>
                 <field name="company_id" options="{'no_create': True}"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -74,22 +73,13 @@
                                 </list>
                             </field>
                         </page>
-                        <page name="activity_norms" string="Activity Norms">
+                        <page name="activity_norms" string="Activity Norms &amp; Wage Rates">
                             <field name="activity_norm_ids" context="{'default_farm_id': id}">
                                 <list editable="bottom" string="Activity Standards &amp; Norms">
                                     <field name="activity_id" options="{'no_create': True}"/>
-                                    <field name="norm_value" string="Standard Norm"/>
+                                    <field name="activity_type" widget="badge" decoration-info="activity_type == 'piece_rate'" decoration-success="activity_type == 'fixed'"/>
+                                    <field name="norm_value" string="Norm / Daily Rate"/>
                                     <field name="uom_name" string="Unit"/>
-                                </list>
-                            </field>
-                        </page>
-                        <page name="temporary_rates" string="Temporary Worker Rates">
-                            <field name="temporary_rate_ids" context="{'default_farm_id': id}">
-                                <list editable="bottom" string="Temporary Worker Rates">
-                                    <field name="full_day_rate" string="Full Day Rate (Birr)"/>
-                                    <field name="half_day_rate" string="Half Day Rate (Birr)"/>
-                                    <field name="uom_name" string="Unit"/>
-                                    <field name="active" widget="boolean_toggle"/>
                                 </list>
                             </field>
                         </page>
@@ -121,7 +111,6 @@
                 <field name="sub_unit_count"/>
                 <field name="block_count"/>
                 <field name="activity_norm_count"/>
-                <field name="temporary_rate_count"/>
                 <field name="total_area"/>
                 <field name="color"/>
                 <templates>
@@ -161,8 +150,8 @@
                             <span class="text-muted small">
                                 <i class="fa fa-map-o me-1"/> <field name="total_area"/> Area
                             </span>
-                            <span class="badge text-bg-light border" title="Configured Activities &amp; Rates">
-                                <i class="fa fa-tasks me-1 text-muted"/> <field name="activity_norm_count"/> Acts | <field name="temporary_rate_count"/> Temp Rates
+                            <span class="badge text-bg-light border" title="Configured Activities &amp; Wage Rates">
+                                <i class="fa fa-tasks me-1 text-muted"/> <field name="activity_norm_count"/> Activities Configured
                             </span>
                         </div>
                     </t>

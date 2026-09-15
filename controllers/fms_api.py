@@ -284,6 +284,21 @@ class FmsRestController(http.Controller):
                     "message": "No farm found in the system to calculate activity norm."
                 }, status=400)
 
+            # Check Activity Type (Fixed vs Piece Rate)
+            is_fixed = (activity.type == 'fixed')
+            if is_fixed:
+                if score_float not in (0.5, 1.0, 1.5, 2.0):
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"For fixed rate activity '{activity.code}' ({activity.name}), score must be strictly 0.5 (Half Day), 1.0 (Full Day), 1.5 (Day and a Half), or 2.0 (Two Days). Received: {score_float}."
+                    }, status=400)
+                duration_map = {0.5: 'half_day', 1.0: 'full_day', 1.5: 'one_and_half_day', 2.0: 'two_days'}
+                work_duration = duration_map.get(score_float, 'full_day')
+                entry_type = 'fixed'
+            else:
+                entry_type = 'piece_rate'
+                work_duration = False
+
             # 4. Resolve Activity Norm
             norm_rec = request.env['farm.activity.norm'].sudo().search([
                 ('activity_id', '=', activity.id),
@@ -302,6 +317,8 @@ class FmsRestController(http.Controller):
                 'sub_unit_id': sub_unit.id if sub_unit else False,
                 'block_id': block.id if block else False,
                 'activity_id': activity.id,
+                'entry_type': entry_type,
+                'work_duration': work_duration,
                 'norm_rate': norm_rate,
                 'score_value': score_float,
                 'total_amount': total_payment,
