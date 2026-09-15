@@ -139,6 +139,20 @@ class HrContract(models.Model):
         tracking=True,
         help='The actual net monthly take-home salary the employee received prior to the approved raise.',
     )
+    back_pay_previous_tax = fields.Float(
+        string='Previous Monthly Income Tax (የቀድሞ የገቢ ግብር)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly income tax from previous payslip before retroactive adjustment.',
+    )
+    back_pay_previous_pension = fields.Float(
+        string='Previous Monthly Pension 7% (የቀድሞ ጡረታ 7%)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly 7% employee pension from previous payslip before retroactive adjustment.',
+    )
     back_pay_new_net = fields.Float(
         string='Corrected Monthly Net Salary (አዲሱ የተጣራ ደመወዝ)',
         compute='_compute_back_pay',
@@ -161,6 +175,34 @@ class HrContract(models.Model):
         store=True,
         digits=(16, 2),
         help='Total Back Pay = Monthly Difference × Number of Months.',
+    )
+    back_pay_tax_monthly = fields.Float(
+        string='Monthly Back Pay Income Tax (ወርሃዊ የተከማቸ የገቢ ግብር)',
+        compute='_compute_back_pay',
+        store=True,
+        digits=(16, 2),
+        help='Monthly income tax difference between new and previous wage.',
+    )
+    back_pay_tax_total = fields.Float(
+        string='Total Back Pay Income Tax (ጠቅላላ የተከማቸ የገቢ ግብር)',
+        compute='_compute_back_pay',
+        store=True,
+        digits=(16, 2),
+        help='Total income tax for the retroactive period (for government reporting, not deducted from net).',
+    )
+    back_pay_pension_monthly = fields.Float(
+        string='Monthly Back Pay Pension 7% (ወርሃዊ የተከማቸ ጡረታ 7%)',
+        compute='_compute_back_pay',
+        store=True,
+        digits=(16, 2),
+        help='Monthly 7% employee pension difference between new and previous wage.',
+    )
+    back_pay_pension_total = fields.Float(
+        string='Total Back Pay Pension 7% (ጠቅላላ የተከማቸ ጡረታ 7%)',
+        compute='_compute_back_pay',
+        store=True,
+        digits=(16, 2),
+        help='Total 7% employee pension for the retroactive period (for government reporting, not deducted from net).',
     )
     is_back_pay_approved = fields.Boolean(
         string='Finance Manager Approval (የፋይናንስ ማረጋገጫ)',
@@ -223,12 +265,27 @@ class HrContract(models.Model):
         tracking=True,
         help='Labor Union Contribution (1%).',
     )
+    has_credit_association = fields.Boolean(
+        string='Credit Association Member (የብድርና ቁጠባ አባል)',
+        default=True,
+        tracking=True,
+        help='Indicates whether employee is enrolled in Credit Association. When enabled, mandatory 5% of base wage is calculated.',
+    )
     deduction_credit_assoc_mandatory = fields.Float(
-        string='Credit Association - Mandatory (የብድርና ቁጠባ አስገዳጅ)',
+        string='Credit Association - Mandatory (5% of Base) (የብድርና ቁጠባ አስገዳጅ)',
+        compute='_compute_credit_association_deductions',
+        store=True,
+        readonly=False,
+        digits=(16, 2),
+        tracking=True,
+        help='Mandatory 5% credit association contribution computed from base salary.',
+    )
+    deduction_credit_assoc_voluntary = fields.Float(
+        string='Credit Association - Voluntary (የብድርና ቁጠባ ፈቃደኝነት)',
         digits=(16, 2),
         default=0.0,
         tracking=True,
-        help='Mandatory credit association contribution.',
+        help='Voluntary additional credit association contribution without mandatory cut percentage.',
     )
     deduction_social_contribution = fields.Float(
         string='Social Contribution (ማህበራዊ መዋጮ)',
@@ -594,7 +651,8 @@ class HrContract(models.Model):
         'gross_monthly_wage',
         # Category 1
         'deduction_pension', 'deduction_income_tax', 'deduction_luc',
-        'deduction_credit_assoc_mandatory', 'deduction_social_contribution',
+        'has_credit_association', 'deduction_credit_assoc_mandatory', 'deduction_credit_assoc_voluntary',
+        'deduction_social_contribution',
         # Category 2
         'deduction_advance', 'deduction_pre_payment', 'deduction_credit_assoc_loan',
         'deduction_medical_recovery', 'deduction_pension_receivable', 'deduction_fine',
@@ -614,7 +672,8 @@ class HrContract(models.Model):
     def _compute_all_deductions(self):
         for c in self:
             c1 = (c.deduction_pension or 0.0) + (c.deduction_income_tax or 0.0) + (c.deduction_luc or 0.0) + \
-                 (c.deduction_credit_assoc_mandatory or 0.0) + (c.deduction_social_contribution or 0.0)
+                 (c.deduction_credit_assoc_mandatory or 0.0) + (c.deduction_credit_assoc_voluntary or 0.0) + \
+                 (c.deduction_social_contribution or 0.0)
             c2 = (c.deduction_advance or 0.0) + (c.deduction_pre_payment or 0.0) + (c.deduction_credit_assoc_loan or 0.0) + \
                  (c.deduction_medical_recovery or 0.0) + (c.deduction_pension_receivable or 0.0) + (c.deduction_fine or 0.0)
             c3 = (c.deduction_saving_kossa or 0.0) + (c.deduction_saving_jimma or 0.0) + (c.deduction_suntu_saving or 0.0) + \
@@ -730,17 +789,61 @@ class HrContract(models.Model):
 
             c.deduction_income_tax = round(max(0.0, tax), 2)
 
+    @api.depends('wage', 'has_credit_association')
+    def _compute_credit_association_deductions(self):
+        for c in self:
+            if c.has_credit_association:
+                c.deduction_credit_assoc_mandatory = round((c.wage or 0.0) * 0.05, 2)
+            else:
+                c.deduction_credit_assoc_mandatory = 0.0
+
+    @api.onchange('wage', 'has_credit_association')
+    def _onchange_credit_association(self):
+        self._compute_credit_association_deductions()
+
     @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
     def _onchange_wage_taxes_estimate(self):
         for c in self:
             c._compute_statutory_taxes()
+            c._compute_credit_association_deductions()
 
     # =========================================================================
     # Back Pay / Retroactive Adjustment Computation & Logic
     # =========================================================================
+    def action_fetch_previous_payslip(self):
+        """Fetches the previous month's net salary, income tax, and pension 7% from the employee's last confirmed payslip."""
+        for c in self:
+            c._fetch_previous_payslip_data()
+
+    def _fetch_previous_payslip_data(self):
+        for c in self:
+            if not c.employee_id:
+                continue
+            payslip = self.env['hr.payslip'].search([
+                ('employee_id', '=', c.employee_id.id),
+                ('state', 'in', ('done', 'paid', 'verify')),
+            ], order='date_to desc, id desc', limit=1)
+            if not payslip:
+                payslip = self.env['hr.payslip'].search([
+                    ('employee_id', '=', c.employee_id.id),
+                    ('state', '!=', 'cancel'),
+                ], order='date_to desc, id desc', limit=1)
+            if payslip:
+                net_line = payslip.line_ids.filtered(lambda l: l.code == 'NET')
+                net_val = net_line[0].total if net_line else payslip.net_wage
+                c.back_pay_previous_net = net_val or 0.0
+
+                tax_line = payslip.line_ids.filtered(lambda l: l.code == 'DED_INCOME_TAX')
+                c.back_pay_previous_tax = abs(tax_line[0].total) if tax_line else 0.0
+
+                pension_line = payslip.line_ids.filtered(lambda l: l.code == 'DED_PENSION_7')
+                c.back_pay_previous_pension = abs(pension_line[0].total) if pension_line else 0.0
+
     @api.depends(
         'back_pay_months',
         'back_pay_previous_net',
+        'back_pay_previous_tax',
+        'back_pay_previous_pension',
         'wage',
         'allowance_transport',
         'allowance_hardship',
@@ -749,11 +852,35 @@ class HrContract(models.Model):
     )
     def _compute_back_pay(self):
         for c in self:
+            wage = c.wage or 0.0
             # Regular monthly net without retroactive addition
-            regular_gross = (c.wage or 0.0) + (c.allowance_transport or 0.0) + \
+            regular_gross = wage + (c.allowance_transport or 0.0) + \
                             (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
             regular_net = max(0.0, regular_gross - (c.total_monthly_deductions or 0.0))
             c.back_pay_new_net = regular_net
+
+            # Statutory taxes on new regular salary
+            new_pension = round(wage * 0.07, 2)
+            taxable = regular_gross
+            if taxable <= 2000:
+                new_tax = 0.0
+            elif taxable <= 4000:
+                new_tax = 0.15 * taxable - 300.0
+            elif taxable <= 7000:
+                new_tax = 0.20 * taxable - 500.0
+            elif taxable <= 10000:
+                new_tax = 0.25 * taxable - 850.0
+            elif taxable <= 14000:
+                new_tax = 0.30 * taxable - 1350.0
+            else:
+                new_tax = 0.35 * taxable - 2050.0
+            new_tax = round(max(0.0, new_tax), 2)
+
+            prev_tax = c.back_pay_previous_tax or 0.0
+            prev_pension = c.back_pay_previous_pension or 0.0
+
+            monthly_tax_diff = max(0.0, round(new_tax - prev_tax, 2)) if (new_tax > prev_tax and prev_tax > 0) else 0.0
+            monthly_pension_diff = max(0.0, round(new_pension - prev_pension, 2)) if (new_pension > prev_pension and prev_pension > 0) else 0.0
 
             if c.back_pay_months > 0 and c.back_pay_previous_net > 0:
                 monthly_diff = max(0.0, round(regular_net - c.back_pay_previous_net, 2))
@@ -761,19 +888,58 @@ class HrContract(models.Model):
                 c.back_pay_monthly_diff = monthly_diff
                 c.back_pay_total = total_back_pay
                 c.allowance_retroactive = total_back_pay
+
+                c.back_pay_tax_monthly = monthly_tax_diff
+                c.back_pay_tax_total = round(monthly_tax_diff * c.back_pay_months, 2)
+                c.back_pay_pension_monthly = monthly_pension_diff
+                c.back_pay_pension_total = round(monthly_pension_diff * c.back_pay_months, 2)
             elif c.back_pay_months > 0 and c.allowance_retroactive > 0:
                 c.back_pay_total = c.allowance_retroactive
                 c.back_pay_monthly_diff = round(c.allowance_retroactive / c.back_pay_months, 2)
+                c.back_pay_tax_monthly = monthly_tax_diff
+                c.back_pay_tax_total = round(monthly_tax_diff * c.back_pay_months, 2)
+                c.back_pay_pension_monthly = monthly_pension_diff
+                c.back_pay_pension_total = round(monthly_pension_diff * c.back_pay_months, 2)
             else:
                 c.back_pay_monthly_diff = 0.0
                 c.back_pay_total = c.allowance_retroactive or 0.0
+                c.back_pay_tax_monthly = 0.0
+                c.back_pay_tax_total = 0.0
+                c.back_pay_pension_monthly = 0.0
+                c.back_pay_pension_total = 0.0
 
     @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'total_monthly_deductions')
     def _onchange_back_pay_calculator(self):
-        regular_gross = (self.wage or 0.0) + (self.allowance_transport or 0.0) + \
+        if self.back_pay_months > 0 and not self.back_pay_previous_net:
+            self._fetch_previous_payslip_data()
+
+        wage = self.wage or 0.0
+        regular_gross = wage + (self.allowance_transport or 0.0) + \
                         (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
         regular_net = max(0.0, regular_gross - (self.total_monthly_deductions or 0.0))
         self.back_pay_new_net = regular_net
+
+        new_pension = round(wage * 0.07, 2)
+        taxable = regular_gross
+        if taxable <= 2000:
+            new_tax = 0.0
+        elif taxable <= 4000:
+            new_tax = 0.15 * taxable - 300.0
+        elif taxable <= 7000:
+            new_tax = 0.20 * taxable - 500.0
+        elif taxable <= 10000:
+            new_tax = 0.25 * taxable - 850.0
+        elif taxable <= 14000:
+            new_tax = 0.30 * taxable - 1350.0
+        else:
+            new_tax = 0.35 * taxable - 2050.0
+        new_tax = round(max(0.0, new_tax), 2)
+
+        prev_tax = self.back_pay_previous_tax or 0.0
+        prev_pension = self.back_pay_previous_pension or 0.0
+
+        monthly_tax_diff = max(0.0, round(new_tax - prev_tax, 2)) if (new_tax > prev_tax and prev_tax > 0) else 0.0
+        monthly_pension_diff = max(0.0, round(new_pension - prev_pension, 2)) if (new_pension > prev_pension and prev_pension > 0) else 0.0
 
         if self.back_pay_months > 0 and self.back_pay_previous_net > 0:
             monthly_diff = max(0.0, round(regular_net - self.back_pay_previous_net, 2))
@@ -781,6 +947,11 @@ class HrContract(models.Model):
             self.back_pay_monthly_diff = monthly_diff
             self.back_pay_total = total_back_pay
             self.allowance_retroactive = total_back_pay
+
+            self.back_pay_tax_monthly = monthly_tax_diff
+            self.back_pay_tax_total = round(monthly_tax_diff * self.back_pay_months, 2)
+            self.back_pay_pension_monthly = monthly_pension_diff
+            self.back_pay_pension_total = round(monthly_pension_diff * self.back_pay_months, 2)
 
     def action_approve_back_pay(self):
         for c in self:
@@ -791,6 +962,12 @@ class HrContract(models.Model):
             c.write({
                 'back_pay_months': 0,
                 'back_pay_previous_net': 0.0,
+                'back_pay_previous_tax': 0.0,
+                'back_pay_previous_pension': 0.0,
+                'back_pay_tax_monthly': 0.0,
+                'back_pay_tax_total': 0.0,
+                'back_pay_pension_monthly': 0.0,
+                'back_pay_pension_total': 0.0,
                 'back_pay_monthly_diff': 0.0,
                 'back_pay_total': 0.0,
                 'allowance_retroactive': 0.0,

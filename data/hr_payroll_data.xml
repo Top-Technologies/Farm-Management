@@ -19,6 +19,12 @@
             <field name="code">TAXABLE_BASE</field>
         </record>
 
+        <!-- Category for Payslip Summary & Informational Reporting -->
+        <record id="category_payslip_summary" model="hr.salary.rule.category">
+            <field name="name">Payslip Summary &amp; Informational Reporting (የደመወዝ ማጠቃለያ)</field>
+            <field name="code">SUMMARY</field>
+        </record>
+
         <!-- 1. Salary Structure: Temporary Workers (Daily Wage) -->
         <record id="structure_farm_temporary" model="hr.payroll.structure">
             <field name="name">Temporary Worker (Daily Wage Structure)</field>
@@ -254,11 +260,27 @@ result = -round(basic * 0.07, 2)
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
+        <!-- Company Pension Contribution 11% (Rendered immediately after Pension 7%, Informational, Not Deducted from Net) -->
+        <record id="rule_comp_pension_11" model="hr.salary.rule">
+            <field name="category_id" ref="category_company_contributions"/>
+            <field name="name">Company Pension Contribution 11% (የድርጅት ጡረታ መዋጮ 11%)</field>
+            <field name="code">COMP_PENSION_11</field>
+            <field name="sequence">111</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# 11% Company Pension Contribution based on Basic Wage (Not deducted from employee net)
+basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+result = round(basic * 0.11, 2)
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
         <record id="rule_ded_income_tax" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.DED"/>
             <field name="name">Income Tax (የገቢ ግብር)</field>
             <field name="code">DED_INCOME_TAX</field>
-            <field name="sequence">111</field>
+            <field name="sequence">112</field>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
@@ -287,7 +309,7 @@ result = round(result, 2)
             <field name="category_id" ref="hr_payroll.DED"/>
             <field name="name">L.U.C 1% (የሰራተኛ ማህበር 1%)</field>
             <field name="code">DED_LUC</field>
-            <field name="sequence">112</field>
+            <field name="sequence">113</field>
             <field name="condition_select">python</field>
             <field name="condition_python">result = bool(contract.deduction_luc and contract.deduction_luc > 0)</field>
             <field name="amount_select">code</field>
@@ -301,12 +323,28 @@ result = -contract.deduction_luc
             <field name="category_id" ref="hr_payroll.DED"/>
             <field name="name">Credit Association Mandatory (የብድርና ቁጠባ አስገዳጅ)</field>
             <field name="code">DED_CREDIT_MANDATORY</field>
-            <field name="sequence">113</field>
+            <field name="sequence">114</field>
             <field name="condition_select">python</field>
             <field name="condition_python">result = bool(contract.deduction_credit_assoc_mandatory and contract.deduction_credit_assoc_mandatory > 0)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_credit_assoc_mandatory
+# Mandatory 5% Credit Association contribution based on basic salary
+basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+result = -round(basic * 0.05, 2)
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_credit_voluntary" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Credit Association Voluntary (የብድርና ቁጠባ ፈቃደኝነት)</field>
+            <field name="code">DED_CREDIT_VOLUNTARY</field>
+            <field name="sequence">115</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_credit_assoc_voluntary
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -315,7 +353,7 @@ result = -contract.deduction_credit_assoc_mandatory
             <field name="category_id" ref="hr_payroll.DED"/>
             <field name="name">Social Contribution (ማህበራዊ መዋጮ)</field>
             <field name="code">DED_SOCIAL_CONTRIBUTION</field>
-            <field name="sequence">114</field>
+            <field name="sequence">116</field>
             <field name="condition_select">python</field>
             <field name="condition_python">result = bool(contract.deduction_social_contribution and contract.deduction_social_contribution > 0)</field>
             <field name="amount_select">code</field>
@@ -722,32 +760,77 @@ result = -contract.deduction_meredaja
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
-        <!-- 3.10 Net Wage -->
-        <record id="rule_perm_net" model="hr.salary.rule">
-            <field name="category_id" ref="hr_payroll.NET"/>
-            <field name="name">Net Wage (የተጣራ ደመወዝ)</field>
-            <field name="code">NET</field>
-            <field name="sequence">200</field>
-            <field name="condition_select">none</field>
+        <!-- 3.10 Informational Government Reporting & Summary Rules (Not Deducted from Net) -->
+        <record id="rule_back_pay_tax" model="hr.salary.rule">
+            <field name="category_id" ref="category_payslip_summary"/>
+            <field name="name">Back Pay Income Tax (የተከማቸ ጭማሪ የገቢ ግብር - ለሪፖርት)</field>
+            <field name="code">BACK_PAY_TAX</field>
+            <field name="sequence">180</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.back_pay_tax_total and contract.back_pay_tax_total > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = categories['GROSS'] + categories['DED']
+result = contract.back_pay_tax_total
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
-        <!-- 3.11 Company Contributions (COMP) - Displayed on Payslip, Not Deducted from Net -->
-        <record id="rule_comp_pension_11" model="hr.salary.rule">
-            <field name="category_id" ref="category_company_contributions"/>
-            <field name="name">Company Pension Contribution 11% (የድርጅት ጡረታ መዋጮ 11%)</field>
-            <field name="code">COMP_PENSION_11</field>
-            <field name="sequence">210</field>
+        <record id="rule_back_pay_pension_7" model="hr.salary.rule">
+            <field name="category_id" ref="category_payslip_summary"/>
+            <field name="name">Back Pay Employee Pension 7% (የተከማቸ ጭማሪ ጡረታ 7% - ለሪፖርት)</field>
+            <field name="code">BACK_PAY_PENSION_7</field>
+            <field name="sequence">181</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.back_pay_pension_total and contract.back_pay_pension_total > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = contract.back_pay_pension_total
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_total_deductions" model="hr.salary.rule">
+            <field name="category_id" ref="category_payslip_summary"/>
+            <field name="name">Total Deductions (ጠቅላላ ተቀናሾች)</field>
+            <field name="code">TOTAL_DEDUCTIONS</field>
+            <field name="sequence">190</field>
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-# 11% Company Pension Contribution based on Basic Wage (Not deducted from employee net)
-basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
-result = round(basic * 0.11, 2)
+# Summation of all deductions incurred on this payslip (displayed for reporting, not deducted again)
+result = abs(categories.get('DED', 0.0))
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_total_deposits" model="hr.salary.rule">
+            <field name="category_id" ref="category_payslip_summary"/>
+            <field name="name">Total Deposits - Bank Savings &amp; Loans (ጠቅላላ የባንክ ቁጠባ እና ብድር)</field>
+            <field name="code">TOTAL_DEPOSITS</field>
+            <field name="sequence">195</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# Total summation of all bank savings and bank loan installments for this employee this month
+bank_codes = ('DED_DASHEN_CREDIT', 'DED_DASHEN_SAVING', 'DED_AWASH_CREDIT', 'DED_AWASH_SAVING')
+total_dep = sum(abs(result_rules[code]['total']) for code in bank_codes if code in result_rules and result_rules[code]['total'] is not None)
+if total_dep == 0.0 and contract:
+    total_dep = (contract.deduction_dashen_credit or 0.0) + (contract.deduction_dashen_saving or 0.0) + (contract.deduction_awash_credit or 0.0) + (contract.deduction_awash_saving or 0.0)
+result = round(total_dep, 2)
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <!-- 3.11 Net Wage (Rendered as Final Row on Payslip) -->
+        <record id="rule_perm_net" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.NET"/>
+            <field name="name">Net Wage (የተጣራ ደመወዝ)</field>
+            <field name="code">NET</field>
+            <field name="sequence">300</field>
+            <field name="condition_select">none</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = categories['GROSS'] + categories['DED']
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>

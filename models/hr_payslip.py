@@ -231,7 +231,32 @@ class HrPayslip(models.Model):
             # Clean up any legacy obsolete salary rules
             self.env.cr.execute("""
                 DELETE FROM hr_salary_rule WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH');
+                DELETE FROM hr_salary_rule WHERE code = 'NET' AND name::text LIKE '%Net Salary%' 
+                AND struct_id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7');
             """)
+            # Update sequences across all structures:
+            # 1. Pension 11% right after Pension 7% (110 -> 111)
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 111 WHERE code = 'COMP_PENSION_11';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 112 WHERE code = 'DED_INCOME_TAX';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 113 WHERE code = 'DED_LUC';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 114 WHERE code = 'DED_CREDIT_MANDATORY';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 115 WHERE code = 'DED_CREDIT_VOLUNTARY';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 116 WHERE code = 'DED_SOCIAL_CONTRIBUTION';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 180 WHERE code = 'BACK_PAY_TAX';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 181 WHERE code = 'BACK_PAY_PENSION_7';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 190 WHERE code = 'TOTAL_DEDUCTIONS';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 195 WHERE code = 'TOTAL_DEPOSITS';")
+            # 2. Net salary as final row
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 300 WHERE code = 'NET';")
+
+            # Update DED_CREDIT_MANDATORY to dynamically compute 5% of Basic Salary
+            credit_mand_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)\nresult = -round(basic * 0.05, 2)"""
+            self.env.cr.execute("""
+                UPDATE hr_salary_rule
+                SET amount_python_compute = %s
+                WHERE code = 'DED_CREDIT_MANDATORY';
+            """, (credit_mand_code,))
+
             # Directly ensure DED_INCOME_TAX and DED_PENSION_7 rules compute dynamically
             income_tax_code = """taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
 
@@ -262,5 +287,28 @@ result = -round(basic * 0.07, 2)"""
                 SET amount_python_compute = %s
                 WHERE code = 'DED_PENSION_7';
             """, (pension_code,))
+
+            # Synchronize new rules to other permanent structures (like Beha Land Coffee)
+            self.env.cr.execute("""
+                INSERT INTO hr_salary_rule (
+                    name, code, sequence, category_id, active, appears_on_payslip,
+                    condition_select, condition_python, amount_select, amount_python_compute,
+                    struct_id, create_uid, write_uid, create_date, write_date
+                )
+                SELECT 
+                    r.name, r.code, r.sequence, r.category_id, r.active, r.appears_on_payslip,
+                    r.condition_select, r.condition_python, r.amount_select, r.amount_python_compute,
+                    s.id, 1, 1, NOW(), NOW()
+                FROM hr_payroll_structure s
+                CROSS JOIN hr_salary_rule r
+                WHERE s.id != r.struct_id
+                AND s.id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7' AND struct_id IS NOT NULL)
+                AND r.struct_id = (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure' LIMIT 1)
+                AND r.code IN ('DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11')
+                AND NOT EXISTS (
+                    SELECT 1 FROM hr_salary_rule existing
+                    WHERE existing.struct_id = s.id AND existing.code = r.code
+                );
+            """)
         except Exception:
             pass

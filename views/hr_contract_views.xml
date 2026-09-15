@@ -86,7 +86,10 @@
                                                 <field name="back_pay_months" class="form-control form-control-sm"/>
                                             </div>
                                             <div class="col-6">
-                                                <label for="back_pay_previous_net" string="Previous Net / Month" class="small fw-bold"/>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <label for="back_pay_previous_net" string="Previous Net / Month" class="small fw-bold"/>
+                                                    <button name="action_fetch_previous_payslip" type="object" string="Fetch Last Slip" class="btn btn-link btn-sm p-0 text-primary" title="Fetch net, tax, and pension from employee's latest payslip"/>
+                                                </div>
                                                 <field name="back_pay_previous_net" widget="monetary" class="form-control form-control-sm"/>
                                             </div>
                                         </div>
@@ -100,9 +103,25 @@
                                                 <div class="fw-bold text-primary">+ <field name="back_pay_monthly_diff" widget="monetary" readonly="1"/></div>
                                             </div>
                                         </div>
+                                        <!-- Government Reporting Breakdown Box (Informative) -->
+                                        <div class="p-2 mb-2 rounded bg-light border" invisible="back_pay_months == 0">
+                                            <div class="small fw-bold text-muted mb-1"><i class="fa fa-institution me-1 text-secondary"/>Government Reporting Breakdown (Not deducted from Net):</div>
+                                            <div class="row g-2 small">
+                                                <div class="col-6">
+                                                    <span class="text-muted">Back Pay Income Tax: </span>
+                                                    <span class="fw-bold text-dark"><field name="back_pay_tax_total" widget="monetary" readonly="1"/></span>
+                                                    <div class="text-muted fst-italic" style="font-size: 0.75rem;">(<field name="back_pay_tax_monthly" widget="monetary" readonly="1"/> / mo)</div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <span class="text-muted">Back Pay Pension 7%: </span>
+                                                    <span class="fw-bold text-dark"><field name="back_pay_pension_total" widget="monetary" readonly="1"/></span>
+                                                    <div class="text-muted fst-italic" style="font-size: 0.75rem;">(<field name="back_pay_pension_monthly" widget="monetary" readonly="1"/> / mo)</div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                                             <div>
-                                                <label for="allowance_retroactive" string="Total Back Pay (Non-Taxable)" class="small fw-bold text-success"/>
+                                                <label for="allowance_retroactive" string="Total Back Pay (Net Payable)" class="small fw-bold text-success"/>
                                                 <div class="fs-5 fw-bold text-success"><field name="allowance_retroactive" widget="monetary"/></div>
                                             </div>
                                             <div class="d-flex align-items-center gap-1">
@@ -144,7 +163,13 @@
                                         <field name="deduction_pension"/>
                                         <field name="deduction_income_tax"/>
                                         <field name="deduction_luc"/>
-                                        <field name="deduction_credit_assoc_mandatory"/>
+                                        <label for="deduction_credit_assoc_mandatory" string="Credit Association Mandatory (5%)"/>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <field name="has_credit_association" widget="boolean_toggle" class="oe_inline"/>
+                                            <field name="deduction_credit_assoc_mandatory" widget="monetary" class="oe_inline" invisible="not has_credit_association"/>
+                                            <span class="text-muted small" invisible="has_credit_association">Not Enrolled</span>
+                                        </div>
+                                        <field name="deduction_credit_assoc_voluntary" widget="monetary"/>
                                         <field name="deduction_social_contribution"/>
                                     </group>
                                 </div>
