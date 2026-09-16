@@ -124,7 +124,7 @@
                             </span>
                         </div>
                         <div class="text-muted small mb-2" t-if="record.manager_id.raw_value">
-                            <i class="fa fa-user me-1"/> <field name="manager_id"/>
+                            <i class="fa fa-user me-1" title="Manager"/> <field name="manager_id"/>
                         </div>
                         <div class="row g-2 text-center my-2">
                             <div class="col-4">
@@ -148,10 +148,10 @@
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
                             <span class="text-muted small">
-                                <i class="fa fa-map-o me-1"/> <field name="total_area"/> Area
+                                <i class="fa fa-map-o me-1" title="Total Area"/> <field name="total_area"/> Area
                             </span>
                             <span class="badge text-bg-light border" title="Configured Activities &amp; Wage Rates">
-                                <i class="fa fa-tasks me-1 text-muted"/> <field name="activity_norm_count"/> Activities Configured
+                                <i class="fa fa-tasks me-1 text-muted" title="Activities"/> <field name="activity_norm_count"/> Activities Configured
                             </span>
                         </div>
                     </t>

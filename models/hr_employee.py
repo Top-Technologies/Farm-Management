@@ -218,8 +218,9 @@ class HrEmployee(models.Model):
     @api.constrains('has_medical_certificate')
     def _check_medical_certificate(self):
         for emp in self:
-            # Skip check when creating employee from recruitment applicant or candidate
-            if emp.candidate_id or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
+            # Skip check when creating employee from recruitment applicant, candidate, or batch import
+            has_candidate = getattr(emp, 'candidate_id', False)
+            if has_candidate or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id') or self.env.context.get('import_file'):
                 continue
             if not emp.has_medical_certificate:
                 raise ValidationError(_(
@@ -233,8 +234,9 @@ class HrEmployee(models.Model):
         today = fields.Date.today()
         for emp in self:
             if not emp.birthday:
-                # Allow employee record creation from recruitment candidate so HR can complete profile onboarding
-                if emp.candidate_id or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
+                # Allow employee record creation from recruitment candidate or batch import so HR can complete profile onboarding
+                has_candidate = getattr(emp, 'candidate_id', False)
+                if has_candidate or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id') or self.env.context.get('import_file'):
                     continue
                 raise ValidationError(_("Date of Birth is mandatory for employee registration."))
             d_birth = emp.birthday
@@ -422,58 +424,106 @@ class HrEmployee(models.Model):
                 employee.employee_code = new_id
                 employee.barcode = new_id
 
-    def _generate_farm_employee_id(self, farm, emp_type):
+    def _generate_farm_employee_id(self, farm, emp_type, taken_codes=None):
         """Generates sequential ID:
         - Head Office Staff: HQ001, HQ002, HQ003...
         - Farm Employees: [FarmCode][TypeCode][SequentialNumber] e.g. FM01T0001, FM01P0001, FM01Z0001.
+        Supports in-memory tracking via taken_codes for batch imports and multi-create.
         """
         if emp_type == 'head_office':
             prefix = 'HQ'
-            existing_domain = [('fms_employee_id', '=like', f"{prefix}%")]
-            if self.id:
-                existing_domain.append(('id', '!=', self.id))
-            existing_records = self.env['hr.employee'].search(existing_domain)
-            max_num = 0
-            for rec in existing_records:
-                code_val = rec.fms_employee_id or ''
-                num_part = code_val[len(prefix):]
-                if num_part.isdigit():
-                    num = int(num_part)
-                    if num > max_num:
-                        max_num = num
-            next_num = max_num + 1
-            return f"{prefix}{next_num:03d}"
-
-        type_map = {'permanent': 'P', 'temporary': 'T', 'zemach': 'Z'}
-        type_code = type_map.get(emp_type or 'temporary', 'T')
-        if farm:
-            farm_code = farm.code or (farm.name[:4].upper() if farm.name else 'FM01')
+            digits = 3
         else:
-            default_farm = self.env['farm.farm'].search([], limit=1)
-            farm_code = (default_farm.code or default_farm.name[:4].upper()) if default_farm else 'FM01'
+            type_map = {'permanent': 'P', 'temporary': 'T', 'zemach': 'Z'}
+            type_code = type_map.get(emp_type or 'temporary', 'T')
+            if farm:
+                farm_code = farm.code or (farm.name[:4].upper() if farm.name else 'FM01')
+            else:
+                default_farm = self.env['farm.farm'].search([], limit=1)
+                farm_code = (default_farm.code or default_farm.name[:4].upper()) if default_farm else 'FM01'
 
-        prefix = f"{farm_code}{type_code}"
-        existing_domain = [('fms_employee_id', '=like', f"{prefix}%")]
-        if self.id:
-            existing_domain.append(('id', '!=', self.id))
+            prefix = f"{farm_code}{type_code}"
+            digits = 4
 
-        existing_records = self.env['hr.employee'].search(existing_domain)
+        # Search existing codes in DB across fms_employee_id, barcode, and employee_code
+        self.env.cr.execute("""
+            SELECT fms_employee_id, barcode, employee_code
+            FROM hr_employee
+            WHERE (fms_employee_id LIKE %s OR barcode LIKE %s OR employee_code LIKE %s)
+        """, (f"{prefix}%", f"{prefix}%", f"{prefix}%"))
+        rows = self.env.cr.fetchall()
+
         max_num = 0
-        for rec in existing_records:
-            code_val = rec.fms_employee_id or ''
-            num_part = code_val[len(prefix):]
-            if num_part.isdigit():
-                num = int(num_part)
-                if num > max_num:
-                    max_num = num
+        for r in rows:
+            for code in r:
+                if code and str(code).startswith(prefix):
+                    num_part = str(code)[len(prefix):]
+                    if num_part.isdigit():
+                        val = int(num_part)
+                        if val > max_num:
+                            max_num = val
+
+        # Also consider any already allocated codes in the current batch
+        if taken_codes:
+            for code in taken_codes:
+                if code and str(code).startswith(prefix):
+                    num_part = str(code)[len(prefix):]
+                    if num_part.isdigit():
+                        val = int(num_part)
+                        if val > max_num:
+                            max_num = val
+
         next_num = max_num + 1
-        return f"{prefix}{next_num:04d}"
+        fmt = f"{{prefix}}{{num:0{digits}d}}"
+        candidate = fmt.format(prefix=prefix, num=next_num)
+        while taken_codes and candidate in taken_codes:
+            next_num += 1
+            candidate = fmt.format(prefix=prefix, num=next_num)
+
+        if taken_codes is not None:
+            taken_codes.add(candidate)
+
+        return candidate
+
+    def _prepare_resource_values(self, vals, tz):
+        # Guarantee that 'name' exists in vals so Odoo core hr_employee's vals.pop('name') never raises KeyError
+        if 'name' not in vals:
+            vals['name'] = vals.get('employee_code') or vals.get('fms_employee_id') or _('Employee')
+        return super()._prepare_resource_values(vals, tz)
+
+    @api.model
+    def _load_records_create(self, vals_list):
+        # Shallow copy each vals dict to shield caller data_list from in-place mutations (e.g. popping 'name' or setting 'resource_id').
+        # If the batch import encounters a savepoint rollback, load() can cleanly retry row-by-row with intact records.
+        safe_vals_list = [dict(v) for v in vals_list]
+        return super()._load_records_create(safe_vals_list)
 
     @api.model_create_multi
     def create(self, vals_list):
+        taken_codes = set()
+        # Collect any explicit codes provided across vals_list so we never collide with them
+        for v in vals_list:
+            for field_name in ('fms_employee_id', 'barcode', 'employee_code'):
+                val = v.get(field_name)
+                if val:
+                    taken_codes.add(str(val).strip())
+
         for vals in vals_list:
-            # When creating employee from recruitment, medical clearance has been completed during hiring
-            if vals.get('candidate_id') or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
+            # If resource_id was set (e.g. mutated by a previous failed attempt in base_import.load)
+            # but the underlying resource.resource record was rolled back, remove it so ResourceMixin creates a fresh one.
+            if vals.get('resource_id') and not self.env['resource.resource'].browse(vals['resource_id']).exists():
+                vals.pop('resource_id', None)
+
+            # Ensure mandatory NOT NULL database fields have defaults if empty in import
+            if not vals.get('marital'):
+                vals['marital'] = 'single'
+            if not vals.get('employee_type'):
+                vals['employee_type'] = 'employee'
+            if not vals.get('distance_home_work_unit'):
+                vals['distance_home_work_unit'] = 'kilometers'
+
+            # When creating employee from recruitment or batch import, medical clearance default is applied
+            if self.env.context.get('import_file') or vals.get('candidate_id') or self.env.context.get('active_model') in ('hr.applicant', 'hr.candidate') or self.env.context.get('default_candidate_id'):
                 vals.setdefault('has_medical_certificate', True)
 
             emp_type = vals.get('farm_employee_type', 'temporary')
@@ -488,11 +538,22 @@ class HrEmployee(models.Model):
                 vals['initial_sub_farm_id'] = False
                 vals['initial_sub_unit_id'] = False
                 vals['initial_block_id'] = False
-                if not vals.get('fms_employee_id') or '_' in str(vals.get('fms_employee_id', '')):
-                    new_id = self._generate_farm_employee_id(False, 'head_office')
+
+                cur_id = vals.get('fms_employee_id')
+                if not cur_id or '_' in str(cur_id):
+                    new_id = self._generate_farm_employee_id(False, 'head_office', taken_codes=taken_codes)
                     vals['fms_employee_id'] = new_id
-                    vals['employee_code'] = new_id
-                    vals['barcode'] = new_id
+                    if not vals.get('employee_code'):
+                        vals['employee_code'] = new_id
+                    if not vals.get('barcode'):
+                        vals['barcode'] = new_id
+                else:
+                    cur_str = str(cur_id).strip()
+                    taken_codes.add(cur_str)
+                    if not vals.get('employee_code'):
+                        vals['employee_code'] = cur_str
+                    if not vals.get('barcode'):
+                        vals['barcode'] = cur_str
             else:
                 # Cascade hierarchy from initial_sub_unit_id if provided
                 sub_unit_id = vals.get('initial_sub_unit_id')
@@ -507,14 +568,26 @@ class HrEmployee(models.Model):
                 farm_id = vals.get('initial_farm_id')
                 farm = self.env['farm.farm'].browse(farm_id) if farm_id else self.env['farm.farm'].search([], limit=1)
 
-                if not vals.get('fms_employee_id') or '_' in str(vals.get('fms_employee_id', '')):
-                    new_id = self._generate_farm_employee_id(farm, emp_type)
+                cur_id = vals.get('fms_employee_id')
+                if not cur_id or '_' in str(cur_id):
+                    new_id = self._generate_farm_employee_id(farm, emp_type, taken_codes=taken_codes)
                     vals['fms_employee_id'] = new_id
-                    vals['employee_code'] = new_id
-                    vals['barcode'] = new_id
+                    if not vals.get('employee_code'):
+                        vals['employee_code'] = new_id
+                    if not vals.get('barcode'):
+                        vals['barcode'] = new_id
+                else:
+                    cur_str = str(cur_id).strip()
+                    taken_codes.add(cur_str)
+                    if not vals.get('employee_code'):
+                        vals['employee_code'] = cur_str
+                    if not vals.get('barcode'):
+                        vals['barcode'] = cur_str
 
             if vals.get('fms_employee_id') and not vals.get('barcode'):
                 vals['barcode'] = vals['fms_employee_id']
+            if vals.get('barcode'):
+                taken_codes.add(str(vals['barcode']).strip())
 
         employees = super().create(vals_list)
 
@@ -559,19 +632,46 @@ class HrEmployee(models.Model):
                     vals['initial_farm_id'] = sub_unit.farm_id.id
 
         if 'farm_employee_type' in vals or 'initial_farm_id' in vals or 'initial_sub_unit_id' in vals:
-            for employee in self:
-                new_type = vals.get('farm_employee_type', employee.farm_employee_type)
-                if new_type == 'head_office':
-                    new_farm = False
-                else:
-                    farm_id = vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
-                    new_farm = self.env['farm.farm'].browse(farm_id) if farm_id else (employee.current_farm_id or employee.initial_farm_id)
+            if len(self) > 1:
+                taken_codes = set()
+                res = True
+                for employee in self:
+                    emp_vals = dict(vals)
+                    new_type = emp_vals.get('farm_employee_type', employee.farm_employee_type)
+                    if new_type == 'head_office':
+                        new_farm = False
+                    else:
+                        farm_id = emp_vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
+                        new_farm = self.env['farm.farm'].browse(farm_id) if farm_id else (employee.current_farm_id or employee.initial_farm_id)
 
-                if new_type != employee.farm_employee_type or (farm_id and farm_id != (employee.initial_farm_id.id if employee.initial_farm_id else False)) or not employee.fms_employee_id:
-                    new_id = employee._generate_farm_employee_id(new_farm, new_type)
-                    vals['fms_employee_id'] = new_id
-                    vals['employee_code'] = new_id
-                    vals['barcode'] = new_id
+                    if new_type != employee.farm_employee_type or (farm_id and farm_id != (employee.initial_farm_id.id if employee.initial_farm_id else False)) or not employee.fms_employee_id:
+                        new_id = employee._generate_farm_employee_id(new_farm, new_type, taken_codes=taken_codes)
+                        emp_vals['fms_employee_id'] = new_id
+                        emp_vals['employee_code'] = new_id
+                        emp_vals['barcode'] = new_id
+                    elif emp_vals.get('fms_employee_id') and not emp_vals.get('barcode'):
+                        emp_vals['barcode'] = emp_vals['fms_employee_id']
+
+                    res = super(HrEmployee, employee).write(emp_vals) and res
+
+                if 'initial_sub_unit_id' in vals or 'initial_farm_id' in vals or 'farm_employee_type' in vals:
+                    for emp in self:
+                        emp._sync_sub_unit_assignment()
+                return res
+            else:
+                for employee in self:
+                    new_type = vals.get('farm_employee_type', employee.farm_employee_type)
+                    if new_type == 'head_office':
+                        new_farm = False
+                    else:
+                        farm_id = vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
+                        new_farm = self.env['farm.farm'].browse(farm_id) if farm_id else (employee.current_farm_id or employee.initial_farm_id)
+
+                    if new_type != employee.farm_employee_type or (farm_id and farm_id != (employee.initial_farm_id.id if employee.initial_farm_id else False)) or not employee.fms_employee_id:
+                        new_id = employee._generate_farm_employee_id(new_farm, new_type)
+                        vals['fms_employee_id'] = new_id
+                        vals['employee_code'] = new_id
+                        vals['barcode'] = new_id
 
         if vals.get('fms_employee_id') and not vals.get('barcode'):
             vals['barcode'] = vals['fms_employee_id']

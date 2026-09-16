@@ -8,7 +8,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='other_input_type_id']" position="after">
                 <field name="loan_deduction_type" widget="selection" readonly="has_done_payslip"/>
-                <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" invisible="not loan_deduction_type or loan_deduction_type == 'other'">
+                <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" role="status" invisible="not loan_deduction_type or loan_deduction_type == 'other'">
                     <i class="fa fa-link me-2 fs-5 text-primary" title="Connected Loan Link"/>
                     <div>
                         <strong>Connected to Contract Loan Deduction:</strong>

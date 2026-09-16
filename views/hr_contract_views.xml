@@ -66,8 +66,8 @@
                                     <field name="allowance_transport" widget="monetary" string="Transport Allowance" invisible="transport_allowance_rule == 'none'"/>
                                     <field name="fuel_liters" invisible="1"/>
                                     <field name="fuel_price_per_liter" invisible="1"/>
-                                    <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" invisible="transport_allowance_rule not in ('fuel_50', 'fuel_60')">
-                                        <i class="fa fa-tint me-2 fs-5 text-primary"/>
+                                    <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" role="status" invisible="transport_allowance_rule not in ('fuel_50', 'fuel_60')">
+                                        <i class="fa fa-tint me-2 fs-5 text-primary" title="Fuel"/>
                                         <div><strong>Fuel Entitlement:</strong> <field name="fuel_liters" readonly="1"/> Litres Fuel @ <field name="fuel_price_per_liter" readonly="1"/> Birr/Liter</div>
                                     </div>
                                     <div class="text-muted small my-1" invisible="transport_allowance_rule != 'fixed_4000'">
