@@ -25,6 +25,17 @@ LEVEL_SELECTION = [
 class HrContract(models.Model):
     _inherit = 'hr.contract'
 
+    name = fields.Char(
+        string='Contract Reference',
+        required=True,
+        default=lambda self: _("New Contract"),
+    )
+    date_start = fields.Date(
+        string='Start Date',
+        required=True,
+        default=fields.Date.today,
+    )
+
     farm_employee_type = fields.Selection(
         related='employee_id.farm_employee_type',
         string='Employee Classification',
@@ -974,6 +985,71 @@ class HrContract(models.Model):
                 'is_back_pay_approved': False,
                 'back_pay_justification': False,
             })
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            # 1. Ensure 'name' is never empty / null to satisfy database NOT NULL constraint
+            if not vals.get('name') or vals.get('name') == _("New Contract"):
+                emp = False
+                if vals.get('employee_id'):
+                    emp = self.env['hr.employee'].browse(vals['employee_id'])
+                elif self.env.context.get('default_employee_id'):
+                    emp = self.env['hr.employee'].browse(self.env.context['default_employee_id'])
+
+                if emp and emp.name:
+                    vals['name'] = f"{emp.name} - Contract"
+                else:
+                    vals['name'] = _("Contract")
+
+            # 2. Ensure salary_matrix_type is set (defaults to scale of grade, or employee type, or 'farm')
+            if not vals.get('salary_matrix_type'):
+                if vals.get('salary_grade_id'):
+                    grade_rec = self.env['hr.salary.matrix.grade'].browse(vals['salary_grade_id'])
+                    if grade_rec.matrix_type:
+                        vals['salary_matrix_type'] = grade_rec.matrix_type
+                if not vals.get('salary_matrix_type'):
+                    emp = self.env['hr.employee'].browse(vals.get('employee_id')) if vals.get('employee_id') else False
+                    if emp and emp.farm_employee_type == 'head_office':
+                        vals['salary_matrix_type'] = 'head_office'
+                    else:
+                        vals['salary_matrix_type'] = 'farm'
+
+            # 3. Synchronize legacy salary_grade selection
+            if vals.get('salary_grade_id') and not vals.get('salary_grade'):
+                grade_rec = self.env['hr.salary.matrix.grade'].browse(vals['salary_grade_id'])
+                if grade_rec.grade:
+                    vals['salary_grade'] = str(grade_rec.grade)
+
+            # 4. Auto-populate basic wage from Salary Matrix if wage is missing / zero
+            if not vals.get('wage'):
+                m_type = vals.get('salary_matrix_type')
+                g_val = vals.get('salary_grade')
+                if not g_val and vals.get('salary_grade_id'):
+                    g_val = self.env['hr.salary.matrix.grade'].browse(vals['salary_grade_id']).grade
+                l_val = vals.get('salary_level')
+                if m_type and g_val and l_val:
+                    try:
+                        matrix_wage = self.env['hr.salary.matrix'].get_matrix_wage(
+                            matrix_type=m_type,
+                            grade=int(g_val),
+                            level=l_val,
+                            company_id=vals.get('company_id')
+                        )
+                        if matrix_wage > 0:
+                            vals['wage'] = matrix_wage
+                            vals['matrix_basic_wage'] = matrix_wage
+                    except Exception:
+                        pass
+                if not vals.get('wage'):
+                    vals['wage'] = 0.0
+
+            # 5. Ensure 'date_start' is never empty / null to satisfy database NOT NULL constraint
+            if not vals.get('date_start'):
+                vals['date_start'] = fields.Date.today()
+
+        return super().create(vals_list)
+
 
 
 

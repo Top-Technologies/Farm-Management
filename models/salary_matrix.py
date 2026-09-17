@@ -355,6 +355,33 @@ class HrSalaryMatrixGrade(models.Model):
         for rec in self:
             rec.name = f"Grade {rec.grade} (ደረጃ {rec.grade})"
 
+    @api.model
+    def name_search(self, name='', args=None, operator='ilike', limit=100):
+        args = list(args or [])
+        m_type = self._context.get('default_salary_matrix_type') or self._context.get('salary_matrix_type')
+        if m_type and not any(arg[0] == 'matrix_type' for arg in args if isinstance(arg, (list, tuple)) and len(arg) > 0):
+            args.append(('matrix_type', '=', m_type))
+
+        results = super().name_search(name=name, args=args, operator=operator, limit=limit)
+
+        # Disambiguate when importing or searching exact equality, avoiding base_import "Found multiple matches"
+        if operator == '=' and len(results) > 1:
+            lower_name = (name or '').lower()
+            if 'head' in lower_name or 'ዋና' in lower_name:
+                ho = [r for r in results if self.browse(r[0]).matrix_type == 'head_office']
+                if ho:
+                    return [ho[0]]
+            elif 'cpw' in lower_name:
+                cpw = [r for r in results if self.browse(r[0]).matrix_type == 'cpw']
+                if cpw:
+                    return [cpw[0]]
+            farm_res = [r for r in results if self.browse(r[0]).matrix_type == 'farm']
+            if farm_res:
+                return [farm_res[0]]
+            return [results[0]]
+
+        return results
+
     def init(self):
         super().init()
         for m_type, max_g in [('head_office', 22), ('cpw', 22), ('farm', 21)]:
