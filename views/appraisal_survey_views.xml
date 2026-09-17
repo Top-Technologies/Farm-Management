@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 1. Question Form View: Weight & Scoring Settings -->
+    <record id="survey_question_form_inherit_weighting" model="ir.ui.view">
+        <field name="name">survey.question.form.inherit.weighting</field>
+        <field name="model">survey.question</field>
+        <field name="inherit_id" ref="survey.survey_question_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[field[@name='question_type']]" position="after">
+                <group string="Appraisal 360 Evaluation Weighting" invisible="is_page">
+                    <group>
+                        <field name="is_weighted"/>
+                        <field name="question_weight" invisible="not is_weighted"/>
+                        <field name="max_score" invisible="not is_weighted"/>
+                    </group>
+                </group>
+            </xpath>
+            <xpath expr="//field[@name='suggested_answer_ids']/list/field[@name='answer_score']" position="attributes">
+                <attribute name="column_invisible">parent.scoring_type == 'no_scoring' and not parent.is_weighted</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 2. Survey Form View: Display Question Weights in Questions List -->
+    <record id="survey_survey_view_form_inherit_weighting" model="ir.ui.view">
+        <field name="name">survey.survey.view.form.inherit.weighting</field>
+        <field name="model">survey.survey</field>
+        <field name="inherit_id" ref="survey.survey_survey_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='question_and_page_ids']/list/field[@name='question_type']" position="after">
+                <field name="question_weight" string="Weight" invisible="is_page" optional="show"/>
+                <field name="max_score" string="Max Score" invisible="is_page" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 3. Appraisal Feedback Responses List: Display Weighted Scores -->
+    <record id="hr_appraisal_survey_user_input_view_tree_inherit_weighting" model="ir.ui.view">
+        <field name="name">survey.user_input.view.list.inherit.weighting</field>
+        <field name="model">survey.user_input</field>
+        <field name="inherit_id" ref="hr_appraisal_survey.hr_appraisal_survey_user_input_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='survey_id']" position="after">
+                <field name="final_weighted_score" string="Weighted Score (/5)" optional="show"/>
+                <field name="final_score_percentage" string="Score (%)" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 4. Survey User Input Form View: Weighted Scoring Details -->
+    <record id="survey_user_input_view_form_inherit_weighting" model="ir.ui.view">
+        <field name="name">survey.user_input.view.form.inherit.weighting</field>
+        <field name="model">survey.user_input</field>
+        <field name="inherit_id" ref="survey.survey_user_input_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[field[@name='scoring_type']]" position="inside">
+                <field name="total_weight" invisible="total_weight == 0"/>
+                <field name="final_weighted_score" string="Final Weighted Score (/5)" invisible="total_weight == 0"/>
+                <field name="final_score_percentage" string="Final Weighted Score (%)" invisible="total_weight == 0"/>
+            </xpath>
+            <xpath expr="//field[@name='user_input_line_ids']/list/field[@name='answer_score']" position="after">
+                <field name="raw_score" string="Answer Score" optional="show"/>
+                <field name="question_weight" string="Weight" optional="show"/>
+                <field name="weighted_score" string="Weighted Score" sum="Total Weighted Score" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 5. HR Appraisal Form: Stat Button and 360 Evaluation Summary Tab -->
+    <record id="hr_appraisal_view_form_inherit_weighting" model="ir.ui.view">
+        <field name="name">hr.appraisal.view.form.inherit.weighting</field>
+        <field name="model">hr.appraisal</field>
+        <field name="inherit_id" ref="hr_appraisal.view_hr_appraisal_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button class="oe_stat_button" name="action_open_survey_inputs" icon="fa-star" type="object" invisible="completed_survey_count == 0">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value">
+                            <field name="final_360_score"/> / 5.0
+                        </span>
+                        <span class="o_stat_text">360 Score (<field name="final_360_percentage"/>%)</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="360 Feedback Evaluation" name="page_360_evaluation" invisible="not employee_feedback_ids">
+                    <group>
+                        <group string="360 Evaluation Summary">
+                            <field name="final_360_score" string="Overall Score (out of 5.0)"/>
+                            <field name="final_360_percentage" string="Overall Percentage (%)"/>
+                            <field name="completed_survey_count" string="Completed Feedbacks"/>
+                            <field name="total_survey_count" string="Total Feedbacks Sent"/>
+                        </group>
+                    </group>
+                    <field name="survey_input_ids" readonly="1">
+                        <list>
+                            <field name="partner_id" string="Evaluator"/>
+                            <field name="survey_id" string="Survey"/>
+                            <field name="state" widget="badge" decoration-success="state == 'done'" decoration-info="state == 'new'" decoration-warning="state == 'in_progress'"/>
+                            <field name="total_weight" string="Total Weight"/>
+                            <field name="final_weighted_score" string="Weighted Score (/5)"/>
+                            <field name="final_score_percentage" string="Score (%)"/>
+                            <button class="oe_stat_button" string="View Answers" invisible="state != 'done'" name="action_open_survey_inputs" icon="fa-external-link" type="object"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

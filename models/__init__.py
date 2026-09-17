@@ -20,4 +20,5 @@ from . import hr_payroll_structure_copy_rules
 from . import hr_department
 from . import approval_location
 from . import approval_request
+from . import appraisal_survey
 

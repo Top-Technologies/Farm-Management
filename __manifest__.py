@@ -26,7 +26,7 @@ This module structures agricultural operations directly integrated into the HR E
     """,
     'author': 'Custom Development',
     'website': 'https://www.odoo.com',
-    'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise', 'approvals'],
+    'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise', 'approvals', 'survey', 'hr_appraisal_survey'],
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
@@ -47,6 +47,7 @@ This module structures agricultural operations directly integrated into the HR E
         'views/approval_location_views.xml',
         'views/approval_request_views.xml',
         'views/res_config_settings_views.xml',
+        'views/appraisal_survey_views.xml',
         'views/menu_views.xml',
     ],
     'demo': [],
