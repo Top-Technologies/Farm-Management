@@ -246,19 +246,42 @@ class HrPayslip(models.Model):
             self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 181 WHERE code = 'BACK_PAY_PENSION_7';")
             self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 190 WHERE code = 'TOTAL_DEDUCTIONS';")
             self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 195 WHERE code = 'TOTAL_DEPOSITS';")
+            self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 126 WHERE code = 'DED_ABSENT';")
             # 2. Net salary as final row
             self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 300 WHERE code = 'NET';")
 
+            # Ensure all payroll structures have Unpaid Leave (LEAVE90) registered as unpaid
+            self.env.cr.execute("""
+                INSERT INTO hr_payroll_structure_hr_work_entry_type_rel (hr_payroll_structure_id, hr_work_entry_type_id)
+                SELECT s.id, w.id
+                FROM hr_payroll_structure s
+                CROSS JOIN hr_work_entry_type w
+                WHERE (w.code = 'LEAVE90' OR w.id IN (SELECT work_entry_type_id FROM hr_leave_type WHERE unpaid = true AND work_entry_type_id IS NOT NULL))
+                AND NOT EXISTS (
+                    SELECT 1 FROM hr_payroll_structure_hr_work_entry_type_rel rel
+                    WHERE rel.hr_payroll_structure_id = s.id AND rel.hr_work_entry_type_id = w.id
+                );
+            """)
+
+            # Update BASIC rule to evaluate paid worked days and deduct unpaid days
+            basic_code = """result = payslip.paid_amount if (payslip.worked_days_line_ids and payslip.struct_id.use_worked_day_lines) else (contract.wage or 0.0)"""
+            self.env.cr.execute("""
+                UPDATE hr_salary_rule
+                SET amount_python_compute = %s
+                WHERE code = 'BASIC' AND struct_id IN (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure');
+            """, (basic_code,))
+
             # Update DED_CREDIT_MANDATORY to dynamically compute 5% of Basic Salary
-            credit_mand_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)\nresult = -round(basic * 0.05, 2)"""
+            credit_mand_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)\nresult = -round(basic * 0.05, 2)"""
             self.env.cr.execute("""
                 UPDATE hr_salary_rule
                 SET amount_python_compute = %s
                 WHERE code = 'DED_CREDIT_MANDATORY';
             """, (credit_mand_code,))
 
-            # Directly ensure DED_INCOME_TAX and DED_PENSION_7 rules compute dynamically
-            income_tax_code = """taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+            # Directly ensure DED_INCOME_TAX, DED_PENSION_7, and COMP_PENSION_11 rules compute dynamically
+            income_tax_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
+taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else (basic + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
 
 if taxable <= 2000:
     result = 0.0
@@ -274,8 +297,10 @@ else:
     result = - 0.35 * taxable + 2050.0
 
 result = round(result, 2)"""
-            pension_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+            pension_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
 result = -round(basic * 0.07, 2)"""
+            comp_pension_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
+result = round(basic * 0.11, 2)"""
 
             self.env.cr.execute("""
                 UPDATE hr_salary_rule
@@ -287,6 +312,11 @@ result = -round(basic * 0.07, 2)"""
                 SET amount_python_compute = %s
                 WHERE code = 'DED_PENSION_7';
             """, (pension_code,))
+            self.env.cr.execute("""
+                UPDATE hr_salary_rule
+                SET amount_python_compute = %s
+                WHERE code = 'COMP_PENSION_11';
+            """, (comp_pension_code,))
 
             # Synchronize new rules to other permanent structures (like Beha Land Coffee)
             self.env.cr.execute("""
@@ -304,7 +334,7 @@ result = -round(basic * 0.07, 2)"""
                 WHERE s.id != r.struct_id
                 AND s.id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7' AND struct_id IS NOT NULL)
                 AND r.struct_id = (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure' LIMIT 1)
-                AND r.code IN ('DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11')
+                AND r.code IN ('DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11', 'DED_ABSENT')
                 AND NOT EXISTS (
                     SELECT 1 FROM hr_salary_rule existing
                     WHERE existing.struct_id = s.id AND existing.code = r.code

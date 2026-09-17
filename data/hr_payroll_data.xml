@@ -30,6 +30,7 @@
             <field name="name">Temporary Worker (Daily Wage Structure)</field>
             <field name="type_id" ref="structure_type_farm_worker"/>
             <field name="country_id" eval="False"/>
+            <field name="unpaid_work_entry_type_ids" eval="[(4, ref('hr_work_entry_contract.work_entry_type_unpaid_leave'))]"/>
         </record>
 
         <!-- Salary Rules for Temporary Structure -->
@@ -77,6 +78,7 @@ result = categories['GROSS'] - categories['DED']
             <field name="name">Seasonal / Zemach Worker (Piece Rate Structure)</field>
             <field name="type_id" ref="structure_type_farm_worker"/>
             <field name="country_id" eval="False"/>
+            <field name="unpaid_work_entry_type_ids" eval="[(4, ref('hr_work_entry_contract.work_entry_type_unpaid_leave'))]"/>
         </record>
 
         <!-- Salary Rules for Seasonal / Zemach Structure -->
@@ -123,6 +125,7 @@ result = categories['GROSS'] - categories['DED']
             <field name="name">Permanent &amp; Head Office Employee Structure</field>
             <field name="type_id" ref="structure_type_farm_worker"/>
             <field name="country_id" eval="False"/>
+            <field name="unpaid_work_entry_type_ids" eval="[(4, ref('hr_work_entry_contract.work_entry_type_unpaid_leave'))]"/>
         </record>
 
         <!-- 3.1 Basic Wage & Untaxed Field Work Additions -->
@@ -134,7 +137,7 @@ result = categories['GROSS'] - categories['DED']
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = payslip.paid_amount or (contract.wage or 0.0)
+result = payslip.paid_amount if (payslip.worked_days_line_ids and payslip.struct_id.use_worked_day_lines) else (contract.wage or 0.0)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -444,6 +447,22 @@ result = -contract.deduction_pension_receivable
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 result = -contract.deduction_fine
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <!-- Absent Deduction for unexcused biometric / attendance absences -->
+        <record id="rule_perm_ded_absent" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Absent Deduction (የቀሪ ሰራተኛ ተቀናሽ)</field>
+            <field name="code">DED_ABSENT</field>
+            <field name="sequence">126</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.work_entry_source != 'attendance' and ((payslip.absent_deduction_amount and payslip.absent_deduction_amount > 0) or (hasattr(contract, 'absent_deduction_amount') and contract.absent_deduction_amount and contract.absent_deduction_amount > 0)))</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+amt = payslip.absent_deduction_amount or (contract.absent_deduction_amount if hasattr(contract, 'absent_deduction_amount') else 0.0) or 0.0
+result = -round(amt, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
