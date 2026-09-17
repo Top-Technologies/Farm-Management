@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List View -->
+    <record id="approval_location_view_tree" model="ir.ui.view">
+        <field name="name">approval.location.list</field>
+        <field name="model">approval.location</field>
+        <field name="arch" type="xml">
+            <list string="Approval Locations">
+                <field name="sequence" widget="handle"/>
+                <field name="name" string="Location / Farm Name"/>
+                <field name="location_type" widget="badge"
+                       decoration-success="location_type == 'farm'"
+                       decoration-info="location_type == 'branch'"
+                       decoration-warning="location_type == 'head_office'"/>
+                <field name="code" optional="show"/>
+                <field name="farm_id" optional="show"/>
+                <field name="approver_count" string="Default Approvers"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="approval_location_view_search" model="ir.ui.view">
+        <field name="name">approval.location.search</field>
+        <field name="model">approval.location</field>
+        <field name="arch" type="xml">
+            <search string="Search Approval Locations">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="farm_id"/>
+                <separator/>
+                <filter string="Farms" name="filter_farm" domain="[('location_type', '=', 'farm')]"/>
+                <filter string="Branches (CPW / Jimma HO)" name="filter_branch" domain="[('location_type', '=', 'branch')]"/>
+                <filter string="Head Office" name="filter_head_office" domain="[('location_type', '=', 'head_office')]"/>
+                <separator/>
+                <filter string="Archived" name="filter_archived" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Location Type" name="group_location_type" context="{'group_by': 'location_type'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="approval_location_view_form" model="ir.ui.view">
+        <field name="name">approval.location.form</field>
+        <field name="model">approval.location</field>
+        <field name="arch" type="xml">
+            <form string="Approval Operational Location">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name" string="Location / Farm Name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Bebeka 1, Head Office, CPW..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group name="location_info">
+                            <field name="active" invisible="1"/>
+                            <field name="location_type" widget="radio" options="{'horizontal': true}"/>
+                            <field name="farm_id" invisible="location_type != 'farm'" options="{'no_create': True}"/>
+                            <field name="code" placeholder="e.g. FM01, HQ, CPW"/>
+                        </group>
+                        <group name="location_settings">
+                            <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Default Approvers" name="approvers">
+                            <div class="alert alert-info py-2" role="alert">
+                                <strong>Approver Routing Rules:</strong>
+                                <ul>
+                                    <li>When this location is selected for <strong>Normal Employees</strong>, the approvers below are assigned automatically.</li>
+                                    <li>For <strong>Executive</strong> requests, approvals are always routed to the <strong>Head Office</strong> approvers.</li>
+                                    <li>Leave <em>Specific Approval Type</em> blank to apply this approver to all requests, or select a category (e.g. <em>Recruitment Request</em>) for category-specific approvers.</li>
+                                </ul>
+                            </div>
+                            <field name="approver_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="user_id" widget="many2one_avatar_user" string="Approver User"/>
+                                    <field name="category_id" string="Specific Approval Type" placeholder="All Approval Types" options="{'no_create': True}"/>
+                                    <field name="required" widget="boolean_toggle"/>
+                                    <field name="company_id" column_invisible="True"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_approval_location" model="ir.actions.act_window">
+        <field name="name">Approval Locations &amp; Approvers</field>
+        <field name="res_model">approval.location</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="approval_location_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create or manage approval locations and default approvers
+            </p>
+            <p>
+                Configure default approvers for each Farm (Bebeka 1, Gomma 1...), Branches (CPW, Jimma HO), and the Head Office.
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item in Approvals -> Configuration -->
+    <menuitem id="menu_approval_location"
+              name="Approval Locations &amp; Approvers"
+              parent="approvals.approvals_menu_config"
+              action="action_approval_location"
+              sequence="25"/>
+
+</odoo>

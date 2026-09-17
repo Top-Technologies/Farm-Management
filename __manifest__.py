@@ -26,7 +26,7 @@ This module structures agricultural operations directly integrated into the HR E
     """,
     'author': 'Custom Development',
     'website': 'https://www.odoo.com',
-    'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise'],
+    'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise', 'approvals'],
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
@@ -44,6 +44,8 @@ This module structures agricultural operations directly integrated into the HR E
         'views/hr_payroll_structure_views.xml',
         'views/salary_matrix_views.xml',
         'views/hr_salary_attachment_views.xml',
+        'views/approval_location_views.xml',
+        'views/approval_request_views.xml',
         'views/res_config_settings_views.xml',
         'views/menu_views.xml',
     ],

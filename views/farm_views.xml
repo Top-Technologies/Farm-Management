@@ -88,6 +88,20 @@
                                 <field name="address" placeholder="Physical location / street / district..."/>
                             </group>
                         </page>
+                        <page name="approval_approvers" string="Approval Approvers">
+                            <div class="alert alert-info py-2" role="alert">
+                                <strong>Farm Approval Routing:</strong>
+                                Default approvers configured here are automatically assigned to approval requests (Medical, Recruitment, Promotion, Resignation, Transfer, Payslip) when this farm is selected for <strong>Normal Employees</strong>.
+                            </div>
+                            <field name="approval_approver_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="user_id" widget="many2one_avatar_user" string="Approver User"/>
+                                    <field name="category_id" string="Specific Approval Type" placeholder="All Approval Types" options="{'no_create': True}"/>
+                                    <field name="required" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
                         <page name="notes" string="Description &amp; Notes">
                             <field name="description" placeholder="Additional notes about the farm, history, or operations..."/>
                         </page>

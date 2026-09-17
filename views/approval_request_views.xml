@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 1. Extend Approval Category Form View: Add Employee Level Option -->
+    <record id="approval_category_view_form_inherit_farm" model="ir.ui.view">
+        <field name="name">approval.category.view.form.inherit.farm</field>
+        <field name="model">approval.category</field>
+        <field name="inherit_id" ref="approvals.approval_category_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='has_location']" position="after">
+                <field name="has_employee_type" string="Employee Level" widget="radio" options="{'horizontal': true}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 2. Extend Approval Request Form View: Add Location & Employee Level with Dynamic Routing -->
+    <record id="approval_request_view_form_inherit_farm" model="ir.ui.view">
+        <field name="name">approval.request.view.form.inherit.farm</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_request_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='has_location']" position="after">
+                <field name="has_employee_type" invisible="1"/>
+            </xpath>
+
+            <!-- Place Farm/Location and Employee Level in Main Details -->
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="approval_location_id"
+                       string="Farm / Location"
+                       placeholder="Select Farm (Bebeka 1, Gomma 1...), CPW, Jimma HO, or Head Office"
+                       invisible="has_location == 'no'"
+                       required="has_location == 'required'"
+                       readonly="request_status != 'new'"
+                       options="{'no_create': True, 'no_open': False}"/>
+
+                <field name="employee_level"
+                       string="Employee Level"
+                       widget="radio"
+                       options="{'horizontal': true}"
+                       invisible="has_employee_type == 'no'"
+                       required="has_employee_type == 'required'"
+                       readonly="request_status != 'new'"/>
+            </xpath>
+
+            <!-- Add Routing Notice Banner in Approver(s) Notebook Page -->
+            <xpath expr="//page[@name='approvers']/field[@name='approver_ids']" position="before">
+                <div class="alert alert-info py-2 mb-3 d-flex align-items-center" role="alert" invisible="not routing_notes">
+                    <i class="fa fa-info-circle fs-5 me-2 text-info" title="Routing Notice"/>
+                    <span><field name="routing_notes" readonly="1" nolabel="1" class="fw-bold"/></span>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 3. Extend Approval Request List View -->
+    <record id="approval_request_view_tree_inherit_farm" model="ir.ui.view">
+        <field name="name">approval.request.view.list.inherit.farm</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_request_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="approval_location_id" string="Farm / Location" optional="show"/>
+                <field name="employee_level" string="Employee Level" optional="hide"
+                       widget="badge"
+                       decoration-info="employee_level == 'normal'"
+                       decoration-warning="employee_level == 'executive'"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 4. Extend Approval Request Search View -->
+    <record id="approval_request_view_search_inherit_farm" model="ir.ui.view">
+        <field name="name">approval.request.view.search.inherit.farm</field>
+        <field name="model">approval.request</field>
+        <field name="inherit_id" ref="approvals.approval_search_view_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="approval_location_id" string="Farm / Location"/>
+                <separator/>
+                <filter string="Normal Employees" name="filter_normal_emp" domain="[('employee_level', '=', 'normal')]"/>
+                <filter string="Executives" name="filter_executive" domain="[('employee_level', '=', 'executive')]"/>
+            </xpath>
+            <xpath expr="//filter[@name='groupby_category_id']" position="after">
+                <filter string="Farm / Location" name="groupby_location" context="{'group_by': 'approval_location_id'}"/>
+                <filter string="Employee Level" name="groupby_employee_level" context="{'group_by': 'employee_level'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

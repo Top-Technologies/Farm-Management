@@ -68,6 +68,29 @@ class Farm(models.Model):
         help='Total combined area of all sub farms under this farm.',
     )
 
+    # Approvals Operational Location & Default Approvers
+    approval_location_id = fields.Many2one(
+        'approval.location',
+        string='Approval Location',
+        compute='_compute_approval_location',
+        store=True,
+        help='The operational approval location corresponding to this farm.',
+    )
+    approval_approver_ids = fields.One2many(
+        related='approval_location_id.approver_ids',
+        readonly=False,
+        string='Default Approvers',
+    )
+
+    def _compute_approval_location(self):
+        for farm in self:
+            loc = self.env['approval.location'].search([('farm_id', '=', farm.id)], limit=1)
+            if not loc and farm.code:
+                loc = self.env['approval.location'].search([('code', '=', farm.code), ('location_type', '=', 'farm')], limit=1)
+            if not loc and farm.id:
+                loc = self.env['approval.location'].search([('name', '=ilike', farm.name), ('location_type', '=', 'farm')], limit=1)
+            farm.approval_location_id = loc.id if loc else False
+
     @api.depends('sub_farm_ids', 'sub_farm_ids.sub_unit_ids', 'sub_farm_ids.sub_unit_ids.block_ids', 'activity_norm_ids')
     def _compute_counts(self):
         for farm in self:
@@ -135,7 +158,32 @@ class Farm(models.Model):
         for vals in vals_list:
             if not vals.get('code') or vals.get('code') == '/':
                 vals['code'] = self._generate_farm_code()
-        return super().create(vals_list)
+        farms = super().create(vals_list)
+        for farm in farms:
+            loc = self.env['approval.location'].sudo().search([('farm_id', '=', farm.id)], limit=1)
+            if not loc:
+                self.env['approval.location'].sudo().create({
+                    'name': farm.name,
+                    'code': farm.code,
+                    'location_type': 'farm',
+                    'farm_id': farm.id,
+                    'company_id': farm.company_id.id or self.env.company.id,
+                })
+        return farms
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'name' in vals or 'code' in vals:
+            for farm in self:
+                loc = self.env['approval.location'].sudo().search([('farm_id', '=', farm.id)], limit=1)
+                if loc:
+                    update_vals = {}
+                    if 'name' in vals:
+                        update_vals['name'] = farm.name
+                    if 'code' in vals:
+                        update_vals['code'] = farm.code
+                    loc.write(update_vals)
+        return res
 
     def init(self):
         super().init()

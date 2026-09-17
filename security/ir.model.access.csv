@@ -24,5 +24,11 @@ access_hr_employee_family_member_manager,hr.employee.family.member.manager,model
 access_hr_salary_matrix_grade_user,hr.salary.matrix.grade.user,model_hr_salary_matrix_grade,base.group_user,1,0,0,0
 access_hr_salary_matrix_grade_manager,hr.salary.matrix.grade.manager,model_hr_salary_matrix_grade,group_farm_manager,1,1,1,1
 access_hr_payroll_structure_copy_rules,hr.payroll.structure.copy.rules,model_hr_payroll_structure_copy_rules,base.group_user,1,1,1,1
+access_approval_location_user,approval.location.user,model_approval_location,base.group_user,1,0,0,0
+access_approval_location_manager,approval.location.manager,model_approval_location,approvals.group_approval_manager,1,1,1,1
+access_approval_location_farm_mgr,approval.location.farm_manager,model_approval_location,group_farm_manager,1,1,1,1
+access_approval_location_approver_user,approval.location.approver.user,model_approval_location_approver,base.group_user,1,0,0,0
+access_approval_location_approver_mgr,approval.location.approver.manager,model_approval_location_approver,approvals.group_approval_manager,1,1,1,1
+access_approval_location_approver_farm_mgr,approval.location.approver.farm_manager,model_approval_location_approver,group_farm_manager,1,1,1,1
 
 
