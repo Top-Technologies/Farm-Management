@@ -16,7 +16,10 @@
         <field name="name">farm.work.entry.list</field>
         <field name="model">farm.work.entry</field>
         <field name="arch" type="xml">
-            <list string="Farm Work Entries" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="payment_status == 'paid'" decoration-muted="state == 'cancelled'">
+            <list string="Farm Work Entries" decoration-info="state == 'draft'" decoration-success="state in ('confirmed', 'approved')" decoration-muted="state == 'cancelled'">
+                <header>
+                    <button name="action_recompute_rates_and_totals" string="Recalculate Rates &amp; Payments" type="object"/>
+                </header>
                 <field name="name"/>
                 <field name="date"/>
                 <field name="employee_id" widget="many2one_avatar_employee"/>
@@ -29,7 +32,7 @@
                 <field name="norm_rate" string="Applied Rate"/>
                 <field name="uom_name" string="Unit"/>
                 <field name="total_amount" sum="Total Payment (Birr)" widget="monetary" decoration-bf="1"/>
-                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state in ('confirmed', 'approved')" decoration-muted="state == 'cancelled'"/>
                 <field name="payment_status" widget="badge" decoration-warning="payment_status == 'unpaid'" decoration-info="payment_status == 'in_payroll'" decoration-success="payment_status == 'paid'"/>
                 <field name="payslip_id" optional="show"/>
                 <field name="company_id" groups="base.group_multi_company" optional="hide"/>
@@ -45,10 +48,10 @@
             <form string="Farm Work Entry">
                 <header>
                     <button name="action_confirm" string="Confirm" type="object" class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_approve" string="Approve" type="object" class="btn-success" invisible="state != 'confirmed'"/>
+                    <button name="action_recompute_rates_and_totals" string="Recalculate Rate &amp; Payment" type="object" class="btn-secondary" invisible="payment_status == 'paid'"/>
                     <button name="action_draft" string="Reset to Draft" type="object" invisible="state not in ('confirmed', 'cancelled') or payment_status == 'paid'"/>
-                    <button name="action_cancel" string="Cancel" type="object" invisible="state in ('approved', 'cancelled') or payment_status == 'paid'"/>
-                    <field name="state" widget="statusbar"/>
+                    <button name="action_cancel" string="Cancel" type="object" invisible="state == 'cancelled' or payment_status == 'paid'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -59,20 +62,20 @@
                     </div>
                     <group>
                         <group name="entry_activity_grp" string="Activity &amp; Deployment Date">
-                            <field name="date" readonly="state == 'approved' or payment_status == 'paid'"/>
-                            <field name="employee_id" widget="many2one_avatar_employee" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="date" readonly="state == 'confirmed' or payment_status == 'paid'"/>
+                            <field name="employee_id" widget="many2one_avatar_employee" readonly="state == 'confirmed' or payment_status == 'paid'"/>
                             <field name="fms_employee_id"/>
                             <field name="employee_type" widget="badge" decoration-primary="employee_type == 'permanent'" decoration-warning="employee_type == 'temporary'" decoration-info="employee_type == 'zemach'"/>
-                            <field name="activity_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="activity_id" options="{'no_create': True}" readonly="state == 'confirmed' or payment_status == 'paid'"/>
                             <field name="activity_code"/>
                             <field name="entry_type" widget="badge" decoration-info="entry_type == 'piece_rate'" decoration-success="entry_type == 'fixed'"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                         <group name="location_details" string="Farm Deployment Location (Autofilled from Employee)">
-                            <field name="farm_id" readonly="1"/>
-                            <field name="sub_farm_id" readonly="1"/>
-                            <field name="sub_unit_id" readonly="1"/>
-                            <field name="block_id" options="{'no_create': True}" readonly="state == 'approved' or payment_status == 'paid'"/>
+                            <field name="farm_id" readonly="state == 'confirmed' or payment_status == 'paid'" force_save="1"/>
+                            <field name="sub_farm_id" readonly="state == 'confirmed' or payment_status == 'paid'" force_save="1"/>
+                            <field name="sub_unit_id" readonly="state == 'confirmed' or payment_status == 'paid'" force_save="1"/>
+                            <field name="block_id" options="{'no_create': True}" readonly="state == 'confirmed' or payment_status == 'paid'" force_save="1"/>
                         </group>
                     </group>
 
@@ -80,21 +83,21 @@
                     <group name="work_calculation_section" string="Work Done &amp; Payment Calculation">
                         <group name="score_duration_grp">
                             <!-- Fixed Rate Activities: Show Duration Picker & Allowed Days (0.5, 1.0, 1.5, 2.0) -->
-                            <field name="work_duration" widget="radio" options="{'horizontal': true}" invisible="entry_type != 'fixed'" readonly="state == 'approved' or payment_status == 'paid'"/>
-                            <field name="score_value" string="Days Worked (0.5 / 1.0 / 1.5 / 2.0)" invisible="entry_type != 'fixed'" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                            <field name="work_duration" widget="radio" options="{'horizontal': true}" invisible="entry_type != 'fixed'" readonly="state == 'confirmed' or payment_status == 'paid'"/>
+                            <field name="score_value" string="Days Worked (0.5 / 1.0 / 1.5 / 2.0)" invisible="entry_type != 'fixed'" readonly="state == 'confirmed' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                             <!-- Piece Rate Activities: Show Quantity / Score Input -->
-                            <field name="score_value" string="Quantity / Output Score" invisible="entry_type == 'fixed'" readonly="state == 'approved' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                            <field name="score_value" string="Quantity / Output Score" invisible="entry_type == 'fixed'" readonly="state == 'confirmed' or payment_status == 'paid'" class="oe_inline fw-bold" style="max-width: 150px;"/>
                         </group>
                         <group name="payment_summary_grp">
                             <label for="norm_rate" string="Applied Rate"/>
                             <div class="d-flex align-items-baseline">
-                                <field name="norm_rate" readonly="1" class="oe_inline fw-bold" style="max-width: 150px;"/>
-                                <span class="ms-2 text-muted fw-bold"><field name="uom_name"/></span>
+                                <field name="norm_rate" readonly="state == 'confirmed' or payment_status == 'paid'" force_save="1" class="oe_inline fw-bold" style="max-width: 150px;"/>
+                                <span class="ms-2 text-muted fw-bold"><field name="uom_name" force_save="1"/></span>
                             </div>
                             <div class="d-flex flex-column mt-2 p-3 bg-light rounded border border-success">
                                 <span class="text-muted small">Total Calculated Payment:</span>
                                 <h2 class="text-success fw-bold mb-0">
-                                    <field name="total_amount"/> <span class="fs-5">Birr</span>
+                                    <field name="total_amount" force_save="1"/> <span class="fs-5">Birr</span>
                                 </h2>
                                 <span class="text-muted small mt-1" invisible="entry_type != 'fixed'">(Daily Rate × Days Worked)</span>
                                 <span class="text-muted small mt-1" invisible="entry_type == 'fixed'">(Quantity × Norm Rate)</span>

@@ -264,25 +264,35 @@ class FarmWorkEntry(models.Model):
             elif not entry.entry_type:
                 entry.entry_type = 'piece_rate'
 
+    @api.model
+    def _get_employee_location(self, emp):
+        if not emp:
+            return False, False, False, False
+        # 1. Check active transfer
+        transfer = self.env['farm.employee.transfer'].search([
+            ('employee_id', '=', emp.id),
+            ('moving_date', '=', False),
+        ], order='transfer_date desc, id desc', limit=1)
+        if transfer and transfer.farm_id:
+            return transfer.farm_id, transfer.sub_farm_id, transfer.sub_unit_id, transfer.block_id
+        # 2. Check initial assignment
+        return emp.initial_farm_id, emp.initial_sub_farm_id, emp.initial_sub_unit_id, emp.initial_block_id
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('farm.work.entry') or _('New')
-            # Auto-populate location from employee
+            # Auto-populate location from employee if not already specified
             if vals.get('employee_id'):
                 emp = self.env['hr.employee'].browse(vals['employee_id'])
-                curr = emp.current_transfer_id
-                target_farm = (curr.farm_id if curr and not curr.moving_date else False) or emp.current_farm_id or emp.initial_farm_id
-                target_sub_farm = (curr.sub_farm_id if curr and not curr.moving_date else False) or emp.current_sub_farm_id or emp.initial_sub_farm_id
-                target_sub_unit = (curr.sub_unit_id if curr and not curr.moving_date else False) or emp.current_sub_unit_id or emp.initial_sub_unit_id
-                target_block = (curr.block_id if curr and not curr.moving_date else False) or emp.current_block_id or emp.initial_block_id
+                target_farm, target_sub_farm, target_sub_unit, target_block = self._get_employee_location(emp)
 
-                if target_farm:
+                if target_farm and not vals.get('farm_id'):
                     vals['farm_id'] = target_farm.id
-                if target_sub_farm:
+                if target_sub_farm and not vals.get('sub_farm_id'):
                     vals['sub_farm_id'] = target_sub_farm.id
-                if target_sub_unit:
+                if target_sub_unit and not vals.get('sub_unit_id'):
                     vals['sub_unit_id'] = target_sub_unit.id
                 if target_block and not vals.get('block_id'):
                     vals['block_id'] = target_block.id
@@ -292,16 +302,11 @@ class FarmWorkEntry(models.Model):
     def _onchange_employee_id(self):
         if self.employee_id:
             emp = self.employee_id
-            curr = emp.current_transfer_id
-            target_farm = (curr.farm_id if curr and not curr.moving_date else False) or emp.current_farm_id or emp.initial_farm_id
-            target_sub_farm = (curr.sub_farm_id if curr and not curr.moving_date else False) or emp.current_sub_farm_id or emp.initial_sub_farm_id
-            target_sub_unit = (curr.sub_unit_id if curr and not curr.moving_date else False) or emp.current_sub_unit_id or emp.initial_sub_unit_id
-            target_block = (curr.block_id if curr and not curr.moving_date else False) or emp.current_block_id or emp.initial_block_id
-
-            self.farm_id = target_farm
-            self.sub_farm_id = target_sub_farm
-            self.sub_unit_id = target_sub_unit
-            self.block_id = target_block
+            farm, sub_farm, sub_unit, block = self._get_employee_location(emp)
+            self.farm_id = farm
+            self.sub_farm_id = sub_farm
+            self.sub_unit_id = sub_unit
+            self.block_id = block
 
             # For temporary workers, suggest the default fixed attendance activity if none selected
             if emp.farm_employee_type == 'temporary' and not self.activity_id:
@@ -347,24 +352,43 @@ class FarmWorkEntry(models.Model):
     @api.depends('activity_id', 'farm_id')
     def _compute_rates(self):
         for entry in self:
-            if entry.activity_id and entry.farm_id:
-                norm_rec = self.env['farm.activity.norm'].search([
-                    ('activity_id', '=', entry.activity_id.id),
-                    ('farm_id', '=', entry.farm_id.id),
-                ], limit=1)
-                entry.norm_rate = norm_rec.norm_value if norm_rec else 0.0
-                if entry.activity_id.type == 'fixed':
-                    entry.uom_name = entry.activity_id.uom_name or 'Birr/Day'
-                else:
-                    entry.uom_name = entry.activity_id.uom_name or 'Birr/Kg'
-            else:
+            rate = 0.0
+            uom = False
+            if entry.activity_id:
+                uom = entry.activity_id.uom_name or ('Birr/Day' if entry.activity_id.type == 'fixed' else 'Birr/Kg')
+                # 1. Look for farm-specific norm
+                if entry.farm_id:
+                    norm_rec = self.env['farm.activity.norm'].search([
+                        ('activity_id', '=', entry.activity_id.id),
+                        ('farm_id', '=', entry.farm_id.id),
+                    ], limit=1)
+                    if norm_rec and norm_rec.norm_value > 0:
+                        rate = norm_rec.norm_value
+                        uom = norm_rec.uom_name or uom
+
+                # 2. Fallback: if no farm-specific norm, check if activity has any configured norm
+                if rate <= 0 and entry.activity_id.farm_norm_ids:
+                    any_norm = entry.activity_id.farm_norm_ids.filtered(lambda n: n.norm_value > 0)
+                    if any_norm:
+                        rate = any_norm[0].norm_value
+                        uom = any_norm[0].uom_name or uom
+
+            # 3. Only update norm_rate if a positive rate was resolved or norm_rate was not manually set
+            if rate > 0:
+                entry.norm_rate = rate
+            elif not entry.norm_rate:
                 entry.norm_rate = 0.0
+
+            if uom:
+                entry.uom_name = uom
+            elif not entry.uom_name:
                 entry.uom_name = 'Birr/Day' if (entry.activity_id and entry.activity_id.type == 'fixed') else 'Birr/Kg'
 
     @api.depends('score_value', 'norm_rate')
     def _compute_total_amount(self):
         for entry in self:
             entry.total_amount = round((entry.score_value or 0.0) * (entry.norm_rate or 0.0), 2)
+
 
     @api.depends('score_value', 'total_amount', 'payment_status', 'entry_type', 'activity_id.type')
     def _compute_report_metrics(self):
@@ -393,20 +417,6 @@ class FarmWorkEntry(models.Model):
                 entry.amount_in_payroll = 0.0
                 entry.amount_unpaid = tot
 
-            # Financial status breakdown
-            tot = entry.total_amount or 0.0
-            if entry.payment_status == 'paid':
-                entry.amount_paid = tot
-                entry.amount_in_payroll = 0.0
-                entry.amount_unpaid = 0.0
-            elif entry.payment_status == 'in_payroll':
-                entry.amount_paid = 0.0
-                entry.amount_in_payroll = tot
-                entry.amount_unpaid = 0.0
-            else:
-                entry.amount_paid = 0.0
-                entry.amount_in_payroll = 0.0
-                entry.amount_unpaid = tot
 
     @api.onchange('farm_id')
     def _onchange_farm_id(self):
@@ -449,11 +459,34 @@ class FarmWorkEntry(models.Model):
                 raise ValidationError(_(
                     "For fixed rate activities (%s), the score must be strictly 0.5 (Half Day), 1.0 (Full Day), 1.5 (Day and a Half), or 2.0 (Two Days). Received: %s"
                 ) % (entry.activity_id.name, entry.score_value))
+
+            # Auto-recompute rate and total if missing/zero
+            if not entry.norm_rate or entry.norm_rate <= 0:
+                entry._compute_rates()
+            entry._compute_total_amount()
+
+            if entry.total_amount <= 0:
+                raise ValidationError(_(
+                    "Cannot confirm work entry '%s': The calculated total payment is 0.00 Birr!\n"
+                    "Please ensure a valid rate is configured for activity '%s' on farm '%s' (in Farm Activities > Farm Norms), or enter a rate in the Applied Rate field."
+                ) % (entry.name, entry.activity_id.name, entry.farm_id.name if entry.farm_id else 'Unspecified'))
+
             entry.state = 'confirmed'
 
     def action_approve(self):
+        """Deprecated: Work entries are now directly finalized upon confirmation."""
+        return self.action_confirm()
+
+    def action_recompute_rates_and_totals(self):
+        """Recalculate norm_rate and total_amount for selected work entries based on activity norms."""
         for entry in self:
-            entry.state = 'approved'
+            if entry.payment_status == 'paid':
+                continue
+            entry._compute_rates()
+            entry._compute_total_amount()
+            if entry.state == 'approved':
+                entry.state = 'confirmed'
+        return True
 
     def action_draft(self):
         for entry in self:
@@ -491,6 +524,8 @@ class FarmWorkEntry(models.Model):
         # 1. Backfill any existing records without payment_status
         # 2. Fix any orphaned records that are 'in_payroll' but have no payslip_id and no payslip_run_id
         # 3. Update any old temporary_rate entry_type to fixed
+        # 4. Migrate any 'approved' entries to 'confirmed' (since confirm now directly finalizes)
+        # 5. Auto-fix any work entries that have 0 norm_rate or 0 total_amount by matching activity norms
         try:
             self.env.cr.execute("""
                 UPDATE farm_work_entry
@@ -504,6 +539,57 @@ class FarmWorkEntry(models.Model):
                 UPDATE farm_work_entry
                 SET entry_type = 'fixed'
                 WHERE entry_type = 'temporary_rate';
+
+                UPDATE farm_work_entry
+                SET state = 'confirmed'
+                WHERE state = 'approved';
+
+                -- Backfill missing farm location from employee initial assignment if null
+                UPDATE farm_work_entry we
+                SET farm_id = emp.initial_farm_id,
+                    sub_farm_id = COALESCE(we.sub_farm_id, emp.initial_sub_farm_id),
+                    sub_unit_id = COALESCE(we.sub_unit_id, emp.initial_sub_unit_id),
+                    block_id = COALESCE(we.block_id, emp.initial_block_id)
+                FROM hr_employee emp
+                WHERE we.employee_id = emp.id
+                  AND we.farm_id IS NULL
+                  AND emp.initial_farm_id IS NOT NULL;
+
+                -- Auto-fix any work entries that have 0 norm_rate or 0 total_amount by matching farm activity norms
+                UPDATE farm_work_entry we
+                SET norm_rate = fan.norm_value,
+                    uom_name = COALESCE(fan.uom_name, we.uom_name),
+                    total_amount = ROUND((we.score_value * fan.norm_value)::numeric, 2)
+                FROM farm_activity_norm fan
+                WHERE we.activity_id = fan.activity_id
+                  AND we.farm_id = fan.farm_id
+                  AND (we.norm_rate IS NULL OR we.norm_rate = 0 OR we.total_amount IS NULL OR we.total_amount = 0)
+                  AND fan.norm_value > 0
+                  AND we.payment_status != 'paid';
+
+                -- Fallback: If farm-specific norm was not found, use any active norm configured for that activity
+                UPDATE farm_work_entry we
+                SET norm_rate = sub.norm_value,
+                    uom_name = COALESCE(sub.uom_name, we.uom_name),
+                    total_amount = ROUND((we.score_value * sub.norm_value)::numeric, 2)
+                FROM (
+                    SELECT DISTINCT ON (activity_id) activity_id, norm_value, uom_name
+                    FROM farm_activity_norm
+                    WHERE norm_value > 0
+                    ORDER BY activity_id, id ASC
+                ) sub
+                WHERE we.activity_id = sub.activity_id
+                  AND (we.norm_rate IS NULL OR we.norm_rate = 0 OR we.total_amount IS NULL OR we.total_amount = 0)
+                  AND we.payment_status != 'paid';
+
+                -- Recompute total_amount where norm_rate exists but total_amount was 0
+                UPDATE farm_work_entry
+                SET total_amount = ROUND((score_value * norm_rate)::numeric, 2)
+                WHERE (total_amount IS NULL OR total_amount = 0)
+                  AND norm_rate > 0
+                  AND score_value > 0
+                  AND payment_status != 'paid';
             """)
         except Exception:
             pass
+

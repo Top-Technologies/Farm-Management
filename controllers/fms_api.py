@@ -299,13 +299,23 @@ class FmsRestController(http.Controller):
                 entry_type = 'piece_rate'
                 work_duration = False
 
-            # 4. Resolve Activity Norm
+            # 4. Resolve Activity Norm (with fallback to any configured norm)
             norm_rec = request.env['farm.activity.norm'].sudo().search([
                 ('activity_id', '=', activity.id),
                 ('farm_id', '=', farm.id)
             ], limit=1)
 
-            norm_rate = norm_rec.norm_value if norm_rec else 0.0
+            norm_rate = 0.0
+            uom_name = activity.uom_name or ('Birr/Day' if is_fixed else 'Birr/Kg')
+            if norm_rec and norm_rec.norm_value > 0:
+                norm_rate = norm_rec.norm_value
+                uom_name = norm_rec.uom_name or uom_name
+            elif activity.farm_norm_ids:
+                any_norm = activity.farm_norm_ids.filtered(lambda n: n.norm_value > 0)
+                if any_norm:
+                    norm_rate = any_norm[0].norm_value
+                    uom_name = any_norm[0].uom_name or uom_name
+
             total_payment = round(score_float * norm_rate, 2)
 
             # 5. Create Work Entry
@@ -320,6 +330,7 @@ class FmsRestController(http.Controller):
                 'entry_type': entry_type,
                 'work_duration': work_duration,
                 'norm_rate': norm_rate,
+                'uom_name': uom_name,
                 'score_value': score_float,
                 'total_amount': total_payment,
                 'notes': str(notes).strip() if notes else "Submitted via FMS REST API",

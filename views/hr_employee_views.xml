@@ -211,7 +211,7 @@
                             <field name="norm_rate" string="Rate"/>
                             <field name="uom_name" string="Unit"/>
                             <field name="total_amount" sum="Total" decoration-bf="1"/>
-                            <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'approved'" decoration-muted="state == 'cancelled'"/>
+                            <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state in ('confirmed', 'approved')" decoration-muted="state == 'cancelled'"/>
                             <field name="payment_status" widget="badge" decoration-warning="payment_status == 'unpaid'" decoration-info="payment_status == 'in_payroll'" decoration-success="payment_status == 'paid'"/>
                         </list>
                     </field>

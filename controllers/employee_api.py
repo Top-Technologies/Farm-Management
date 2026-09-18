@@ -346,13 +346,22 @@ class EmployeeAPI(http.Controller):
                 work_duration = False
                 uom_name = activity.uom_name or 'Birr/Kg'
 
-            # 5. Resolve Activity Norm / Daily Rate for Farm
+            # 5. Resolve Activity Norm / Daily Rate for Farm (with fallback to any configured norm)
             norm_rec = env['farm.activity.norm'].search([
                 ('activity_id', '=', activity.id),
                 ('farm_id', '=', farm.id)
             ], limit=1)
 
-            norm_rate = norm_rec.norm_value if norm_rec else 0.0
+            norm_rate = 0.0
+            if norm_rec and norm_rec.norm_value > 0:
+                norm_rate = norm_rec.norm_value
+                uom_name = norm_rec.uom_name or uom_name
+            elif activity.farm_norm_ids:
+                any_norm = activity.farm_norm_ids.filtered(lambda n: n.norm_value > 0)
+                if any_norm:
+                    norm_rate = any_norm[0].norm_value
+                    uom_name = any_norm[0].uom_name or uom_name
+
             total_payment = round(score_float * norm_rate, 2)
 
             # 6. Create Work Entry Record
@@ -367,6 +376,7 @@ class EmployeeAPI(http.Controller):
                 'block_id': block.id if block else False,
                 'activity_id': activity.id,
                 'norm_rate': norm_rate,
+                'uom_name': uom_name,
                 'score_value': score_float,
                 'total_amount': total_payment,
                 'notes': str(notes).strip() if notes else "Submitted via FMS REST API",
