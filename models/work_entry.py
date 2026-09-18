@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class FarmWorkEntry(models.Model):
@@ -527,69 +530,76 @@ class FarmWorkEntry(models.Model):
         # 4. Migrate any 'approved' entries to 'confirmed' (since confirm now directly finalizes)
         # 5. Auto-fix any work entries that have 0 norm_rate or 0 total_amount by matching activity norms
         try:
-            self.env.cr.execute("""
-                UPDATE farm_work_entry
-                SET payment_status = 'unpaid',
-                    payslip_id = NULL,
-                    payslip_run_id = NULL,
-                    paid_date = NULL
-                WHERE payment_status IS NULL 
-                   OR (payment_status = 'in_payroll' AND (payslip_id IS NULL AND payslip_run_id IS NULL));
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE farm_work_entry
+                    SET payment_status = 'unpaid',
+                        payslip_id = NULL,
+                        payslip_run_id = NULL,
+                        paid_date = NULL
+                    WHERE payment_status IS NULL 
+                       OR (payment_status = 'in_payroll' AND (payslip_id IS NULL AND payslip_run_id IS NULL));
 
-                UPDATE farm_work_entry
-                SET entry_type = 'fixed'
-                WHERE entry_type = 'temporary_rate';
+                    UPDATE farm_work_entry
+                    SET entry_type = 'fixed'
+                    WHERE entry_type = 'temporary_rate';
 
-                UPDATE farm_work_entry
-                SET state = 'confirmed'
-                WHERE state = 'approved';
+                    UPDATE farm_work_entry
+                    SET state = 'confirmed'
+                    WHERE state = 'approved';
 
-                -- Backfill missing farm location from employee initial assignment if null
-                UPDATE farm_work_entry we
-                SET farm_id = emp.initial_farm_id,
-                    sub_farm_id = COALESCE(we.sub_farm_id, emp.initial_sub_farm_id),
-                    sub_unit_id = COALESCE(we.sub_unit_id, emp.initial_sub_unit_id),
-                    block_id = COALESCE(we.block_id, emp.initial_block_id)
-                FROM hr_employee emp
-                WHERE we.employee_id = emp.id
-                  AND we.farm_id IS NULL
-                  AND emp.initial_farm_id IS NOT NULL;
+                    -- Backfill missing farm location from employee initial assignment if null
+                    UPDATE farm_work_entry we
+                    SET farm_id = emp.initial_farm_id,
+                        sub_farm_id = COALESCE(we.sub_farm_id, emp.initial_sub_farm_id),
+                        sub_unit_id = COALESCE(we.sub_unit_id, emp.initial_sub_unit_id),
+                        block_id = COALESCE(we.block_id, emp.initial_block_id)
+                    FROM hr_employee emp
+                    WHERE we.employee_id = emp.id
+                      AND we.farm_id IS NULL
+                      AND emp.initial_farm_id IS NOT NULL;
 
-                -- Auto-fix any work entries that have 0 norm_rate or 0 total_amount by matching farm activity norms
-                UPDATE farm_work_entry we
-                SET norm_rate = fan.norm_value,
-                    uom_name = COALESCE(fan.uom_name, we.uom_name),
-                    total_amount = ROUND((we.score_value * fan.norm_value)::numeric, 2)
-                FROM farm_activity_norm fan
-                WHERE we.activity_id = fan.activity_id
-                  AND we.farm_id = fan.farm_id
-                  AND (we.norm_rate IS NULL OR we.norm_rate = 0 OR we.total_amount IS NULL OR we.total_amount = 0)
-                  AND fan.norm_value > 0
-                  AND we.payment_status != 'paid';
+                    -- Auto-fix any work entries that have 0 norm_rate or 0 total_amount by matching farm activity norms
+                    UPDATE farm_work_entry we
+                    SET norm_rate = fan.norm_value,
+                        total_amount = ROUND((we.score_value * fan.norm_value)::numeric, 2)
+                    FROM farm_activity_norm fan
+                    WHERE we.activity_id = fan.activity_id
+                      AND we.farm_id = fan.farm_id
+                      AND (we.norm_rate IS NULL OR we.norm_rate = 0 OR we.total_amount IS NULL OR we.total_amount = 0)
+                      AND fan.norm_value > 0
+                      AND we.payment_status != 'paid';
 
-                -- Fallback: If farm-specific norm was not found, use any active norm configured for that activity
-                UPDATE farm_work_entry we
-                SET norm_rate = sub.norm_value,
-                    uom_name = COALESCE(sub.uom_name, we.uom_name),
-                    total_amount = ROUND((we.score_value * sub.norm_value)::numeric, 2)
-                FROM (
-                    SELECT DISTINCT ON (activity_id) activity_id, norm_value, uom_name
-                    FROM farm_activity_norm
-                    WHERE norm_value > 0
-                    ORDER BY activity_id, id ASC
-                ) sub
-                WHERE we.activity_id = sub.activity_id
-                  AND (we.norm_rate IS NULL OR we.norm_rate = 0 OR we.total_amount IS NULL OR we.total_amount = 0)
-                  AND we.payment_status != 'paid';
+                    -- Fallback: If farm-specific norm was not found, use any active norm configured for that activity
+                    UPDATE farm_work_entry we
+                    SET norm_rate = sub.norm_value,
+                        total_amount = ROUND((we.score_value * sub.norm_value)::numeric, 2)
+                    FROM (
+                        SELECT DISTINCT ON (activity_id) activity_id, norm_value
+                        FROM farm_activity_norm
+                        WHERE norm_value > 0
+                        ORDER BY activity_id, id ASC
+                    ) sub
+                    WHERE we.activity_id = sub.activity_id
+                      AND (we.norm_rate IS NULL OR we.norm_rate = 0 OR we.total_amount IS NULL OR we.total_amount = 0)
+                      AND we.payment_status != 'paid';
 
-                -- Recompute total_amount where norm_rate exists but total_amount was 0
-                UPDATE farm_work_entry
-                SET total_amount = ROUND((score_value * norm_rate)::numeric, 2)
-                WHERE (total_amount IS NULL OR total_amount = 0)
-                  AND norm_rate > 0
-                  AND score_value > 0
-                  AND payment_status != 'paid';
-            """)
-        except Exception:
-            pass
+                    -- Recompute total_amount where norm_rate exists but total_amount was 0
+                    UPDATE farm_work_entry
+                    SET total_amount = ROUND((score_value * norm_rate)::numeric, 2)
+                    WHERE (total_amount IS NULL OR total_amount = 0)
+                      AND norm_rate > 0
+                      AND score_value > 0
+                      AND payment_status != 'paid';
+
+                    -- Backfill uom_name from activity if null or empty
+                    UPDATE farm_work_entry we
+                    SET uom_name = fa.uom_name
+                    FROM farm_activity fa
+                    WHERE we.activity_id = fa.id
+                      AND (we.uom_name IS NULL OR we.uom_name = '')
+                      AND fa.uom_name IS NOT NULL;
+                """)
+        except Exception as e:
+            _logger.warning("FarmWorkEntry.init() migration warning: %s", e)
 

@@ -19,7 +19,8 @@ class ApprovalCategory(models.Model):
     def init(self):
         super().init()
         try:
-            self._setup_standard_categories()
+            with self.env.cr.savepoint():
+                self._setup_standard_categories()
         except Exception as e:
             _logger.warning("Could not setup standard approval categories during init: %s", str(e))
 

@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
+
+_logger = logging.getLogger(__name__)
 
 
 class SubUnit(models.Model):
@@ -232,15 +235,19 @@ class SubUnit(models.Model):
 
     def init(self):
         super().init()
-        # Automatically migrate existing sub units to match hierarchical [SubFarmCode]SU0X format
-        sub_farms = self.env['farm.sub.farm'].search([], order='id asc')
-        for sf in sub_farms:
-            sf_code = sf.code or (f"{sf.farm_id.code}SF01" if sf.farm_id and sf.farm_id.code else f"SF{sf.id:02d}")
-            prefix = f"{sf_code}SU"
-            sub_units = self.search([('sub_farm_id', '=', sf.id)], order='id asc')
-            seq = 1
-            for su in sub_units:
-                expected_code = f"{prefix}{seq:02d}"
-                if su.code != expected_code:
-                    su.code = expected_code
-                seq += 1
+        try:
+            with self.env.cr.savepoint():
+                # Automatically migrate existing sub units to match hierarchical [SubFarmCode]SU0X format
+                sub_farms = self.env['farm.sub.farm'].search([], order='id asc')
+                for sf in sub_farms:
+                    sf_code = sf.code or (f"{sf.farm_id.code}SF01" if sf.farm_id and sf.farm_id.code else f"SF{sf.id:02d}")
+                    prefix = f"{sf_code}SU"
+                    sub_units = self.search([('sub_farm_id', '=', sf.id)], order='id asc')
+                    seq = 1
+                    for su in sub_units:
+                        expected_code = f"{prefix}{seq:02d}"
+                        if su.code != expected_code:
+                            su.code = expected_code
+                        seq += 1
+        except Exception as e:
+            _logger.warning("SubUnit.init() warning: %s", e)

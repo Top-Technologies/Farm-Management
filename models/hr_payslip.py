@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, Command, _
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 LOAN_RULE_TO_ATTACHMENT_TYPE = {
     'DED_DASHEN_CREDIT': 'dashen_credit',
@@ -222,7 +225,8 @@ class HrPayslip(models.Model):
     def init(self):
         super().init()
         try:
-            # Set noupdate=False for farm_management data records so XML updates apply seamlessly
+            with self.env.cr.savepoint():
+                # Set noupdate=False for farm_management data records so XML updates apply seamlessly
             self.env.cr.execute("""
                 UPDATE ir_model_data 
                 SET noupdate = false 
@@ -340,5 +344,5 @@ result = round(basic * 0.11, 2)"""
                     WHERE existing.struct_id = s.id AND existing.code = r.code
                 );
             """)
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("HrPayslip.init() warning: %s", e)

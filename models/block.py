@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api
+
+_logger = logging.getLogger(__name__)
 
 
 class Block(models.Model):
@@ -117,15 +120,19 @@ class Block(models.Model):
 
     def init(self):
         super().init()
-        # Automatically migrate existing blocks to match hierarchical [SubUnitCode]BK0X format
-        sub_units = self.env['farm.sub.unit'].search([], order='id asc')
-        for su in sub_units:
-            su_code = su.code or f"SU{su.id:02d}"
-            prefix = f"{su_code}BK"
-            blocks = self.search([('sub_unit_id', '=', su.id)], order='id asc')
-            seq = 1
-            for bk in blocks:
-                expected_code = f"{prefix}{seq:02d}"
-                if bk.code != expected_code:
-                    bk.code = expected_code
-                seq += 1
+        try:
+            with self.env.cr.savepoint():
+                # Automatically migrate existing blocks to match hierarchical [SubUnitCode]BK0X format
+                sub_units = self.env['farm.sub.unit'].search([], order='id asc')
+                for su in sub_units:
+                    su_code = su.code or f"SU{su.id:02d}"
+                    prefix = f"{su_code}BK"
+                    blocks = self.search([('sub_unit_id', '=', su.id)], order='id asc')
+                    seq = 1
+                    for bk in blocks:
+                        expected_code = f"{prefix}{seq:02d}"
+                        if bk.code != expected_code:
+                            bk.code = expected_code
+                        seq += 1
+        except Exception as e:
+            _logger.warning("Block.init() warning: %s", e)

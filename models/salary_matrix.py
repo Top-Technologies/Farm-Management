@@ -384,13 +384,17 @@ class HrSalaryMatrixGrade(models.Model):
 
     def init(self):
         super().init()
-        for m_type, max_g in [('head_office', 22), ('cpw', 22), ('farm', 21)]:
-            for g in range(1, max_g + 1):
-                existing = self.search([('matrix_type', '=', m_type), ('grade', '=', g)], limit=1)
-                if not existing:
-                    self.create({
-                        'matrix_type': m_type,
-                        'grade': g,
-                        'name': f"Grade {g} (ደረጃ {g})"
-                    })
+        try:
+            with self.env.cr.savepoint():
+                for m_type, max_g in [('head_office', 22), ('cpw', 22), ('farm', 21)]:
+                    for g in range(1, max_g + 1):
+                        existing = self.search([('matrix_type', '=', m_type), ('grade', '=', g)], limit=1)
+                        if not existing:
+                            self.create({
+                                'matrix_type': m_type,
+                                'grade': g,
+                                'name': f"Grade {g} (ደረጃ {g})"
+                            })
+        except Exception as e:
+            _logger.warning("SalaryMatrixGrade.init() warning: %s", e)
 

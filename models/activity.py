@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
+
+_logger = logging.getLogger(__name__)
 
 
 class FarmActivity(models.Model):
@@ -84,52 +87,53 @@ class FarmActivity(models.Model):
     def init(self):
         super().init()
         try:
-            # 1. Ensure standard Fixed Activity 'DAILY' exists
-            self.env.cr.execute("SELECT id FROM farm_activity WHERE code = 'DAILY' LIMIT 1;")
-            row = self.env.cr.fetchone()
-            daily_act_id = row[0] if row else None
+            with self.env.cr.savepoint():
+                # 1. Ensure standard Fixed Activity 'DAILY' exists
+                self.env.cr.execute("SELECT id FROM farm_activity WHERE code = 'DAILY' LIMIT 1;")
+                row = self.env.cr.fetchone()
+                daily_act_id = row[0] if row else None
 
-            if not daily_act_id:
+                if not daily_act_id:
+                    self.env.cr.execute("""
+                        INSERT INTO farm_activity (
+                            name, code, type, category, uom_name, active, company_id, create_date, write_date, create_uid, write_uid
+                        ) VALUES (
+                            'Daily Labor / Attendance', 'DAILY', 'fixed', 'maintenance', 'Birr/Day', TRUE, 1, NOW(), NOW(), 1, 1
+                        ) RETURNING id;
+                    """)
+                    daily_act_id = self.env.cr.fetchone()[0]
+
+                # 2. If farm_temporary_rate table exists, migrate rates to farm_activity_norm
                 self.env.cr.execute("""
-                    INSERT INTO farm_activity (
-                        name, code, type, category, uom_name, active, company_id, create_date, write_date, create_uid, write_uid
-                    ) VALUES (
-                        'Daily Labor / Attendance', 'DAILY', 'fixed', 'maintenance', 'Birr/Day', TRUE, 1, NOW(), NOW(), 1, 1
-                    ) RETURNING id;
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = 'farm_temporary_rate'
+                    );
                 """)
-                daily_act_id = self.env.cr.fetchone()[0]
+                has_temp_table = self.env.cr.fetchone()[0]
+                if has_temp_table and daily_act_id:
+                    self.env.cr.execute("""
+                        INSERT INTO farm_activity_norm (
+                            activity_id, farm_id, norm_value, create_date, write_date, create_uid, write_uid
+                        )
+                        SELECT 
+                            %s, farm_id, full_day_rate, NOW(), NOW(), 1, 1
+                        FROM farm_temporary_rate
+                        WHERE farm_id IS NOT NULL AND full_day_rate > 0
+                        ON CONFLICT (activity_id, farm_id) DO UPDATE
+                        SET norm_value = EXCLUDED.norm_value;
+                    """, (daily_act_id,))
 
-            # 2. If farm_temporary_rate table exists, migrate rates to farm_activity_norm
-            self.env.cr.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'farm_temporary_rate'
-                );
-            """)
-            has_temp_table = self.env.cr.fetchone()[0]
-            if has_temp_table and daily_act_id:
-                self.env.cr.execute("""
-                    INSERT INTO farm_activity_norm (
-                        activity_id, farm_id, norm_value, create_date, write_date, create_uid, write_uid
-                    )
-                    SELECT 
-                        %s, farm_id, full_day_rate, NOW(), NOW(), 1, 1
-                    FROM farm_temporary_rate
-                    WHERE farm_id IS NOT NULL AND full_day_rate > 0
-                    ON CONFLICT (activity_id, farm_id) DO UPDATE
-                    SET norm_value = EXCLUDED.norm_value;
-                """, (daily_act_id,))
-
-            # 3. For any existing work entries without activity_id, assign daily_act_id
-            if daily_act_id:
-                self.env.cr.execute("""
-                    UPDATE farm_work_entry
-                    SET activity_id = %s,
-                        entry_type = 'fixed'
-                    WHERE activity_id IS NULL;
-                """, (daily_act_id,))
-        except Exception:
-            pass
+                # 3. For any existing work entries without activity_id, assign daily_act_id
+                if daily_act_id:
+                    self.env.cr.execute("""
+                        UPDATE farm_work_entry
+                        SET activity_id = %s,
+                            entry_type = 'fixed'
+                        WHERE activity_id IS NULL;
+                    """, (daily_act_id,))
+        except Exception as e:
+            _logger.warning("FarmActivity.init() warning: %s", e)
 
 
 class FarmActivityNorm(models.Model):

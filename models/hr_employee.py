@@ -193,16 +193,17 @@ class HrEmployee(models.Model):
     def init(self):
         super().init()
         try:
-            self.env.cr.execute("""
-                UPDATE hr_employee 
-                SET has_medical_certificate = true 
-                WHERE has_medical_certificate IS NULL;
-                UPDATE hr_employee
-                SET employment_term = 'permanent'
-                WHERE farm_employee_type IN ('head_office', 'permanent') AND employment_term IS NULL;
-            """)
-        except Exception:
-            pass
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE hr_employee 
+                    SET has_medical_certificate = true 
+                    WHERE has_medical_certificate IS NULL;
+                    UPDATE hr_employee
+                    SET employment_term = 'permanent'
+                    WHERE farm_employee_type IN ('head_office', 'permanent') AND employment_term IS NULL;
+                """)
+        except Exception as e:
+            _logger.warning("HrEmployee.init() warning: %s", e)
 
     @api.depends('birthday')
     def _compute_employee_age(self):
