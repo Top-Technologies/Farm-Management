@@ -129,22 +129,3 @@ class Block(models.Model):
                 if rec.sub_unit_id:
                     rec.code = rec._generate_block_code(rec.sub_unit_id)
         return res
-
-    def init(self):
-        super().init()
-        try:
-            with self.env.cr.savepoint():
-                # Automatically migrate existing blocks to match hierarchical [SubUnitCode]BK0X format
-                sub_units = self.env['farm.sub.unit'].search([], order='id asc')
-                for su in sub_units:
-                    su_code = su.code or f"SU{su.id:02d}"
-                    prefix = f"{su_code}BK"
-                    blocks = self.search([('sub_unit_id', '=', su.id)], order='id asc')
-                    seq = 1
-                    for bk in blocks:
-                        expected_code = f"{prefix}{seq:02d}"
-                        if bk.code != expected_code:
-                            bk.code = expected_code
-                        seq += 1
-        except Exception as e:
-            _logger.warning("Block.init() warning: %s", e)

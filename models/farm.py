@@ -187,14 +187,3 @@ class Farm(models.Model):
                         update_vals['code'] = farm.code
                     loc.write(update_vals)
         return res
-
-    def init(self):
-        super().init()
-        try:
-            with self.env.cr.savepoint():
-                # Ensure any farm without code gets a valid FM0X code
-                farms_without_code = self.search([('code', 'in', (False, ''))], order='id asc')
-                for farm in farms_without_code:
-                    farm.code = farm._generate_farm_code()
-        except Exception as e:
-            _logger.warning("Farm.init() warning: %s", e)

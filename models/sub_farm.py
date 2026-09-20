@@ -139,22 +139,3 @@ class SubFarm(models.Model):
                         for bk in su.block_ids:
                             bk.code = bk._generate_block_code(su)
         return res
-
-    def init(self):
-        super().init()
-        try:
-            with self.env.cr.savepoint():
-                # Automatically migrate existing sub farms to match hierarchical [FarmCode]SF0X format
-                farms = self.env['farm.farm'].search([], order='id asc')
-                for farm in farms:
-                    farm_code = (farm.code or f"FM{farm.id:02d}").strip()
-                    prefix = f"{farm_code}SF"
-                    sub_farms = self.search([('farm_id', '=', farm.id)], order='id asc')
-                    seq = 1
-                    for sf in sub_farms:
-                        expected_code = f"{prefix}{seq:02d}"
-                        if sf.code != expected_code:
-                            sf.code = expected_code
-                        seq += 1
-        except Exception as e:
-            _logger.warning("SubFarm.init() warning: %s", e)
