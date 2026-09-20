@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Farm Data Import Wizard Form View -->
+    <record id="view_farm_data_import_wizard_form" model="ir.ui.view">
+        <field name="name">farm.data.import.wizard.form</field>
+        <field name="model">farm.data.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Farm &amp; Activity Data">
+                <sheet>
+                    <field name="summary" widget="html" readonly="1" invisible="not summary"/>
+                    <group>
+                        <group>
+                            <field name="import_type" widget="radio"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page name="file_upload" string="Upload Spreadsheet File">
+                            <group>
+                                <field name="data_file" filename="filename" widget="binary"/>
+                                <field name="filename" invisible="1"/>
+                            </group>
+                            <div class="alert alert-info py-2 my-2">
+                                <i class="fa fa-info-circle me-1"></i>
+                                Supported formats: <strong>.xlsx</strong> (Excel) or <strong>.csv</strong>.
+                            </div>
+                        </page>
+                        <page name="paste_text" string="Direct Copy &amp; Paste from Excel">
+                            <field name="data_text" placeholder="Copy the table columns and rows directly from your Excel sheet and paste them here (tab or comma separated)..." style="min-height: 220px; font-family: monospace; font-size: 12px;"/>
+                            <div class="alert alert-secondary py-2 my-2 small">
+                                <i class="fa fa-clipboard me-1"></i>
+                                Simply select the cells in Excel (including header row), press <strong>Ctrl+C</strong>, and paste with <strong>Ctrl+V</strong> above.
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button name="action_import" string="Import Data" type="object" class="btn-primary" icon="fa-cloud-upload"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Farm Data Import Wizard -->
+    <record id="action_farm_data_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Farm / Activity Data</field>
+        <field name="res_model">farm.data.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Import Farms, Sub Farms, Hudads, Blocks, and Activities directly from Excel spreadsheets.
+            </p>
+        </field>
+    </record>
+</odoo>

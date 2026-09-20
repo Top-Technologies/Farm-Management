@@ -11,9 +11,17 @@
                 <field name="sub_unit_id"/>
                 <field name="sub_farm_id"/>
                 <field name="farm_id"/>
+                <field name="crop_name" optional="show"/>
+                <field name="variety" optional="show"/>
+                <field name="size_ha" sum="Total Gross Ha" optional="show"/>
+                <field name="net_area" sum="Total Net Ha" optional="show"/>
+                <field name="population" sum="Total Trees" optional="show"/>
+                <field name="plantation_year" optional="hide"/>
+                <field name="stumping_year" optional="hide"/>
+                <field name="uprooting_year" optional="hide"/>
+                <field name="productivity_quarter" optional="hide"/>
+                <field name="soil_type" optional="hide"/>
                 <field name="supervisor_id" widget="many2one_avatar_employee"/>
-                <field name="crop_type"/>
-                <field name="area" sum="Total Area"/>
                 <field name="status" widget="badge" decoration-success="status == 'active'" decoration-info="status == 'preparation'" decoration-warning="status == 'harvested'" decoration-muted="status == 'fallow'"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -49,15 +57,27 @@
                             <field name="farm_id"/>
                             <field name="active" invisible="1"/>
                         </group>
-                        <group name="agricultural_specs" string="Agricultural Specifications">
-                            <field name="crop_type" placeholder="e.g. Wheat, Citrus, Olives"/>
-                            <field name="soil_type" placeholder="e.g. Clay loam, Sandy"/>
-                            <field name="area"/>
+                        <group name="supervision" string="Supervision &amp; Company">
+                            <field name="supervisor_id" widget="many2one_avatar_employee"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                     </group>
-                    <group name="supervision" string="Supervision">
-                        <field name="supervisor_id" widget="many2one_avatar_employee"/>
+                    <group name="agronomic_details" string="Agronomic &amp; Inventory Specifications">
+                        <group>
+                            <field name="crop_name" placeholder="e.g. Mature Coffee"/>
+                            <field name="crop_type" placeholder="e.g. Arabica"/>
+                            <field name="variety" placeholder="e.g. 74-1-10, 74-1-12, K-2"/>
+                            <field name="population"/>
+                            <field name="soil_type" placeholder="e.g. Clay loam"/>
+                        </group>
+                        <group>
+                            <field name="size_ha" string="Size / Gross Area (Ha)"/>
+                            <field name="net_area" string="Net Area (Ha)"/>
+                            <field name="plantation_year"/>
+                            <field name="stumping_year"/>
+                            <field name="uprooting_year"/>
+                            <field name="productivity_quarter"/>
+                        </group>
                     </group>
                     <notebook>
                         <page name="notes" string="Description &amp; Observations">
@@ -125,6 +145,8 @@
         <field name="arch" type="xml">
             <search string="Search Blocks">
                 <field name="name" string="Block" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="crop_name"/>
+                <field name="variety"/>
                 <field name="crop_type"/>
                 <field name="sub_unit_id"/>
                 <field name="sub_farm_id"/>
@@ -141,6 +163,9 @@
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Crop Name" name="group_crop_name" context="{'group_by': 'crop_name'}"/>
+                    <filter string="Variety" name="group_variety" context="{'group_by': 'variety'}"/>
+                    <filter string="Plantation Year" name="group_plantation_year" context="{'group_by': 'plantation_year'}"/>
                     <filter string="Crop Type" name="group_crop" context="{'group_by': 'crop_type'}"/>
                     <filter string="Sub Unit" name="group_sub_unit" context="{'group_by': 'sub_unit_id'}"/>
                     <filter string="Sub Farm" name="group_sub_farm" context="{'group_by': 'sub_farm_id'}"/>

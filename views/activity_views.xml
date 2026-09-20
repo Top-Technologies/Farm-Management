@@ -8,9 +8,16 @@
             <list string="Farm Activities">
                 <field name="name"/>
                 <field name="code"/>
+                <field name="crop_name" optional="show"/>
+                <field name="cost_category" optional="show"/>
+                <field name="main_activity" optional="show"/>
+                <field name="sub_activity" optional="show"/>
                 <field name="type" widget="badge" decoration-info="type == 'piece_rate'" decoration-success="type == 'fixed'"/>
-                <field name="category" widget="badge" decoration-info="category == 'land_prep'" decoration-success="category in ('planting', 'crop_care')" decoration-warning="category == 'harvest'"/>
-                <field name="uom_name" string="Unit of Measure"/>
+                <field name="uom_name" string="Unit"/>
+                <field name="standard_hours" optional="show"/>
+                <field name="required_cost" optional="show"/>
+                <field name="requires_labor" widget="boolean_toggle" optional="hide"/>
+                <field name="requires_machine" widget="boolean_toggle" optional="hide"/>
                 <field name="farm_norm_count" string="Configured Farms"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -35,14 +42,27 @@
                         </h1>
                         <div class="d-flex align-items-baseline">
                             <label for="code" class="me-2 text-muted" string="Activity ID:"/>
-                            <field name="code" placeholder="e.g. SP, CULT, HARV" style="max-width: 150px; font-weight: bold;"/>
+                            <field name="code" placeholder="e.g. SP, CULT, HARV (auto-generated if empty)" style="max-width: 250px; font-weight: bold;"/>
                         </div>
                     </div>
                     <group>
                         <group name="general_specs" string="Activity Specifications">
                             <field name="type" widget="radio" options="{'horizontal': true}"/>
                             <field name="category"/>
-                            <field name="uom_name" placeholder="e.g. Birr/Kg or Birr/Day"/>
+                            <field name="uom_name" placeholder="e.g. Birr/Kg, Birr/Day, Ha, Man-Days"/>
+                            <field name="activity_type" placeholder="e.g. Operational, Contract"/>
+                        </group>
+                        <group name="cost_work_specs" string="Operational &amp; Cost Category">
+                            <field name="crop_name" placeholder="e.g. Mature Coffee"/>
+                            <field name="cost_category" placeholder="e.g. Direct, Indirect, Production"/>
+                            <field name="main_activity" placeholder="e.g. Coffee Maintenance"/>
+                            <field name="sub_activity" placeholder="e.g. Desuckering, Pruning"/>
+                            <field name="standard_hours"/>
+                            <field name="required_cost"/>
+                            <div class="d-flex gap-4 mt-2">
+                                <field name="requires_labor"/>
+                                <field name="requires_machine"/>
+                            </div>
                         </group>
                     </group>
                     <notebook>
@@ -111,16 +131,26 @@
         <field name="model">farm.activity</field>
         <field name="arch" type="xml">
             <search string="Search Farm Activities">
-                <field name="name" string="Activity" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="name" string="Activity" filter_domain="['|', '|', ('name', 'ilike', self), ('code', 'ilike', self), ('main_activity', 'ilike', self)]"/>
                 <field name="code"/>
+                <field name="crop_name"/>
+                <field name="cost_category"/>
+                <field name="main_activity"/>
+                <field name="sub_activity"/>
                 <field name="type"/>
                 <field name="category"/>
                 <separator/>
                 <filter string="Fixed (Daily Rate)" name="filter_fixed" domain="[('type', '=', 'fixed')]"/>
                 <filter string="Piece Rate" name="filter_piece_rate" domain="[('type', '=', 'piece_rate')]"/>
                 <separator/>
+                <filter string="Requires Labor" name="filter_labor" domain="[('requires_labor', '=', True)]"/>
+                <filter string="Requires Machine" name="filter_machine" domain="[('requires_machine', '=', True)]"/>
+                <separator/>
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
                 <group expand="0" string="Group By">
+                    <filter string="Crop Name" name="group_crop_name" context="{'group_by': 'crop_name'}"/>
+                    <filter string="Cost Category" name="group_cost_cat" context="{'group_by': 'cost_category'}"/>
+                    <filter string="Main Activity" name="group_main_act" context="{'group_by': 'main_activity'}"/>
                     <filter string="Type" name="group_type" context="{'group_by': 'type'}"/>
                     <filter string="Category" name="group_category" context="{'group_by': 'category'}"/>
                     <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>

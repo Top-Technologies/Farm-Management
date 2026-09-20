@@ -19,10 +19,10 @@ class FarmActivity(models.Model):
     )
     code = fields.Char(
         string='Activity ID / Code',
-        required=True,
+        required=False,
         copy=False,
         tracking=True,
-        help='Short unique identifier for the activity, e.g. SP, CULT, HARV...',
+        help='Short unique identifier for the activity, e.g. SP, CULT, HARV... Auto-generated if omitted.',
     )
     active = fields.Boolean(default=True, tracking=True)
     color = fields.Integer(string='Color Index')
@@ -40,6 +40,17 @@ class FarmActivity(models.Model):
         ('harvest', 'Harvesting'),
         ('maintenance', 'Maintenance & Other'),
     ], string='Category', default='land_prep', tracking=True)
+
+    # Operational & Agronomic Activity Fields (from Field Spreadsheets)
+    crop_name = fields.Char(string='Crop Name', tracking=True, help='e.g. Mature Coffee, Young Coffee')
+    cost_category = fields.Char(string='Cost Category', tracking=True, help='e.g. Direct, Indirect, Production')
+    main_activity = fields.Char(string='Main Activity', tracking=True, help='e.g. Land Development, Coffee Maintenance, Harvesting')
+    sub_activity = fields.Char(string='Sub Activity', tracking=True, help='e.g. Desuckering, Weeding, Pruning')
+    standard_hours = fields.Float(string='Standard Hours', digits=(16, 2), tracking=True, help='Standard labor/machine hours required')
+    required_cost = fields.Float(string='Required Amount / Cost', digits=(16, 2), tracking=True, help='Standard required cost/budget for this activity')
+    activity_type = fields.Char(string='Activity Type / Mode', tracking=True, help='e.g. Regular, Contract, Special')
+    requires_labor = fields.Boolean(string='Requires Labor', default=True, tracking=True)
+    requires_machine = fields.Boolean(string='Requires Machine', default=False, tracking=True)
 
     uom_name = fields.Char(
         string='Unit of Measure',
@@ -71,6 +82,24 @@ class FarmActivity(models.Model):
     _sql_constraints = [
         ('code_uniq', 'unique(code, company_id)', 'The Activity ID / Code must be unique per company!'),
     ]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = self.sudo().search([('code', '=like', 'ACT-%')])
+        max_num = 0
+        for rec in records:
+            if rec.code and rec.code.startswith('ACT-'):
+                num_part = rec.code[4:]
+                if num_part.isdigit():
+                    num = int(num_part)
+                    if num > max_num:
+                        max_num = num
+
+        for vals in vals_list:
+            if not vals.get('code') or vals.get('code') == '/':
+                max_num += 1
+                vals['code'] = f"ACT-{max_num:04d}"
+        return super().create(vals_list)
 
     @api.onchange('type')
     def _onchange_type(self):

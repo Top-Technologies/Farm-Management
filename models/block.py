@@ -59,7 +59,19 @@ class Block(models.Model):
 
     area = fields.Float(string='Area (Acres/Ha)', tracking=True)
     crop_type = fields.Char(string='Crop / Culture', tracking=True)
-    soil_type = fields.Char(string='Soil Type')
+    soil_type = fields.Char(string='Soil Type', tracking=True)
+
+    # Agronomic & Inventory Details (from Field Spreadsheets)
+    crop_name = fields.Char(string='Crop Name', tracking=True, help='e.g. Mature Coffee, Young Coffee')
+    size_ha = fields.Float(string='Size / Gross Area (Ha)', digits=(16, 2), tracking=True)
+    net_area = fields.Float(string='Net Area (Ha)', digits=(16, 2), tracking=True)
+    plantation_year = fields.Integer(string='Plantation Year', tracking=True)
+    variety = fields.Char(string='Variety', tracking=True, help='Coffee variety e.g. 74-1-10, 74-1-12, K-2, 74-40, Mixed')
+    population = fields.Float(string='Population (Tree Count)', digits=(16, 2), tracking=True)
+    productivity_quarter = fields.Char(string='Productivity / Quarter', tracking=True)
+    stumping_year = fields.Integer(string='Stumping Year', tracking=True)
+    uprooting_year = fields.Integer(string='Uprooting Year', tracking=True)
+
     status = fields.Selection([
         ('preparation', 'Land Preparation'),
         ('active', 'Cultivated / Active'),

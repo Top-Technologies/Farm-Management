@@ -402,7 +402,7 @@ class FmsRestController(http.Controller):
             data = []
             for act in activities:
                 norms = []
-                for n in act.norm_ids:
+                for n in act.farm_norm_ids:
                     if not farm_code or (n.farm_id.code and n.farm_id.code.lower() == farm_code.lower()):
                         norms.append({
                             "farm_id": n.farm_id.id,
@@ -415,7 +415,19 @@ class FmsRestController(http.Controller):
                     "id": act.id,
                     "code": act.code,
                     "name": act.name,
-                    "uom": act.uom_name,
+                    "type": act.type,
+                    "type_label": "Fixed (Daily Rate)" if act.type == 'fixed' else "Piece Rate",
+                    "category": act.category,
+                    "crop_name": act.crop_name or "",
+                    "cost_category": act.cost_category or "",
+                    "main_activity": act.main_activity or "",
+                    "sub_activity": act.sub_activity or "",
+                    "standard_hours": act.standard_hours or 0.0,
+                    "required_cost": act.required_cost or 0.0,
+                    "activity_type": act.activity_type or "",
+                    "requires_labor": act.requires_labor,
+                    "requires_machine": act.requires_machine,
+                    "uom_name": act.uom_name,
                     "norms": norms
                 })
 

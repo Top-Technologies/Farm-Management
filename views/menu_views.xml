@@ -35,6 +35,14 @@
               action="action_farm_block"
               sequence="40"/>
 
+    <!-- 5th Tier: Import Farm / Activity Data Wizard -->
+    <menuitem id="menu_farm_data_import_wizard"
+              name="Import Farm / Activity Data"
+              parent="menu_farm_management_root"
+              action="action_farm_data_import_wizard"
+              sequence="50"
+              groups="group_farm_manager"/>
+
 
     <!-- Top-level Section inside HR / Employees Top Bar: Activities -->
     <!-- Section inside HR / Employees Top Bar: Activities -->

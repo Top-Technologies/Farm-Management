@@ -30,5 +30,7 @@ access_approval_location_farm_mgr,approval.location.farm_manager,model_approval_
 access_approval_location_approver_user,approval.location.approver.user,model_approval_location_approver,base.group_user,1,0,0,0
 access_approval_location_approver_mgr,approval.location.approver.manager,model_approval_location_approver,approvals.group_approval_manager,1,1,1,1
 access_approval_location_approver_farm_mgr,approval.location.approver.farm_manager,model_approval_location_approver,group_farm_manager,1,1,1,1
+access_farm_data_import_wizard_user,farm.data.import.wizard.user,model_farm_data_import_wizard,group_farm_user,1,1,1,1
+access_farm_data_import_wizard_mgr,farm.data.import.wizard.manager,model_farm_data_import_wizard,group_farm_manager,1,1,1,1
 
 

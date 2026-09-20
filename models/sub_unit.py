@@ -50,6 +50,25 @@ class SubUnit(models.Model):
     )
 
     area = fields.Float(string='Area (Acres/Ha)', tracking=True)
+    hudad_number = fields.Char(string='Hudad Number / Code', tracking=True, help='e.g. 1.1, 1.2, 2.1...')
+    total_gross_area = fields.Float(
+        string='Total Gross Area (Ha)',
+        compute='_compute_totals',
+        store=True,
+        digits=(16, 2),
+    )
+    total_net_area = fields.Float(
+        string='Total Net Area (Ha)',
+        compute='_compute_totals',
+        store=True,
+        digits=(16, 2),
+    )
+    total_population = fields.Float(
+        string='Total Population (Trees)',
+        compute='_compute_totals',
+        store=True,
+        digits=(16, 2),
+    )
     description = fields.Html(string='Notes / Description')
 
     # Relational Hierarchy: Sub Unit -> Blocks
@@ -90,6 +109,13 @@ class SubUnit(models.Model):
     def _compute_counts(self):
         for unit in self:
             unit.block_count = len(unit.block_ids)
+
+    @api.depends('block_ids.size_ha', 'block_ids.net_area', 'block_ids.population', 'block_ids.area')
+    def _compute_totals(self):
+        for unit in self:
+            unit.total_gross_area = sum(unit.block_ids.mapped('size_ha')) or sum(unit.block_ids.mapped('area'))
+            unit.total_net_area = sum(unit.block_ids.mapped('net_area'))
+            unit.total_population = sum(unit.block_ids.mapped('population'))
 
     @api.depends('assigned_employee_ids')
     def _compute_worker_count(self):

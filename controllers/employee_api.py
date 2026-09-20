@@ -475,6 +475,15 @@ class EmployeeAPI(http.Controller):
                     "type": act.type,
                     "type_label": "Fixed (Daily Rate)" if act.type == 'fixed' else "Piece Rate",
                     "category": act.category,
+                    "crop_name": act.crop_name or "",
+                    "cost_category": act.cost_category or "",
+                    "main_activity": act.main_activity or "",
+                    "sub_activity": act.sub_activity or "",
+                    "standard_hours": act.standard_hours or 0.0,
+                    "required_cost": act.required_cost or 0.0,
+                    "activity_type": act.activity_type or "",
+                    "requires_labor": act.requires_labor,
+                    "requires_machine": act.requires_machine,
                     "uom_name": act.uom_name,
                     "norms": norms
                 })
@@ -605,7 +614,16 @@ class EmployeeAPI(http.Controller):
                                     "employee_id": bk.supervisor_id.fms_employee_id or ""
                                 } if bk.supervisor_id else None,
                                 "area": bk.area,
-                                "crop_type": bk.crop_type or "",
+                                "crop_name": bk.crop_name or bk.crop_type or "",
+                                "crop_type": bk.crop_type or bk.crop_name or "",
+                                "size_ha": bk.size_ha or bk.area or 0.0,
+                                "net_area": bk.net_area or 0.0,
+                                "plantation_year": bk.plantation_year or None,
+                                "variety": bk.variety or "",
+                                "population": bk.population or 0.0,
+                                "productivity_quarter": bk.productivity_quarter or "",
+                                "stumping_year": bk.stumping_year or None,
+                                "uprooting_year": bk.uprooting_year or None,
                                 "soil_type": bk.soil_type or "",
                                 "status": bk.status or "active"
                             })
@@ -614,6 +632,7 @@ class EmployeeAPI(http.Controller):
                             "id": su.id,
                             "name": su.name,
                             "code": su.code or "",
+                            "hudad_number": su.hudad_number or "",
                             "sub_farm_id": sf.id,
                             "sub_farm_code": sf.code or "",
                             "farm_id": farm.id,
@@ -624,6 +643,9 @@ class EmployeeAPI(http.Controller):
                                 "employee_id": su.manager_id.fms_employee_id or ""
                             } if su.manager_id else None,
                             "area": su.area,
+                            "total_gross_area": su.total_gross_area or su.area or 0.0,
+                            "total_net_area": su.total_net_area or 0.0,
+                            "total_population": su.total_population or 0.0,
                             "blocks_count": len(blocks_data),
                             "assigned_workers_count": len(su.assigned_employee_ids),
                             "blocks": blocks_data
