@@ -65,6 +65,9 @@ def _normalize_col(name):
     return clean
 
 
+DITTO_VALUES = ('"', '”', '“', "''", "'' ''")
+
+
 class FarmDataImportWizard(models.TransientModel):
     _name = 'farm.data.import.wizard'
     _description = 'Farm & Activity Data Import Wizard'
@@ -117,7 +120,8 @@ class FarmDataImportWizard(models.TransientModel):
                     row_dict = {}
                     for col_idx, col_name in enumerate(header):
                         if col_name and col_idx < len(row):
-                            row_dict[col_name] = row[col_idx]
+                            val = row[col_idx]
+                            row_dict[col_name] = "" if val is None else str(val)
                     if any(v is not None and v != '' for v in row_dict.values()):
                         rows.append(row_dict)
                 return rows
@@ -132,24 +136,48 @@ class FarmDataImportWizard(models.TransientModel):
         else:
             raise UserError(_("Please upload a spreadsheet file or paste data into the text box."))
 
-        # Parse text_content (could be tab-separated or comma-separated)
-        first_line = text_content.split('\n')[0] if text_content else ''
-        delimiter = '\t' if '\t' in first_line else ','
-        reader = csv.reader(io.StringIO(text_content), delimiter=delimiter)
+        # Clean line breaks: replace CRLF with LF
+        raw_lines = [l for l in text_content.replace('\r\n', '\n').replace('\r', '\n').split('\n') if l.strip()]
+        if not raw_lines:
+            return []
+
+        first_line = raw_lines[0]
+        is_tsv = '\t' in first_line
 
         header = []
-        for row in reader:
-            if not row or all(not v.strip() for v in row):
-                continue
-            if not header:
-                header = [_normalize_col(c) for c in row]
-                continue
-            row_dict = {}
-            for col_idx, col_name in enumerate(header):
-                if col_name and col_idx < len(row):
-                    row_dict[col_name] = row[col_idx]
-            if any(v is not None and v != '' for v in row_dict.values()):
-                rows.append(row_dict)
+        if is_tsv:
+            # For TSV (direct paste from Excel):
+            # Split strictly by tabs line-by-line!
+            # DO NOT use standard csv.reader with quotechar='"' because ditto marks (")
+            # in cells will be interpreted as open quotes that swallow multiple lines!
+            for line in raw_lines:
+                cols = [c.strip() for c in line.split('\t')]
+                if not any(cols):
+                    continue
+                if not header:
+                    header = [_normalize_col(c) for c in cols]
+                    continue
+                row_dict = {}
+                for col_idx, col_name in enumerate(header):
+                    if col_name and col_idx < len(cols):
+                        row_dict[col_name] = cols[col_idx]
+                if any(v is not None and v != '' for v in row_dict.values()):
+                    rows.append(row_dict)
+        else:
+            # For CSV, use csv.reader with QUOTE_NONE so quotes inside fields never swallow lines
+            reader = csv.reader(io.StringIO(text_content), delimiter=',', quoting=csv.QUOTE_NONE)
+            for row in reader:
+                if not row or all(not v.strip() for v in row):
+                    continue
+                if not header:
+                    header = [_normalize_col(c) for c in row]
+                    continue
+                row_dict = {}
+                for col_idx, col_name in enumerate(header):
+                    if col_name and col_idx < len(row):
+                        row_dict[col_name] = row[col_idx].strip()
+                if any(v is not None and v != '' for v in row_dict.values()):
+                    rows.append(row_dict)
 
         return rows
 
@@ -177,10 +205,19 @@ class FarmDataImportWizard(models.TransientModel):
         created_blocks = 0
         updated_blocks = 0
 
+        prev_farm = '1'
+        prev_sub_farm = '1'
+        prev_hudad = '1.1'
+        prev_crop_name = 'Mature Coffee'
+
         for row in rows:
             # 1. Farm
-            # Expected raw: 1, 2, 3, 4 or Gomma2 (1)...
             raw_farm = _clean_str(row.get('farm_name') or row.get('farm') or '')
+            if raw_farm in DITTO_VALUES or not raw_farm:
+                raw_farm = prev_farm
+            else:
+                prev_farm = raw_farm
+
             if not raw_farm:
                 continue
 
@@ -190,7 +227,6 @@ class FarmDataImportWizard(models.TransientModel):
             elif raw_farm.startswith('Gomma2'):
                 farm_name = raw_farm
             else:
-                # If e.g. "1.0"
                 try:
                     f_int = int(float(raw_farm))
                     farm_name = f"Gomma2 ({f_int})"
@@ -209,8 +245,12 @@ class FarmDataImportWizard(models.TransientModel):
                 created_farms.add(farm_name)
 
             # 2. Sub Farm
-            # Expected raw: 1, 2, Sub Farm 1...
-            raw_sub_farm = _clean_str(row.get('sub_farm') or row.get('subfarm') or '1')
+            raw_sub_farm = _clean_str(row.get('sub_farm') or row.get('subfarm') or '')
+            if raw_sub_farm in DITTO_VALUES or not raw_sub_farm:
+                raw_sub_farm = prev_sub_farm
+            else:
+                prev_sub_farm = raw_sub_farm
+
             if raw_sub_farm.isdigit():
                 sub_farm_name = f"Sub Farm {raw_sub_farm}"
             elif not raw_sub_farm:
@@ -232,8 +272,12 @@ class FarmDataImportWizard(models.TransientModel):
                 created_sub_farms.add(f"{farm_name} -> {sub_farm_name}")
 
             # 3. Sub Unit / Hudad
-            # Expected raw: 1.1, 1.2, 2.1...
             raw_hudad = _clean_str(row.get('hudad') or row.get('sub_unit') or row.get('subunit') or '')
+            if raw_hudad in DITTO_VALUES or not raw_hudad:
+                raw_hudad = prev_hudad
+            else:
+                prev_hudad = raw_hudad
+
             if not raw_hudad:
                 raw_hudad = "1.1"
 
@@ -254,12 +298,16 @@ class FarmDataImportWizard(models.TransientModel):
                 sub_unit.hudad_number = raw_hudad
 
             # 4. Block
-            # Expected raw: G1, G3, G5, G9, G10...
             raw_block = _clean_str(row.get('block_name') or row.get('block') or '')
             if not raw_block:
                 continue
 
             crop_name = _clean_str(row.get('crop_name') or '')
+            if crop_name in DITTO_VALUES or not crop_name:
+                crop_name = prev_crop_name
+            else:
+                prev_crop_name = crop_name
+
             size_ha = _parse_float(row.get('size_ha') or row.get('size') or row.get('area') or 0.0)
             net_area = _parse_float(row.get('net_area') or 0.0)
             plantation_year = _parse_int(row.get('plantation_year') or row.get('plantation__year') or 0)
@@ -327,16 +375,72 @@ class FarmDataImportWizard(models.TransientModel):
         created_acts = 0
         updated_acts = 0
 
+        # Auto-clean any previously corrupted activities from previous faulty imports
+        # (e.g. activities where uom_name swallowed multi-line text > 35 chars or contains 'norm ')
+        corrupted = ActivityObj.search([('company_id', '=', self.company_id.id)])
+        for c in corrupted:
+            uom_val = c.uom_name or ''
+            if len(uom_val) > 35 or '\n' in uom_val or 'norm ' in uom_val.lower():
+                _logger.info("Purging previously corrupted activity: %s (ID: %s)", c.name, c.id)
+                c.unlink()
+
+        prev_crop_name = 'Coffee'
+        prev_cost_category = 'Direct Activity'
+        prev_main_activity = 'Maintenance'
+        prev_sub_activity = 'Mature Coffee'
+        prev_uom = 'Birr/Kg'
+
         for row in rows:
             activity_name = _clean_str(row.get('activity_name') or row.get('name') or '')
             if not activity_name:
                 continue
 
-            crop_name = _clean_str(row.get('crop_name') or '')
-            cost_category = _clean_str(row.get('cost_catagory') or row.get('cost_category') or '')
-            main_activity = _clean_str(row.get('main_activity') or '')
-            sub_activity = _clean_str(row.get('sub_activity') or '')
-            uom = _clean_str(row.get('unit_measurement') or row.get('unitmeasurement') or row.get('unit') or row.get('uom') or 'Birr/Kg')
+            # Ditto resolution for hierarchy and UoM
+            raw_crop = _clean_str(row.get('crop_name') or '')
+            if raw_crop in DITTO_VALUES:
+                crop_name = prev_crop_name
+            elif raw_crop:
+                crop_name = raw_crop
+                prev_crop_name = raw_crop
+            else:
+                crop_name = prev_crop_name
+
+            raw_cost_cat = _clean_str(row.get('cost_catagory') or row.get('cost_category') or '')
+            if raw_cost_cat in DITTO_VALUES:
+                cost_category = prev_cost_category
+            elif raw_cost_cat:
+                cost_category = raw_cost_cat
+                prev_cost_category = raw_cost_cat
+            else:
+                cost_category = prev_cost_category
+
+            raw_main = _clean_str(row.get('main_activity') or '')
+            if raw_main in DITTO_VALUES:
+                main_activity = prev_main_activity
+            elif raw_main:
+                main_activity = raw_main
+                prev_main_activity = raw_main
+            else:
+                main_activity = prev_main_activity
+
+            raw_sub = _clean_str(row.get('sub_activity') or '')
+            if raw_sub in DITTO_VALUES:
+                sub_activity = prev_sub_activity
+            elif raw_sub:
+                sub_activity = raw_sub
+                prev_sub_activity = raw_sub
+            else:
+                sub_activity = prev_sub_activity
+
+            raw_uom = _clean_str(row.get('unit_measurement') or row.get('unitmeasurement') or row.get('unit') or row.get('uom') or '')
+            if raw_uom in DITTO_VALUES:
+                uom = prev_uom
+            elif raw_uom:
+                uom = raw_uom
+                prev_uom = raw_uom
+            else:
+                uom = prev_uom or 'Birr/Kg'
+
             standard_hours = _parse_float(row.get('standard_hours') or 0.0)
             required_cost = _parse_float(row.get('required_amount_cost') or row.get('required_cost') or row.get('cost') or 0.0)
             activity_type = _clean_str(row.get('activity_type') or '')
@@ -378,19 +482,17 @@ class FarmDataImportWizard(models.TransientModel):
                 'company_id': self.company_id.id,
             }
 
-            # Search by name (and optionally main_activity)
+            # Search by exact name, sub_activity, and main_activity so distinct activities are never collapsed
             domain = [
                 ('name', '=', activity_name),
                 ('company_id', '=', self.company_id.id),
             ]
+            if sub_activity:
+                domain.append(('sub_activity', '=', sub_activity))
             if main_activity:
                 domain.append(('main_activity', '=', main_activity))
 
             activity = ActivityObj.search(domain, limit=1)
-            if not activity:
-                # Search by name only
-                activity = ActivityObj.search([('name', '=', activity_name), ('company_id', '=', self.company_id.id)], limit=1)
-
             if activity:
                 activity.write(vals)
                 updated_acts += 1
@@ -404,6 +506,7 @@ class FarmDataImportWizard(models.TransientModel):
             <ul class="mb-0">
                 <li><strong>Activities Created:</strong> {created_acts}</li>
                 <li><strong>Activities Updated:</strong> {updated_acts}</li>
+                <li><strong>Total Activities Processed:</strong> {created_acts + updated_acts}</li>
             </ul>
         </div>
         """
