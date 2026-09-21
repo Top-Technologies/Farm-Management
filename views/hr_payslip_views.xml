@@ -117,5 +117,24 @@
             </xpath>
         </field>
     </record>
+
+    <!-- HR Payslip Search View Inherit: Add Gender, Classification, and Farm Location -->
+    <record id="view_hr_payslip_filter_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payslip.select.farm.inherit</field>
+        <field name="model">hr.payslip</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='employee_id']" position="after">
+                <field name="gender"/>
+                <field name="farm_id"/>
+                <field name="sub_unit_id"/>
+            </xpath>
+            <xpath expr="//filter[@name='group_by_employee_id']" position="after">
+                <filter string="Gender" name="group_by_gender" context="{'group_by': 'gender'}"/>
+                <filter string="Worker Classification" name="group_by_farm_employee_type" context="{'group_by': 'farm_employee_type'}"/>
+                <filter string="Farm Location" name="group_by_farm" context="{'group_by': 'farm_id'}"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>
 

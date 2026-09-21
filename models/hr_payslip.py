@@ -40,6 +40,12 @@ class HrPayslip(models.Model):
         store=True,
         readonly=True,
     )
+    gender = fields.Selection(
+        related='employee_id.gender',
+        string='Gender',
+        store=True,
+        readonly=True,
+    )
 
     # Permanent Employee Salary Matrix Placement
     salary_matrix_type = fields.Selection(

@@ -32,5 +32,9 @@ access_approval_location_approver_mgr,approval.location.approver.manager,model_a
 access_approval_location_approver_farm_mgr,approval.location.approver.farm_manager,model_approval_location_approver,group_farm_manager,1,1,1,1
 access_farm_data_import_wizard_user,farm.data.import.wizard.user,model_farm_data_import_wizard,group_farm_user,1,1,1,1
 access_farm_data_import_wizard_mgr,farm.data.import.wizard.manager,model_farm_data_import_wizard,group_farm_manager,1,1,1,1
+access_hr_salary_attachment_schedule_user,hr.salary.attachment.schedule.user,model_hr_salary_attachment_schedule,base.group_user,1,0,0,0
+access_hr_salary_attachment_schedule_mgr,hr.salary.attachment.schedule.mgr,model_hr_salary_attachment_schedule,group_farm_manager,1,1,1,1
+access_hr_salary_attachment_adjust_wizard_user,hr.salary.attachment.adjust.wizard.user,model_hr_salary_attachment_adjust_wizard,base.group_user,1,1,1,1
+access_hr_salary_attachment_adjust_wizard_mgr,hr.salary.attachment.adjust.wizard.mgr,model_hr_salary_attachment_adjust_wizard,group_farm_manager,1,1,1,1
 
 

@@ -49,6 +49,7 @@ This module structures agricultural operations directly integrated into the HR E
         'views/res_config_settings_views.xml',
         'views/appraisal_survey_views.xml',
         'wizard/farm_data_import_views.xml',
+        'wizard/hr_salary_attachment_adjust_wizard_views.xml',
         'views/menu_views.xml',
     ],
     'demo': [],

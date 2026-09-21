@@ -1,20 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Salary Attachment Form View Inherit: Add Contract Loan Deduction Link -->
+    <!-- Salary Attachment Form View Inherit: Add Contract Loan Deduction Link, Flexibility, and Repayment Schedule -->
     <record id="hr_salary_attachment_view_form_farm_inherit" model="ir.ui.view">
         <field name="name">hr.salary.attachment.form.farm.inherit</field>
         <field name="model">hr.salary.attachment</field>
         <field name="inherit_id" ref="hr_payroll.hr_salary_attachment_view_form"/>
         <field name="arch" type="xml">
+            <!-- Header buttons for flexible adjustment -->
+            <xpath expr="//header" position="inside">
+                <button name="action_adjust_schedule" string="Adjust / Skip Repayment" type="object" class="btn-primary"
+                        invisible="state != 'open' or not has_total_amount"/>
+                <button name="action_generate_schedule" string="Recalculate Schedule" type="object" class="btn-secondary"
+                        invisible="state != 'open' or not has_total_amount"/>
+            </xpath>
+
+            <!-- Hide confusing standard Type (Attachment of Salary, Assignment of Salary, Child Support) -->
+            <xpath expr="//field[@name='other_input_type_id']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
+            <!-- Replace with clear Loan / Deduction Type link -->
             <xpath expr="//field[@name='other_input_type_id']" position="after">
-                <field name="loan_deduction_type" widget="selection" readonly="has_done_payslip"/>
+                <field name="loan_deduction_type" string="Deduction / Loan Type" widget="selection" readonly="has_done_payslip"/>
                 <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" role="status" invisible="not loan_deduction_type or loan_deduction_type == 'other'">
                     <i class="fa fa-link me-2 fs-5 text-primary" title="Connected Loan Link"/>
                     <div>
-                        <strong>Connected to Contract Loan Deduction:</strong>
+                        <strong>Connected to Contract Deduction:</strong>
                         Monthly installment automatically synchronizes with the employee's contract deduction and tracks loan repayment without double-deducting on the payslip.
                     </div>
                 </div>
+            </xpath>
+
+            <!-- Add Repayment Schedule & Flexibility Notebook Page -->
+            <xpath expr="//group[1]" position="after">
+                <field name="has_schedule" invisible="1"/>
+                <notebook invisible="not has_total_amount">
+                    <page string="Repayment Schedule" name="repayment_schedule">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="text-muted small">
+                                Installment schedule for flexible repayment. Click <strong>Adjust / Skip</strong> to defer or modify an installment.
+                            </div>
+                            <div>
+                                <button name="action_adjust_schedule" string="Adjust This Month" type="object"
+                                        class="btn btn-sm btn-outline-primary me-2" icon="fa-sliders"/>
+                                <button name="action_generate_schedule" string="Recalculate Schedule" type="object"
+                                        class="btn btn-sm btn-outline-secondary" icon="fa-refresh"
+                                        confirm="This will reset and regenerate all unpaid installments. Paid installments will be preserved. Continue?"/>
+                            </div>
+                        </div>
+                        <field name="schedule_line_ids" readonly="1">
+                            <list decoration-muted="state == 'paid'" decoration-warning="state == 'skipped'" decoration-primary="is_current_month and state == 'scheduled'">
+                                <field name="sequence" widget="handle"/>
+                                <field name="date"/>
+                                <field name="amount" widget="monetary"/>
+                                <field name="currency_id" column_invisible="True"/>
+                                <field name="is_current_month" column_invisible="True"/>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'paid'"
+                                       decoration-warning="state == 'skipped'"
+                                       decoration-info="state == 'scheduled'"/>
+                                <field name="payslip_id" optional="show"/>
+                                <field name="notes"/>
+                                <button name="action_adjust_this_line" string="Adjust" type="object"
+                                        icon="fa-sliders" class="btn btn-sm btn-link"
+                                        invisible="state != 'scheduled'"/>
+                            </list>
+                        </field>
+                    </page>
+                </notebook>
             </xpath>
         </field>
     </record>
@@ -25,11 +78,16 @@
         <field name="model">hr.salary.attachment</field>
         <field name="inherit_id" ref="hr_payroll.hr_salary_attachment_view_tree"/>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='other_input_type_id']" position="attributes">
+                <attribute name="optional">hide</attribute>
+            </xpath>
             <xpath expr="//field[@name='other_input_type_id']" position="after">
-                <field name="loan_deduction_type" widget="badge" optional="show"
+                <field name="loan_deduction_type" string="Deduction Type" widget="badge" optional="show"
+                       decoration-success="loan_deduction_type == 'cost_sharing'"
                        decoration-info="loan_deduction_type in ('dashen_credit', 'awash_credit')"
                        decoration-warning="loan_deduction_type == 'credit_assoc_loan'"
                        decoration-primary="loan_deduction_type in ('advance', 'pre_payment')"/>
+                <field name="current_month_installment" string="Current Month Due" widget="monetary" optional="show"/>
             </xpath>
         </field>
     </record>

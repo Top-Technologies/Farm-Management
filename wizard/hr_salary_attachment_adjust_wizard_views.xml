@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Streamlined Native Odoo Salary Attachment Schedule Adjustment Wizard -->
+    <record id="view_hr_salary_attachment_adjust_wizard_form" model="ir.ui.view">
+        <field name="name">hr.salary.attachment.adjust.wizard.form</field>
+        <field name="model">hr.salary.attachment.adjust.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Adjust Loan Repayment">
+                <sheet>
+                    <field name="attachment_id" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+
+                    <!-- Clean Header Banner showing target month and amount -->
+                    <div class="mb-3 pb-2 border-bottom">
+                        <span class="text-muted">Adjusting Installment: </span>
+                        <strong class="fs-5 text-dark"><field name="month_display" class="oe_inline"/></strong>
+                        <span class="text-muted ms-2">Current Due: </span>
+                        <strong class="fs-5 text-primary"><field name="current_amount" class="oe_inline" widget="monetary"/></strong>
+                    </div>
+
+                    <group>
+                        <group string="Action">
+                            <field name="action_type" widget="radio" nolabel="1"/>
+                            <field name="new_amount" string="New Amount" widget="monetary"
+                                   invisible="action_type == 'skip'" required="action_type == 'reduce'"/>
+                        </group>
+                        <group string="Unpaid Balance Option">
+                            <field name="redistribute_method" widget="radio" nolabel="1"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <field name="reason" placeholder="e.g. Employee financial difficulty, personal emergency..."/>
+                    </group>
+
+                    <!-- Optional toggle to change month if needed, hidden by default -->
+                    <div class="mt-2 text-muted small">
+                        <field name="change_month"/>
+                        <label for="change_month" class="oe_inline ms-1"/>
+                    </div>
+                    <group invisible="not change_month">
+                        <field name="schedule_line_id" options="{'no_create': True, 'no_open': True}"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Confirm Adjustment" name="action_apply" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

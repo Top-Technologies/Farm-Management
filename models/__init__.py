@@ -16,9 +16,9 @@ from . import salary_matrix
 from . import family_member
 from . import hr_contract
 from . import hr_salary_attachment
+from . import hr_salary_attachment_schedule
 from . import hr_payroll_structure_copy_rules
 from . import hr_department
 from . import approval_location
 from . import approval_request
 from . import appraisal_survey
-
