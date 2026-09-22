@@ -219,12 +219,34 @@ class HrPayslipRun(models.Model):
 
         # Filter by structure_id if specified on batch
         if self.structure_id:
-            eligible_employees = eligible_employees.filtered(
-                lambda e: e.contract_id and (
-                    e.contract_id.struct_id == self.structure_id or 
-                    e.contract_id.structure_type_id.default_struct_id == self.structure_id
-                )
-            )
+            def _emp_matches_structure(emp, target_struct):
+                contract = emp.contract_id
+                if contract and contract.structure_type_id:
+                    st = contract.structure_type_id
+                    if st.default_struct_id == target_struct or target_struct in st.struct_ids:
+                        return True
+                emp_struct = False
+                if emp.farm_employee_type == 'temporary':
+                    emp_struct = (
+                        self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False) or
+                        self.env.ref('Farm-Management.structure_farm_temporary', raise_if_not_found=False) or
+                        self.env.ref('Farm_Management.structure_farm_temporary', raise_if_not_found=False)
+                    )
+                elif emp.farm_employee_type == 'zemach':
+                    emp_struct = (
+                        self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False) or
+                        self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
+                        self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
+                    )
+                elif emp.farm_employee_type in ('permanent', 'head_office'):
+                    emp_struct = (
+                        self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
+                        self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or
+                        self.env.ref('Farm_Management.structure_farm_permanent', raise_if_not_found=False)
+                    )
+                return emp_struct == target_struct
+
+            eligible_employees = eligible_employees.filtered(lambda e: _emp_matches_structure(e, self.structure_id))
 
         if not eligible_employees:
             worker_label = dict(self._fields['worker_type'].selection).get(self.worker_type, self.worker_type)
@@ -268,8 +290,8 @@ class HrPayslipRun(models.Model):
                         self.env.ref('Farm_Management.structure_farm_permanent', raise_if_not_found=False)
                     )
 
-                if not struct and contract:
-                    struct = contract.structure_type_id.default_struct_id or contract.struct_id
+                if not struct and contract and contract.structure_type_id:
+                    struct = contract.structure_type_id.default_struct_id
 
             slip_name = _('Payslip - %s - %s', emp.name, self.name or '')
             vals = {

@@ -67,14 +67,38 @@ class HrPayslipEmployees(models.TransientModel):
 
         employees = self.env['hr.employee'].search(domain)
         if self.structure_id:
-            employees = employees.filtered(
-                lambda e: e.contract_id and (
-                    e.contract_id.struct_id == self.structure_id or
-                    e.contract_id.structure_type_id.default_struct_id == self.structure_id
-                )
-            )
+            employees = self._filter_employees_by_structure(employees, self.structure_id)
 
         self.employee_ids = [(6, 0, employees.ids)]
+
+    def _filter_employees_by_structure(self, employees, target_struct):
+        def _emp_matches(emp):
+            contract = emp.contract_id
+            if contract and contract.structure_type_id:
+                st = contract.structure_type_id
+                if st.default_struct_id == target_struct or target_struct in st.struct_ids:
+                    return True
+            emp_struct = False
+            if emp.farm_employee_type == 'temporary':
+                emp_struct = (
+                    self.env.ref('farm_management.structure_farm_temporary', raise_if_not_found=False) or
+                    self.env.ref('Farm-Management.structure_farm_temporary', raise_if_not_found=False) or
+                    self.env.ref('Farm_Management.structure_farm_temporary', raise_if_not_found=False)
+                )
+            elif emp.farm_employee_type == 'zemach':
+                emp_struct = (
+                    self.env.ref('farm_management.structure_farm_zemach', raise_if_not_found=False) or
+                    self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
+                    self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
+                )
+            elif emp.farm_employee_type in ('permanent', 'head_office'):
+                emp_struct = (
+                    self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
+                    self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or
+                    self.env.ref('Farm_Management.structure_farm_permanent', raise_if_not_found=False)
+                )
+            return emp_struct == target_struct
+        return employees.filtered(_emp_matches)
 
     @api.model
     def default_get(self, fields_list):
@@ -103,12 +127,7 @@ class HrPayslipEmployees(models.TransientModel):
 
                 employees = self.env['hr.employee'].search(emp_domain)
                 if batch.structure_id:
-                    employees = employees.filtered(
-                        lambda e: e.contract_id and (
-                            e.contract_id.struct_id == batch.structure_id or
-                            e.contract_id.structure_type_id.default_struct_id == batch.structure_id
-                        )
-                    )
+                    employees = self._filter_employees_by_structure(employees, batch.structure_id)
 
                 if batch.date_start and batch.date_end and batch.worker_type in ('temporary', 'zemach'):
                     we_domain = [
