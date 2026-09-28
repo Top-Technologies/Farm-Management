@@ -16,8 +16,8 @@
                 <field name="uom_name" string="Unit"/>
                 <field name="standard_hours" optional="show"/>
                 <field name="required_cost" optional="show"/>
-                <field name="requires_labor" widget="boolean_toggle" optional="hide"/>
-                <field name="requires_machine" widget="boolean_toggle" optional="hide"/>
+                <field name="requires_labor" widget="boolean_toggle" string="Requires Labor?" optional="show"/>
+                <field name="requires_machine" widget="boolean_toggle" string="Requires Machine?" optional="show"/>
                 <field name="farm_norm_count" string="Configured Farms"/>
                 <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active" widget="boolean_toggle"/>
@@ -44,6 +44,20 @@
                             <label for="code" class="me-2 text-muted" string="Activity ID:"/>
                             <field name="code" placeholder="e.g. SP, CULT, HARV (auto-generated if empty)" style="max-width: 250px; font-weight: bold;"/>
                         </div>
+                        <div class="d-flex gap-2 mt-2">
+                            <span class="badge rounded-pill text-bg-info px-2 py-1" invisible="not requires_labor">
+                                <i class="fa fa-users me-1"/>Requires Labor
+                            </span>
+                            <span class="badge rounded-pill text-bg-secondary px-2 py-1" invisible="requires_labor">
+                                <i class="fa fa-ban me-1"/>No Labor Required
+                            </span>
+                            <span class="badge rounded-pill text-bg-warning px-2 py-1" invisible="not requires_machine">
+                                <i class="fa fa-cogs me-1"/>Requires Machine
+                            </span>
+                            <span class="badge rounded-pill text-bg-secondary px-2 py-1" invisible="requires_machine">
+                                <i class="fa fa-hand-paper-o me-1"/>Manual Only
+                            </span>
+                        </div>
                     </div>
                     <group>
                         <group name="general_specs" string="Activity Specifications">
@@ -59,10 +73,8 @@
                             <field name="sub_activity" placeholder="e.g. Desuckering, Pruning"/>
                             <field name="standard_hours"/>
                             <field name="required_cost"/>
-                            <div class="d-flex gap-4 mt-2">
-                                <field name="requires_labor"/>
-                                <field name="requires_machine"/>
-                            </div>
+                            <field name="requires_labor" widget="boolean_toggle" string="Requires Labor?"/>
+                            <field name="requires_machine" widget="boolean_toggle" string="Requires Machine?"/>
                         </group>
                     </group>
                     <notebook>
@@ -98,6 +110,8 @@
                 <field name="uom_name"/>
                 <field name="farm_norm_count"/>
                 <field name="color"/>
+                <field name="requires_labor"/>
+                <field name="requires_machine"/>
                 <templates>
                     <t t-name="card">
                         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -111,8 +125,16 @@
                                 <field name="type" widget="badge" decoration-info="type == 'piece_rate'" decoration-success="type == 'fixed'"/>
                             </div>
                         </div>
-                        <div class="text-muted small mb-2">
+                        <div class="text-muted small mb-1">
                             <i class="fa fa-tachometer me-1" title="Unit"/> Unit: <span class="fw-medium text-dark"><field name="uom_name"/></span>
+                        </div>
+                        <div class="d-flex gap-1 mb-2">
+                            <span t-if="record.requires_labor.raw_value" class="badge text-bg-info">
+                                <i class="fa fa-users me-1"/>Requires Labor
+                            </span>
+                            <span t-if="record.requires_machine.raw_value" class="badge text-bg-warning">
+                                <i class="fa fa-cogs me-1"/>Requires Machine
+                            </span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
                             <span class="badge rounded-pill text-bg-light border">

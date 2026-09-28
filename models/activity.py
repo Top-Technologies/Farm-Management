@@ -49,8 +49,8 @@ class FarmActivity(models.Model):
     standard_hours = fields.Float(string='Standard Hours', digits=(16, 2), tracking=True, help='Standard labor/machine hours required')
     required_cost = fields.Float(string='Required Amount / Cost', digits=(16, 2), tracking=True, help='Standard required cost/budget for this activity')
     activity_type = fields.Char(string='Activity Type / Mode', tracking=True, help='e.g. Regular, Contract, Special')
-    requires_labor = fields.Boolean(string='Requires Labor', default=True, tracking=True)
-    requires_machine = fields.Boolean(string='Requires Machine', default=False, tracking=True)
+    requires_labor = fields.Boolean(string='Requires Labor?', default=True, tracking=True)
+    requires_machine = fields.Boolean(string='Requires Machine?', default=False, tracking=True)
 
     uom_name = fields.Char(
         string='Unit of Measure',
