@@ -419,16 +419,85 @@ class FmsRestController(http.Controller):
             "norms": norms
         }
 
+    def _parse_payload(self, kwargs):
+        """Helper to parse request payload from JSON body and merge with query params."""
+        payload = {}
+        if request.httprequest.data:
+            try:
+                raw_body = request.httprequest.data.decode('utf-8')
+                if raw_body.strip():
+                    payload = json.loads(raw_body)
+            except Exception:
+                pass
+        if not isinstance(payload, dict):
+            payload = {}
+        for k, v in kwargs.items():
+            if k not in payload:
+                payload[k] = v
+        return payload
+
+    def _find_activity(self, identifier=None, payload=None, kwargs=None):
+        """Resolves a farm.activity record by code, database ID, or name."""
+        payload = payload or {}
+        kwargs = kwargs or {}
+        target = (
+            identifier
+            or payload.get('code')
+            or payload.get('activity_code')
+            or payload.get('id')
+            or payload.get('activity_id')
+            or kwargs.get('code')
+            or kwargs.get('activity_code')
+            or kwargs.get('id')
+            or kwargs.get('activity_id')
+        )
+        if not target:
+            return None
+
+        target_str = str(target).strip()
+        act = request.env['farm.activity'].sudo().search([('code', '=ilike', target_str)], limit=1)
+        if act:
+            return act
+
+        if target_str.isdigit():
+            try:
+                act = request.env['farm.activity'].sudo().browse(int(target_str)).exists()
+                if act:
+                    return act
+            except Exception:
+                pass
+
+        act = request.env['farm.activity'].sudo().search([('name', '=ilike', target_str)], limit=1)
+        return act or None
+
+    def _resolve_farm(self, norm_item):
+        """Resolves a farm record by id, code, or name."""
+        farm = None
+        farm_id = norm_item.get('farm_id')
+        farm_code = norm_item.get('farm_code')
+        farm_name = norm_item.get('farm_name') or norm_item.get('farm')
+
+        if farm_id:
+            try:
+                farm = request.env['farm.farm'].sudo().browse(int(farm_id)).exists()
+            except (ValueError, TypeError):
+                pass
+        if not farm and farm_code:
+            farm = request.env['farm.farm'].sudo().search([('code', '=ilike', str(farm_code).strip())], limit=1)
+        if not farm and farm_name:
+            farm = request.env['farm.farm'].sudo().search([('name', '=ilike', str(farm_name).strip())], limit=1)
+        return farm
+
     # -------------------------------------------------------------------------
     # READ: GET /api/fms/activities & GET /api/activities
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/fms/activities/<activity_identifier>',
+        '/api/activities/<activity_identifier>',
         '/api/fms/activities',
         '/api/activities',
-        '/api/fms/activities/<int:activity_id>',
-        '/api/activities/<int:activity_id>',
     ], type='http', auth='public', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
-    def get_activities(self, activity_id=None, farm_code=None, **kwargs):
+    def get_activities(self, activity_identifier=None, farm_code=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -440,29 +509,19 @@ class FmsRestController(http.Controller):
             }, status=401)
 
         try:
-            target_id = activity_id or kwargs.get('id') or kwargs.get('activity_id')
-            target_code = kwargs.get('code') or kwargs.get('activity_code')
-
-            if target_id or target_code:
-                activity = None
-                if target_id:
-                    try:
-                        activity = request.env['farm.activity'].sudo().browse(int(target_id)).exists()
-                    except (ValueError, TypeError):
-                        pass
-                if not activity and target_code:
-                    activity = request.env['farm.activity'].sudo().search([('code', '=ilike', str(target_code).strip())], limit=1)
-
-                if not activity:
-                    return self._json_response({
-                        "status": "error",
-                        "message": f"Activity with identifier '{target_id or target_code}' not found."
-                    }, status=404)
-
+            activity = self._find_activity(identifier=activity_identifier, kwargs=kwargs)
+            if activity:
                 return self._json_response({
                     "status": "success",
                     "data": self._format_activity(activity, farm_code=farm_code)
                 }, status=200)
+
+            target = activity_identifier or kwargs.get('code') or kwargs.get('id')
+            if target:
+                return self._json_response({
+                    "status": "error",
+                    "message": f"Activity with code or ID '{target}' not found."
+                }, status=404)
 
             domain = []
             if 'active' in kwargs:
@@ -521,15 +580,7 @@ class FmsRestController(http.Controller):
                 "message": "Unauthorized"
             }, status=401)
 
-        payload = {}
-        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
-            try:
-                raw_body = request.httprequest.data.decode('utf-8')
-                payload = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                return self._json_response({"status": "error", "message": "Invalid JSON payload."}, status=400)
-        else:
-            payload = kwargs
+        payload = self._parse_payload(kwargs)
 
         name = payload.get('name')
         if not name or not str(name).strip():
@@ -597,14 +648,7 @@ class FmsRestController(http.Controller):
                 for norm_item in norms_payload:
                     if not isinstance(norm_item, dict):
                         continue
-                    farm = None
-                    farm_id = norm_item.get('farm_id')
-                    farm_code = norm_item.get('farm_code')
-                    if farm_id:
-                        farm = request.env['farm.farm'].sudo().browse(int(farm_id)).exists()
-                    elif farm_code:
-                        farm = request.env['farm.farm'].sudo().search([('code', '=ilike', str(farm_code).strip())], limit=1)
-
+                    farm = self._resolve_farm(norm_item)
                     if farm:
                         norm_val = norm_item.get('norm_value', norm_item.get('value', 0.0))
                         try:
@@ -636,15 +680,15 @@ class FmsRestController(http.Controller):
             return self._json_response({"status": "error", "message": f"Failed to create activity: {str(e)}"}, status=500)
 
     # -------------------------------------------------------------------------
-    # UPDATE: PUT & PATCH /api/fms/activities & /api/activities
+    # UPDATE: PUT & PATCH /api/fms/activities/<code_or_id> or /api/fms/activities
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/fms/activities/<activity_identifier>',
+        '/api/activities/<activity_identifier>',
         '/api/fms/activities',
         '/api/activities',
-        '/api/fms/activities/<int:activity_id>',
-        '/api/activities/<int:activity_id>',
-    ], type='http', auth='public', methods=['PUT', 'PATCH', 'OPTIONS'], csrf=False, cors='*')
-    def update_activity(self, activity_id=None, **kwargs):
+    ], type='http', auth='public', methods=['PUT', 'PATCH', 'POST', 'OPTIONS'], csrf=False, cors='*')
+    def update_activity(self, activity_identifier=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -655,32 +699,14 @@ class FmsRestController(http.Controller):
                 "message": "Unauthorized"
             }, status=401)
 
-        payload = {}
-        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
-            try:
-                raw_body = request.httprequest.data.decode('utf-8')
-                payload = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                return self._json_response({"status": "error", "message": "Invalid JSON payload."}, status=400)
-        else:
-            payload = kwargs
+        payload = self._parse_payload(kwargs)
 
-        target_id = activity_id or payload.get('id') or payload.get('activity_id') or kwargs.get('id')
-        target_code = payload.get('code') or kwargs.get('code')
-
-        activity = None
-        if target_id:
-            try:
-                activity = request.env['farm.activity'].sudo().browse(int(target_id)).exists()
-            except (ValueError, TypeError):
-                pass
-        if not activity and target_code:
-            activity = request.env['farm.activity'].sudo().search([('code', '=ilike', str(target_code).strip())], limit=1)
-
+        activity = self._find_activity(identifier=activity_identifier, payload=payload, kwargs=kwargs)
         if not activity:
+            target = activity_identifier or payload.get('code') or payload.get('id') or kwargs.get('code') or kwargs.get('id')
             return self._json_response({
                 "status": "error",
-                "message": f"Activity not found with identifier '{target_id or target_code}'."
+                "message": f"Activity not found with code or ID '{target}'."
             }, status=404)
 
         try:
@@ -688,7 +714,7 @@ class FmsRestController(http.Controller):
             if 'name' in payload and payload['name']:
                 vals['name'] = str(payload['name']).strip()
 
-            new_code = payload.get('new_code') or (payload.get('code') if target_id and payload.get('code') != activity.code else None)
+            new_code = payload.get('new_code') or (payload.get('code') if payload.get('code') and payload.get('code') != activity.code else None)
             if new_code and new_code != activity.code:
                 existing = request.env['farm.activity'].sudo().search([('code', '=ilike', str(new_code).strip()), ('id', '!=', activity.id)], limit=1)
                 if existing:
@@ -742,14 +768,7 @@ class FmsRestController(http.Controller):
                 for norm_item in norms_payload:
                     if not isinstance(norm_item, dict):
                         continue
-                    farm = None
-                    farm_id = norm_item.get('farm_id')
-                    farm_code = norm_item.get('farm_code')
-                    if farm_id:
-                        farm = request.env['farm.farm'].sudo().browse(int(farm_id)).exists()
-                    elif farm_code:
-                        farm = request.env['farm.farm'].sudo().search([('code', '=ilike', str(farm_code).strip())], limit=1)
-
+                    farm = self._resolve_farm(norm_item)
                     if farm:
                         norm_val = norm_item.get('norm_value', norm_item.get('value', 0.0))
                         try:
@@ -782,15 +801,15 @@ class FmsRestController(http.Controller):
             return self._json_response({"status": "error", "message": f"Failed to update activity: {str(e)}"}, status=500)
 
     # -------------------------------------------------------------------------
-    # DELETE: DELETE /api/fms/activities & /api/activities
+    # DELETE: DELETE /api/fms/activities/<code_or_id> or /api/fms/activities
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/fms/activities/<activity_identifier>',
+        '/api/activities/<activity_identifier>',
         '/api/fms/activities',
         '/api/activities',
-        '/api/fms/activities/<int:activity_id>',
-        '/api/activities/<int:activity_id>',
     ], type='http', auth='public', methods=['DELETE', 'OPTIONS'], csrf=False, cors='*')
-    def delete_activity(self, activity_id=None, **kwargs):
+    def delete_activity(self, activity_identifier=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -801,32 +820,14 @@ class FmsRestController(http.Controller):
                 "message": "Unauthorized"
             }, status=401)
 
-        payload = {}
-        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
-            try:
-                raw_body = request.httprequest.data.decode('utf-8')
-                payload = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                payload = {}
-        else:
-            payload = kwargs
+        payload = self._parse_payload(kwargs)
 
-        target_id = activity_id or payload.get('id') or payload.get('activity_id') or kwargs.get('id')
-        target_code = payload.get('code') or kwargs.get('code')
-
-        activity = None
-        if target_id:
-            try:
-                activity = request.env['farm.activity'].sudo().browse(int(target_id)).exists()
-            except (ValueError, TypeError):
-                pass
-        if not activity and target_code:
-            activity = request.env['farm.activity'].sudo().search([('code', '=ilike', str(target_code).strip())], limit=1)
-
+        activity = self._find_activity(identifier=activity_identifier, payload=payload, kwargs=kwargs)
         if not activity:
+            target = activity_identifier or payload.get('code') or payload.get('id') or kwargs.get('code') or kwargs.get('id')
             return self._json_response({
                 "status": "error",
-                "message": f"Activity not found with identifier '{target_id or target_code}'."
+                "message": f"Activity not found with code or ID '{target}'."
             }, status=404)
 
         try:

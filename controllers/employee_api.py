@@ -474,20 +474,92 @@ class EmployeeAPI(http.Controller):
             "norms": norms
         }
 
+    def _parse_payload(self, kwargs):
+        """Helper to parse request payload from JSON body and merge with query params."""
+        payload = {}
+        if request.httprequest.data:
+            try:
+                raw_body = request.httprequest.data.decode('utf-8')
+                if raw_body.strip():
+                    payload = json.loads(raw_body)
+            except Exception:
+                pass
+        if not isinstance(payload, dict):
+            payload = {}
+        for k, v in kwargs.items():
+            if k not in payload:
+                payload[k] = v
+        return payload
+
+    def _find_activity(self, env, identifier=None, payload=None, kwargs=None):
+        """Resolves a farm.activity record by code, database ID, or name."""
+        payload = payload or {}
+        kwargs = kwargs or {}
+        target = (
+            identifier
+            or payload.get('code')
+            or payload.get('activity_code')
+            or payload.get('id')
+            or payload.get('activity_id')
+            or kwargs.get('code')
+            or kwargs.get('activity_code')
+            or kwargs.get('id')
+            or kwargs.get('activity_id')
+        )
+        if not target:
+            return None
+
+        target_str = str(target).strip()
+        # 1. Search by Activity Code (case-insensitive)
+        act = env['farm.activity'].search([('code', '=ilike', target_str)], limit=1)
+        if act:
+            return act
+
+        # 2. Search by Database ID if numeric
+        if target_str.isdigit():
+            try:
+                act = env['farm.activity'].browse(int(target_str)).exists()
+                if act:
+                    return act
+            except Exception:
+                pass
+
+        # 3. Search by Activity Name (case-insensitive)
+        act = env['farm.activity'].search([('name', '=ilike', target_str)], limit=1)
+        return act or None
+
+    def _resolve_farm(self, env, norm_item):
+        """Resolves a farm record by id, code, or name."""
+        farm = None
+        farm_id = norm_item.get('farm_id')
+        farm_code = norm_item.get('farm_code')
+        farm_name = norm_item.get('farm_name') or norm_item.get('farm')
+
+        if farm_id:
+            try:
+                farm = env['farm.farm'].browse(int(farm_id)).exists()
+            except (ValueError, TypeError):
+                pass
+        if not farm and farm_code:
+            farm = env['farm.farm'].search([('code', '=ilike', str(farm_code).strip())], limit=1)
+        if not farm and farm_name:
+            farm = env['farm.farm'].search([('name', '=ilike', str(farm_name).strip())], limit=1)
+        return farm
+
     # -------------------------------------------------------------------------
-    # READ: GET /api/activities & /odoo/api/activities & /api/fms/activities
+    # READ: GET /api/activities & /api/activities/<code_or_id>
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/activities/<activity_identifier>',
+        '/odoo/api/activities/<activity_identifier>',
+        '/api/fms/activities/<activity_identifier>',
+        '/odoo/api/fms/activities/<activity_identifier>',
         '/api/activities',
         '/odoo/api/activities',
         '/api/fms/activities',
         '/odoo/api/fms/activities',
-        '/api/activities/<int:activity_id>',
-        '/odoo/api/activities/<int:activity_id>',
-        '/api/fms/activities/<int:activity_id>',
-        '/odoo/api/fms/activities/<int:activity_id>',
     ], type='http', auth='none', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
-    def get_activities(self, activity_id=None, farm_code=None, **kwargs):
+    def get_activities(self, activity_identifier=None, farm_code=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -496,33 +568,24 @@ class EmployeeAPI(http.Controller):
             return self._json_response({"status": "error", "message": "Database not found."}, status=500)
 
         try:
-            # Check if a single activity is requested
-            target_id = activity_id or kwargs.get('id') or kwargs.get('activity_id')
-            target_code = kwargs.get('code') or kwargs.get('activity_code')
-
-            if target_id or target_code:
-                activity = None
-                if target_id:
-                    try:
-                        activity = env['farm.activity'].browse(int(target_id)).exists()
-                    except (ValueError, TypeError):
-                        pass
-                if not activity and target_code:
-                    activity = env['farm.activity'].search([('code', '=ilike', str(target_code).strip())], limit=1)
-
-                if not activity:
-                    return self._json_response({
-                        "status": "error",
-                        "message": f"Activity with identifier '{target_id or target_code}' not found."
-                    }, status=404)
-
+            # Check if a single activity is requested by code, ID, or query parameter
+            activity = self._find_activity(env, identifier=activity_identifier, kwargs=kwargs)
+            if activity:
                 return self._json_response({
                     "status": "success",
                     "database": db_name,
                     "data": self._format_activity(activity, farm_code=farm_code)
                 }, status=200)
 
-            # List activities with optional filters
+            # If an explicit identifier was given but not found
+            target = activity_identifier or kwargs.get('code') or kwargs.get('id')
+            if target:
+                return self._json_response({
+                    "status": "error",
+                    "message": f"Activity with code or ID '{target}' not found."
+                }, status=404)
+
+            # Otherwise, list activities with optional filters
             domain = []
             if 'active' in kwargs:
                 val = str(kwargs['active']).lower() in ('1', 'true', 'yes')
@@ -569,7 +632,7 @@ class EmployeeAPI(http.Controller):
                 cr.close()
 
     # -------------------------------------------------------------------------
-    # CREATE: POST /api/activities & /odoo/api/activities & /api/fms/activities
+    # CREATE: POST /api/activities
     # -------------------------------------------------------------------------
     @http.route([
         '/api/activities',
@@ -585,16 +648,7 @@ class EmployeeAPI(http.Controller):
         if not env:
             return self._json_response({"status": "error", "message": "Database not found."}, status=500)
 
-        payload = {}
-        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
-            try:
-                raw_body = request.httprequest.data.decode('utf-8')
-                payload = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                if cr: cr.close()
-                return self._json_response({"status": "error", "message": "Invalid JSON payload."}, status=400)
-        else:
-            payload = kwargs
+        payload = self._parse_payload(kwargs)
 
         name = payload.get('name')
         if not name or not str(name).strip():
@@ -605,9 +659,7 @@ class EmployeeAPI(http.Controller):
             }, status=400)
 
         try:
-            vals = {
-                'name': str(name).strip(),
-            }
+            vals = {'name': str(name).strip()}
 
             # Activity Code
             code = payload.get('code')
@@ -636,11 +688,8 @@ class EmployeeAPI(http.Controller):
             # Category
             category = payload.get('category')
             valid_categories = ('land_prep', 'planting', 'crop_care', 'irrigation', 'harvest', 'maintenance')
-            if category:
-                if category in valid_categories:
-                    vals['category'] = category
-                else:
-                    _logger.warning("Unknown category '%s', skipping assignment.", category)
+            if category and category in valid_categories:
+                vals['category'] = category
 
             # Booleans
             if 'requires_labor' in payload:
@@ -677,14 +726,7 @@ class EmployeeAPI(http.Controller):
                 for norm_item in norms_payload:
                     if not isinstance(norm_item, dict):
                         continue
-                    farm = None
-                    farm_id = norm_item.get('farm_id')
-                    farm_code = norm_item.get('farm_code')
-                    if farm_id:
-                        farm = env['farm.farm'].browse(int(farm_id)).exists()
-                    elif farm_code:
-                        farm = env['farm.farm'].search([('code', '=ilike', str(farm_code).strip())], limit=1)
-
+                    farm = self._resolve_farm(env, norm_item)
                     if farm:
                         norm_val = norm_item.get('norm_value', norm_item.get('value', 0.0))
                         try:
@@ -722,19 +764,19 @@ class EmployeeAPI(http.Controller):
                 cr.close()
 
     # -------------------------------------------------------------------------
-    # UPDATE: PUT & PATCH /api/activities & /odoo/api/activities & /api/fms/activities
+    # UPDATE: PUT & PATCH /api/activities/<code_or_id> or /api/activities
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/activities/<activity_identifier>',
+        '/odoo/api/activities/<activity_identifier>',
+        '/api/fms/activities/<activity_identifier>',
+        '/odoo/api/fms/activities/<activity_identifier>',
         '/api/activities',
         '/odoo/api/activities',
         '/api/fms/activities',
         '/odoo/api/fms/activities',
-        '/api/activities/<int:activity_id>',
-        '/odoo/api/activities/<int:activity_id>',
-        '/api/fms/activities/<int:activity_id>',
-        '/odoo/api/fms/activities/<int:activity_id>',
-    ], type='http', auth='none', methods=['PUT', 'PATCH', 'OPTIONS'], csrf=False, cors='*')
-    def update_activity(self, activity_id=None, **kwargs):
+    ], type='http', auth='none', methods=['PUT', 'PATCH', 'POST', 'OPTIONS'], csrf=False, cors='*')
+    def update_activity(self, activity_identifier=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -742,34 +784,15 @@ class EmployeeAPI(http.Controller):
         if not env:
             return self._json_response({"status": "error", "message": "Database not found."}, status=500)
 
-        payload = {}
-        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
-            try:
-                raw_body = request.httprequest.data.decode('utf-8')
-                payload = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                if cr: cr.close()
-                return self._json_response({"status": "error", "message": "Invalid JSON payload."}, status=400)
-        else:
-            payload = kwargs
+        payload = self._parse_payload(kwargs)
 
-        target_id = activity_id or payload.get('id') or payload.get('activity_id') or kwargs.get('id')
-        target_code = payload.get('code') or kwargs.get('code')
-
-        activity = None
-        if target_id:
-            try:
-                activity = env['farm.activity'].browse(int(target_id)).exists()
-            except (ValueError, TypeError):
-                pass
-        if not activity and target_code:
-            activity = env['farm.activity'].search([('code', '=ilike', str(target_code).strip())], limit=1)
-
+        activity = self._find_activity(env, identifier=activity_identifier, payload=payload, kwargs=kwargs)
         if not activity:
+            target = activity_identifier or payload.get('code') or payload.get('id') or kwargs.get('code') or kwargs.get('id')
             if cr: cr.close()
             return self._json_response({
                 "status": "error",
-                "message": f"Activity not found with identifier '{target_id or target_code}'."
+                "message": f"Activity not found with code or ID '{target}'."
             }, status=404)
 
         try:
@@ -777,7 +800,7 @@ class EmployeeAPI(http.Controller):
             if 'name' in payload and payload['name']:
                 vals['name'] = str(payload['name']).strip()
 
-            new_code = payload.get('new_code') or (payload.get('code') if target_id and payload.get('code') != activity.code else None)
+            new_code = payload.get('new_code') or (payload.get('code') if payload.get('code') and payload.get('code') != activity.code else None)
             if new_code and new_code != activity.code:
                 existing = env['farm.activity'].search([('code', '=ilike', str(new_code).strip()), ('id', '!=', activity.id)], limit=1)
                 if existing:
@@ -833,14 +856,7 @@ class EmployeeAPI(http.Controller):
                 for norm_item in norms_payload:
                     if not isinstance(norm_item, dict):
                         continue
-                    farm = None
-                    farm_id = norm_item.get('farm_id')
-                    farm_code = norm_item.get('farm_code')
-                    if farm_id:
-                        farm = env['farm.farm'].browse(int(farm_id)).exists()
-                    elif farm_code:
-                        farm = env['farm.farm'].search([('code', '=ilike', str(farm_code).strip())], limit=1)
-
+                    farm = self._resolve_farm(env, norm_item)
                     if farm:
                         norm_val = norm_item.get('norm_value', norm_item.get('value', 0.0))
                         try:
@@ -879,19 +895,19 @@ class EmployeeAPI(http.Controller):
                 cr.close()
 
     # -------------------------------------------------------------------------
-    # DELETE: DELETE /api/activities & /odoo/api/activities & /api/fms/activities
+    # DELETE: DELETE /api/activities/<code_or_id> or /api/activities
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/activities/<activity_identifier>',
+        '/odoo/api/activities/<activity_identifier>',
+        '/api/fms/activities/<activity_identifier>',
+        '/odoo/api/fms/activities/<activity_identifier>',
         '/api/activities',
         '/odoo/api/activities',
         '/api/fms/activities',
         '/odoo/api/fms/activities',
-        '/api/activities/<int:activity_id>',
-        '/odoo/api/activities/<int:activity_id>',
-        '/api/fms/activities/<int:activity_id>',
-        '/odoo/api/activities/<int:activity_id>',
     ], type='http', auth='none', methods=['DELETE', 'OPTIONS'], csrf=False, cors='*')
-    def delete_activity(self, activity_id=None, **kwargs):
+    def delete_activity(self, activity_identifier=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -899,33 +915,15 @@ class EmployeeAPI(http.Controller):
         if not env:
             return self._json_response({"status": "error", "message": "Database not found."}, status=500)
 
-        payload = {}
-        if request.httprequest.content_type and 'application/json' in request.httprequest.content_type:
-            try:
-                raw_body = request.httprequest.data.decode('utf-8')
-                payload = json.loads(raw_body) if raw_body else {}
-            except Exception:
-                payload = {}
-        else:
-            payload = kwargs
+        payload = self._parse_payload(kwargs)
 
-        target_id = activity_id or payload.get('id') or payload.get('activity_id') or kwargs.get('id')
-        target_code = payload.get('code') or kwargs.get('code')
-
-        activity = None
-        if target_id:
-            try:
-                activity = env['farm.activity'].browse(int(target_id)).exists()
-            except (ValueError, TypeError):
-                pass
-        if not activity and target_code:
-            activity = env['farm.activity'].search([('code', '=ilike', str(target_code).strip())], limit=1)
-
+        activity = self._find_activity(env, identifier=activity_identifier, payload=payload, kwargs=kwargs)
         if not activity:
+            target = activity_identifier or payload.get('code') or payload.get('id') or kwargs.get('code') or kwargs.get('id')
             if cr: cr.close()
             return self._json_response({
                 "status": "error",
-                "message": f"Activity not found with identifier '{target_id or target_code}'."
+                "message": f"Activity not found with code or ID '{target}'."
             }, status=404)
 
         try:
