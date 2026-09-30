@@ -253,12 +253,16 @@ result = categories['BASIC'] + categories['ALW']
             <field name="name">Pension 7% (የሰራተኛ ጡረታ 7%)</field>
             <field name="code">DED_PENSION_7</field>
             <field name="sequence">110</field>
-            <field name="condition_select">none</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(getattr(contract, 'has_pension', True))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Dynamic 7% Employee Pension deduction based on Basic Salary
-basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
-result = -round(basic * 0.07, 2)
+if not getattr(contract, 'has_pension', True):
+    result = 0.0
+else:
+    basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+    result = -round(basic * 0.07, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -269,12 +273,16 @@ result = -round(basic * 0.07, 2)
             <field name="name">Company Pension Contribution 11% (የድርጅት ጡረታ መዋጮ 11%)</field>
             <field name="code">COMP_PENSION_11</field>
             <field name="sequence">111</field>
-            <field name="condition_select">none</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(getattr(contract, 'has_pension', True))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # 11% Company Pension Contribution based on Basic Wage (Not deducted from employee net)
-basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
-result = round(basic * 0.11, 2)
+if not getattr(contract, 'has_pension', True):
+    result = 0.0
+else:
+    basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+    result = round(basic * 0.11, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -800,10 +808,10 @@ result = contract.back_pay_tax_total
             <field name="code">BACK_PAY_PENSION_7</field>
             <field name="sequence">181</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.back_pay_pension_total and contract.back_pay_pension_total > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
+            <field name="condition_python">result = bool(getattr(contract, 'has_pension', True) and contract.back_pay_pension_total and contract.back_pay_pension_total > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = contract.back_pay_pension_total
+result = contract.back_pay_pension_total if getattr(contract, 'has_pension', True) else 0.0
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
