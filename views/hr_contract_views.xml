@@ -160,7 +160,12 @@
                                 </div>
                                 <div class="card-body">
                                     <group class="mb-0">
-                                        <field name="deduction_pension"/>
+                                        <label for="deduction_pension" string="Pension 7% (የጡረታ መዋጮ)"/>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <field name="has_pension" widget="boolean_toggle" class="oe_inline"/>
+                                            <field name="deduction_pension" widget="monetary" class="oe_inline" invisible="not has_pension"/>
+                                            <span class="text-muted small" invisible="has_pension">Exempt (አይቀነስም)</span>
+                                        </div>
                                         <field name="deduction_income_tax"/>
                                         <field name="deduction_luc"/>
                                         <label for="deduction_credit_assoc_mandatory" string="Credit Association Mandatory (5%)"/>
@@ -286,6 +291,7 @@
         <field name="inherit_id" ref="hr_contract.hr_contract_view_tree"/>
         <field name="arch" type="xml">
             <field name="wage" position="after">
+                <field name="has_pension" widget="boolean_toggle" optional="hide" string="Pension Subject"/>
                 <field name="total_monthly_allowances" widget="monetary" optional="show" string="Allowances"/>
                 <field name="gross_monthly_wage" widget="monetary" optional="show" string="Gross Wage"/>
                 <field name="total_monthly_deductions" widget="monetary" optional="show" string="Total Deductions"/>
