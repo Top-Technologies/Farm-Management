@@ -251,6 +251,12 @@ class HrContract(models.Model):
     # =========================================================================
     # 1. Statutory & Mandatory Deductions
     # =========================================================================
+    has_pension = fields.Boolean(
+        string='Pension Scheme (የጡረታ ተጠቃሚ)',
+        default=True,
+        tracking=True,
+        help='Indicates whether employee is enrolled in the pension scheme. When disabled, 7% employee and 11% company pension will not be deducted.',
+    )
     deduction_pension = fields.Float(
         string='Pension 7% (የጡረታ መዋጮ)',
         compute='_compute_statutory_taxes',
@@ -661,7 +667,7 @@ class HrContract(models.Model):
         'wage',
         'gross_monthly_wage',
         # Category 1
-        'deduction_pension', 'deduction_income_tax', 'deduction_luc',
+        'has_pension', 'deduction_pension', 'deduction_income_tax', 'deduction_luc',
         'has_credit_association', 'deduction_credit_assoc_mandatory', 'deduction_credit_assoc_voluntary',
         'deduction_social_contribution',
         # Category 2
@@ -774,12 +780,15 @@ class HrContract(models.Model):
     # =========================================================================
     # Statutory Taxes Dynamic Computation
     # =========================================================================
-    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
+    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'has_pension')
     def _compute_statutory_taxes(self):
         for c in self:
             wage = c.wage or 0.0
             # 7% Employee Pension based on basic wage
-            c.deduction_pension = round(wage * 0.07, 2)
+            if c.has_pension:
+                c.deduction_pension = round(wage * 0.07, 2)
+            else:
+                c.deduction_pension = 0.0
 
             # Taxable Salary = Wage + Taxable Allowances (Transport, Hardship, Overtime)
             taxable = wage + (c.allowance_transport or 0.0) + \
@@ -812,11 +821,12 @@ class HrContract(models.Model):
     def _onchange_credit_association(self):
         self._compute_credit_association_deductions()
 
-    @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime')
+    @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'has_pension')
     def _onchange_wage_taxes_estimate(self):
         for c in self:
             c._compute_statutory_taxes()
             c._compute_credit_association_deductions()
+            c._compute_all_deductions()
 
     # =========================================================================
     # Back Pay / Retroactive Adjustment Computation & Logic
@@ -859,6 +869,7 @@ class HrContract(models.Model):
         'allowance_transport',
         'allowance_hardship',
         'allowance_overtime',
+        'has_pension',
         'total_monthly_deductions',
     )
     def _compute_back_pay(self):
@@ -871,7 +882,7 @@ class HrContract(models.Model):
             c.back_pay_new_net = regular_net
 
             # Statutory taxes on new regular salary
-            new_pension = round(wage * 0.07, 2)
+            new_pension = round(wage * 0.07, 2) if c.has_pension else 0.0
             taxable = regular_gross
             if taxable <= 2000:
                 new_tax = 0.0
@@ -1049,6 +1060,21 @@ class HrContract(models.Model):
                 vals['date_start'] = fields.Date.today()
 
         return super().create(vals_list)
+
+    def init(self):
+        super().init()
+        # Default existing contracts with NULL has_pension to True (enrolled)
+        self.env.cr.execute("""
+            DO $$ 
+            BEGIN 
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'hr_contract' AND column_name = 'has_pension'
+                ) THEN 
+                    UPDATE hr_contract SET has_pension = true WHERE has_pension IS NULL;
+                END IF; 
+            END $$;
+        """)
 
 
 
