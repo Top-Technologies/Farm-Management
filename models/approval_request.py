@@ -19,7 +19,7 @@ class ApprovalCategory(models.Model):
     def init(self):
         super().init()
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 self._setup_standard_categories()
         except Exception as e:
             _logger.warning("Could not setup standard approval categories during init: %s", str(e))
@@ -98,6 +98,10 @@ class ApprovalRequest(models.Model):
                 hq = self.env['approval.location'].search([('location_type', '=', 'head_office')], limit=1)
                 if hq:
                     return hq.id
+            elif emp.farm_employee_type == 'cpw':
+                cpw_loc = self.env['approval.location'].search(['|', ('code', '=', 'CPW'), ('name', '=ilike', 'CPW')], limit=1)
+                if cpw_loc:
+                    return cpw_loc.id
         return False
 
     @api.depends('approval_location_id', 'employee_level', 'category_id')

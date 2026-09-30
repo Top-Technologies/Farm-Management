@@ -11,6 +11,7 @@ class HrPayslipRun(models.Model):
         ('zemach', 'Seasonal / Zemach Workers (Piece Rate)'),
         ('permanent', 'Farm Staff (Standard Salary)'),
         ('head_office', 'Head Office Staff (Standard Salary)'),
+        ('cpw', 'CPW Staff (Standard Salary)'),
         ('all', 'All Workers'),
     ], string='Worker Classification', default='temporary', required=True,
        help='Select which category of workers this payroll batch is targeting.')
@@ -203,7 +204,7 @@ class HrPayslipRun(models.Model):
         elif self.worker_type == 'all':
             we_employees = unpaid_entries.mapped('employee_id')
             perm_domain = [
-                ('farm_employee_type', 'in', ('permanent', 'head_office')),
+                ('farm_employee_type', 'in', ('permanent', 'head_office', 'cpw')),
                 '|', ('company_id', '=', False), ('company_id', '=', self.company_id.id)
             ]
             if self.farm_id:
@@ -238,7 +239,7 @@ class HrPayslipRun(models.Model):
                         self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
                         self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
                     )
-                elif emp.farm_employee_type in ('permanent', 'head_office'):
+                elif emp.farm_employee_type in ('permanent', 'head_office', 'cpw'):
                     emp_struct = (
                         self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
                         self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or
@@ -283,7 +284,7 @@ class HrPayslipRun(models.Model):
                         self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
                         self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
                     )
-                elif emp.farm_employee_type in ('permanent', 'head_office'):
+                elif emp.farm_employee_type in ('permanent', 'head_office', 'cpw'):
                     struct = (
                         self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
                         self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or

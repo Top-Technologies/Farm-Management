@@ -116,7 +116,7 @@ class FarmActivity(models.Model):
     def init(self):
         super().init()
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 # 1. Ensure standard Fixed Activity 'DAILY' exists
                 self.env.cr.execute("SELECT id FROM farm_activity WHERE code = 'DAILY' LIMIT 1;")
                 row = self.env.cr.fetchone()

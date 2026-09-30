@@ -17,6 +17,7 @@ class HrEmployee(models.Model):
         ('permanent', 'Farm (የእርሻ)'),
         ('temporary', 'Temporary (ጊዜያዊ)'),
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
+        ('cpw', 'CPW'),
     ], string='Employee Classification', default='temporary', required=True, tracking=True)
 
     # Employment Term: Contract vs Permanent (Applicable for Head Office and Farm employees)
@@ -193,14 +194,14 @@ class HrEmployee(models.Model):
     def init(self):
         super().init()
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 self.env.cr.execute("""
                     UPDATE hr_employee 
                     SET has_medical_certificate = true 
                     WHERE has_medical_certificate IS NULL;
                     UPDATE hr_employee
                     SET employment_term = 'permanent'
-                    WHERE farm_employee_type IN ('head_office', 'permanent') AND employment_term IS NULL;
+                    WHERE farm_employee_type IN ('head_office', 'permanent', 'cpw') AND employment_term IS NULL;
                 """)
         except Exception as e:
             _logger.warning("HrEmployee.init() warning: %s", e)
@@ -388,20 +389,20 @@ class HrEmployee(models.Model):
 
     @api.onchange('farm_employee_type')
     def _onchange_farm_employee_type(self):
-        if self.farm_employee_type == 'head_office':
+        if self.farm_employee_type in ('head_office', 'cpw'):
             self.initial_farm_id = False
             self.initial_sub_farm_id = False
             self.initial_sub_unit_id = False
             self.initial_block_id = False
-        if self.farm_employee_type not in ('head_office', 'permanent'):
+        if self.farm_employee_type not in ('head_office', 'permanent', 'cpw'):
             self.employment_term = False
         elif not self.employment_term:
             self.employment_term = 'permanent'
         self._update_preview_id()
 
     def _update_preview_id(self):
-        if self.farm_employee_type == 'head_office':
-            new_id = self._generate_farm_employee_id(False, 'head_office')
+        if self.farm_employee_type in ('head_office', 'cpw'):
+            new_id = self._generate_farm_employee_id(False, self.farm_employee_type)
             self.fms_employee_id = new_id
             self.employee_code = new_id
             self.barcode = new_id
@@ -428,11 +429,15 @@ class HrEmployee(models.Model):
     def _generate_farm_employee_id(self, farm, emp_type, taken_codes=None):
         """Generates sequential ID:
         - Head Office Staff: HQ001, HQ002, HQ003...
+        - CPW Staff: CPW001, CPW002, CPW003...
         - Farm Employees: [FarmCode][TypeCode][SequentialNumber] e.g. FM01T0001, FM01P0001, FM01Z0001.
         Supports in-memory tracking via taken_codes for batch imports and multi-create.
         """
         if emp_type == 'head_office':
             prefix = 'HQ'
+            digits = 3
+        elif emp_type == 'cpw':
+            prefix = 'CPW'
             digits = 3
         else:
             type_map = {'permanent': 'P', 'temporary': 'T', 'zemach': 'Z'}
@@ -594,7 +599,7 @@ class HrEmployee(models.Model):
 
         # Auto-create initial transfer record & sync sub unit field workers for farm employees
         for emp in employees:
-            if emp.farm_employee_type != 'head_office':
+            if emp.farm_employee_type not in ('head_office', 'cpw'):
                 if emp.initial_farm_id and not emp.transfer_history_ids:
                     self.env['farm.employee.transfer'].create({
                         'employee_id': emp.id,
@@ -610,12 +615,12 @@ class HrEmployee(models.Model):
 
     def write(self, vals):
         if 'farm_employee_type' in vals:
-            if vals['farm_employee_type'] == 'head_office':
+            if vals['farm_employee_type'] in ('head_office', 'cpw'):
                 vals['initial_farm_id'] = False
                 vals['initial_sub_farm_id'] = False
                 vals['initial_sub_unit_id'] = False
                 vals['initial_block_id'] = False
-            if vals['farm_employee_type'] not in ('head_office', 'permanent'):
+            if vals['farm_employee_type'] not in ('head_office', 'permanent', 'cpw'):
                 vals['employment_term'] = False
             elif 'employment_term' not in vals:
                 for emp in self:
@@ -714,6 +719,16 @@ class HrEmployee(models.Model):
 
     @api.depends('work_entry_ids', 'work_entry_ids.total_amount', 'work_entry_ids.state', 'work_entry_ids.payment_status')
     def _compute_work_entry_stats(self):
+        from odoo.tools import sql
+        if not sql.table_exists(self.env.cr, 'farm_work_entry'):
+            for employee in self:
+                employee.work_entry_count = 0
+                employee.total_earned_amount = 0.0
+                employee.unpaid_work_entry_count = 0
+                employee.unpaid_work_entry_amount = 0.0
+                employee.paid_work_entry_amount = 0.0
+            return
+
         for employee in self:
             entries = employee.work_entry_ids.filtered(lambda e: e.state != 'cancelled')
             employee.work_entry_count = len(entries)
@@ -726,6 +741,12 @@ class HrEmployee(models.Model):
 
     @api.depends('transfer_history_ids', 'transfer_history_ids.moving_date', 'transfer_history_ids.transfer_date')
     def _compute_current_transfer(self):
+        from odoo.tools import sql
+        if not sql.table_exists(self.env.cr, 'farm_employee_transfer'):
+            for employee in self:
+                employee.current_transfer_id = False
+            return
+
         for employee in self:
             # Active transfer is the latest transfer where moving_date is False
             active_transfers = employee.transfer_history_ids.filtered(lambda t: not t.moving_date)
@@ -759,25 +780,32 @@ class HrEmployee(models.Model):
         'transfer_history_ids',
     )
     def _compute_farm_counts(self):
+        from odoo.tools import sql
+        has_farm = sql.table_exists(self.env.cr, 'farm_farm')
+        has_sub_farm = sql.table_exists(self.env.cr, 'farm_sub_farm')
+        has_sub_unit = sql.table_exists(self.env.cr, 'farm_sub_unit')
+        has_block = sql.table_exists(self.env.cr, 'farm_block')
+        has_transfers = sql.table_exists(self.env.cr, 'farm_employee_transfer')
+
         for employee in self:
-            farm_cnt = len(employee.managed_farm_ids)
-            sub_farm_cnt = len(employee.managed_sub_farm_ids)
-            sub_unit_cnt = len(employee.managed_sub_unit_ids)
-            super_cnt = len(employee.supervised_block_ids)
-            transfer_cnt = len(employee.transfer_history_ids)
+            farm_cnt = len(employee.managed_farm_ids) if has_farm else 0
+            sub_farm_cnt = len(employee.managed_sub_farm_ids) if has_sub_farm else 0
+            sub_unit_cnt = len(employee.managed_sub_unit_ids) if has_sub_unit else 0
+            super_cnt = len(employee.supervised_block_ids) if has_block else 0
+            transfer_cnt = len(employee.transfer_history_ids) if has_transfers else 0
 
             employee.managed_farm_count = farm_cnt
             employee.transfer_count = transfer_cnt
 
             has_fm = bool(farm_cnt or sub_farm_cnt or sub_unit_cnt)
             has_sup = bool(super_cnt)
-            has_transfers = bool(transfer_cnt)
+            has_transfers_flag = bool(transfer_cnt)
 
             employee.has_farm_management_scope = has_fm
             employee.has_block_supervision_scope = has_sup
             employee.has_management_role = has_fm or has_sup
-            employee.has_transfer_history = has_transfers
-            employee.has_any_farm_assignment = has_fm or has_sup or has_transfers
+            employee.has_transfer_history = has_transfers_flag
+            employee.has_any_farm_assignment = has_fm or has_sup or has_transfers_flag
 
     @api.depends(
         'name',
@@ -799,7 +827,16 @@ class HrEmployee(models.Model):
 
             # Classification & ID Card
             type_label = dict(self._fields['farm_employee_type'].selection).get(employee.farm_employee_type, 'Temporary')
-            badge_color = 'primary' if employee.farm_employee_type == 'permanent' else ('warning text-dark' if employee.farm_employee_type == 'temporary' else 'info')
+            if employee.farm_employee_type == 'permanent':
+                badge_color = 'primary'
+            elif employee.farm_employee_type == 'head_office':
+                badge_color = 'success'
+            elif employee.farm_employee_type == 'cpw':
+                badge_color = 'dark'
+            elif employee.farm_employee_type == 'temporary':
+                badge_color = 'warning text-dark'
+            else:
+                badge_color = 'info'
             id_str = employee.fms_employee_id or _('Unassigned')
 
             items.append(f"""
@@ -941,7 +978,7 @@ class HrEmployee(models.Model):
                 self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
                 self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
             )
-        elif self.farm_employee_type in ('permanent', 'head_office'):
+        elif self.farm_employee_type in ('permanent', 'head_office', 'cpw'):
             struct = (
                 self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
                 self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or

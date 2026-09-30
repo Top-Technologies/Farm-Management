@@ -385,7 +385,7 @@ class HrSalaryMatrixGrade(models.Model):
     def init(self):
         super().init()
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 for m_type, max_g in [('head_office', 22), ('cpw', 22), ('farm', 21)]:
                     for g in range(1, max_g + 1):
                         existing = self.search([('matrix_type', '=', m_type), ('grade', '=', g)], limit=1)

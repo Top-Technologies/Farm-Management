@@ -99,7 +99,7 @@ class ApprovalLocation(models.Model):
         """
         super().init()
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 self._ensure_default_locations()
         except Exception as e:
             _logger.warning("Could not initialize default approval locations during init: %s", str(e))

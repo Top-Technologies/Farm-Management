@@ -530,7 +530,7 @@ class FarmWorkEntry(models.Model):
         # 4. Migrate any 'approved' entries to 'confirmed' (since confirm now directly finalizes)
         # 5. Auto-fix any work entries that have 0 norm_rate or 0 total_amount by matching activity norms
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 self.env.cr.execute("""
                     UPDATE farm_work_entry
                     SET payment_status = 'unpaid',

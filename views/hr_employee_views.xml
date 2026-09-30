@@ -19,21 +19,21 @@
                         type="object"
                         class="oe_stat_button"
                         icon="fa-exchange"
-                        invisible="transfer_count == 0 or farm_employee_type == 'head_office'">
+                        invisible="transfer_count == 0 or farm_employee_type in ('head_office', 'cpw')">
                     <field name="transfer_count" widget="statinfo" string="Transfers"/>
                 </button>
                 <button name="action_view_work_entries"
                         type="object"
                         class="oe_stat_button"
                         icon="fa-tasks"
-                        invisible="work_entry_count == 0 or farm_employee_type == 'head_office'">
+                        invisible="work_entry_count == 0 or farm_employee_type in ('head_office', 'cpw')">
                     <field name="work_entry_count" widget="statinfo" string="Work Entries"/>
                 </button>
                 <button name="action_view_unpaid_work_entries"
                         type="object"
                         class="oe_stat_button"
                         icon="fa-money"
-                        invisible="unpaid_work_entry_count == 0 or farm_employee_type == 'head_office'">
+                        invisible="unpaid_work_entry_count == 0 or farm_employee_type in ('head_office', 'cpw')">
                     <field name="unpaid_work_entry_count" widget="statinfo" string="Unpaid Entries"/>
                 </button>
             </div>
@@ -49,18 +49,19 @@
                             <group>
                                 <field name="farm_employee_type" widget="radio" options="{'horizontal': false}" required="1"/>
                                 <field name="employment_term" widget="radio" options="{'horizontal': true}"
-                                       invisible="farm_employee_type not in ('head_office', 'permanent')"
-                                       required="farm_employee_type in ('head_office', 'permanent')"/>
+                                       invisible="farm_employee_type not in ('head_office', 'permanent', 'cpw')"
+                                       required="farm_employee_type in ('head_office', 'permanent', 'cpw')"/>
                                 <label for="fms_employee_id" string="Employee ID"/>
                                 <div>
                                     <field name="fms_employee_id" readonly="1" class="fw-bold fs-4 text-primary font-monospace"/>
                                     <div class="text-muted small" invisible="farm_employee_type != 'head_office'">Head Office format: <strong>HQ001, HQ002...</strong></div>
-                                    <div class="text-muted small" invisible="farm_employee_type == 'head_office'">Farm format: <strong>[FarmCode][Type: P/T/Z][SequentialNumber]</strong></div>
+                                    <div class="text-muted small" invisible="farm_employee_type != 'cpw'">CPW format: <strong>CPW001, CPW002...</strong></div>
+                                    <div class="text-muted small" invisible="farm_employee_type in ('head_office', 'cpw')">Farm format: <strong>[FarmCode][Type: P/T/Z][SequentialNumber]</strong></div>
                                 </div>
                                 <label for="birthday" string="Date of Birth (DOB)"/>
                                 <div>
                                     <div class="d-flex align-items-center gap-2">
-                                        <field name="birthday" required="1" placeholder="Select Date of Birth..." class="oe_inline me-1" style="max-width: 170px !important; min-width: 140px !important;"/>
+                                         <field name="birthday" required="1" placeholder="Select Date of Birth..." class="oe_inline me-1" style="max-width: 170px !important; min-width: 140px !important;"/>
                                         <span class="badge text-bg-success px-2 py-1 d-inline-flex align-items-center gap-1"
                                               style="white-space: nowrap !important; flex-shrink: 0 !important; font-size: 0.85rem;"
                                               invisible="not birthday or age &lt; 18">
@@ -98,11 +99,11 @@
                                 </div>
                             </group>
                         </div>
-                        <div class="col-md-6" invisible="farm_employee_type == 'head_office'">
+                        <div class="col-md-6" invisible="farm_employee_type in ('head_office', 'cpw')">
                             <group>
-                                <field name="initial_farm_id" options="{'no_create': True}" required="farm_employee_type != 'head_office'" placeholder="Select Farm..."/>
-                                <field name="initial_sub_farm_id" options="{'no_create': True}" required="farm_employee_type != 'head_office'" placeholder="Select Sub Farm..."/>
-                                <field name="initial_sub_unit_id" options="{'no_create': True}" required="farm_employee_type != 'head_office'" placeholder="Select Sub Unit..."/>
+                                <field name="initial_farm_id" options="{'no_create': True}" required="farm_employee_type not in ('head_office', 'cpw')" placeholder="Select Farm..."/>
+                                <field name="initial_sub_farm_id" options="{'no_create': True}" required="farm_employee_type not in ('head_office', 'cpw')" placeholder="Select Sub Farm..."/>
+                                <field name="initial_sub_unit_id" options="{'no_create': True}" required="farm_employee_type not in ('head_office', 'cpw')" placeholder="Select Sub Unit..."/>
                                 <field name="initial_block_id" options="{'no_create': True}" placeholder="Select Block (Optional)..."/>
                             </group>
                         </div>
@@ -112,6 +113,15 @@
                                 <div>
                                     <h6 class="mb-1 fw-bold">Head Office Staff</h6>
                                     <p class="mb-0 small text-muted">Stationed at Head Office (ዋና መ/ቤት). No agricultural farm placement or field transfer is required.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6" invisible="farm_employee_type != 'cpw'">
+                            <div class="alert alert-dark d-flex align-items-center mt-3 p-3" role="status">
+                                <i class="fa fa-industry fs-2 me-3 text-warning" title="CPW"/>
+                                <div>
+                                    <h6 class="mb-1 fw-bold">CPW Staff</h6>
+                                    <p class="mb-0 small text-muted">Stationed at CPW (Central Processing Washing / Coffee Processing Workshop). No agricultural farm placement or field transfer is required.</p>
                                 </div>
                             </div>
                         </div>
@@ -152,7 +162,7 @@
 
             <!-- Dedicated Notebook Page for Agricultural Assignments & Transfer History -->
             <xpath expr="//notebook" position="inside">
-                <page name="farm_assignments" string="Farm Assignments" groups="farm_management.group_farm_user" invisible="farm_employee_type == 'head_office'">
+                <page name="farm_assignments" string="Farm Assignments" groups="farm_management.group_farm_user" invisible="farm_employee_type in ('head_office', 'cpw')">
                     <!-- Live Structural Hierarchy Banner -->
                     <div class="mb-4">
                         <h4 class="text-primary mb-2"><i class="fa fa-sitemap me-2"/>Current Placement &amp; Management Roles</h4>
@@ -189,7 +199,7 @@
                 </page>
 
                 <!-- Dedicated Page for Work Entries -->
-                <page name="farm_work_entries" string="Work Entries" groups="farm_management.group_farm_user" invisible="farm_employee_type == 'head_office'">
+                <page name="farm_work_entries" string="Work Entries" groups="farm_management.group_farm_user" invisible="farm_employee_type in ('head_office', 'cpw')">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <span class="text-muted">Total Calculated Earnings: </span>
@@ -244,7 +254,7 @@
                 <field name="fms_employee_id" string="Employee ID" optional="show" decoration-bf="1"/>
             </field>
             <field name="work_email" position="after">
-                <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'head_office'" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'" optional="show"/>
+                <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type == 'head_office'" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'" decoration-muted="farm_employee_type == 'cpw'" optional="show"/>
                 <field name="employment_term" widget="badge" decoration-success="employment_term == 'permanent'" decoration-info="employment_term == 'contract'" optional="show"/>
                 <field name="birthday" optional="show"/>
                 <field name="age" string="Age" optional="show"/>
@@ -269,6 +279,7 @@
                 <filter string="Farm" name="filter_permanent" domain="[('farm_employee_type', '=', 'permanent')]"/>
                 <filter string="Temporary Employees" name="filter_temporary" domain="[('farm_employee_type', '=', 'temporary')]"/>
                 <filter string="Zemach Employees" name="filter_zemach" domain="[('farm_employee_type', '=', 'zemach')]"/>
+                <filter string="CPW" name="filter_cpw" domain="[('farm_employee_type', '=', 'cpw')]"/>
                 <separator/>
                 <filter string="Permanent Staff" name="filter_term_permanent" domain="[('employment_term', '=', 'permanent')]"/>
                 <filter string="Contract Staff" name="filter_term_contract" domain="[('employment_term', '=', 'contract')]"/>

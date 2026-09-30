@@ -772,6 +772,8 @@ class HrContract(models.Model):
         if self.employee_id:
             if self.employee_id.farm_employee_type == 'head_office':
                 self.salary_matrix_type = 'head_office'
+            elif self.employee_id.farm_employee_type == 'cpw':
+                self.salary_matrix_type = 'cpw'
             elif self.employee_id.farm_employee_type == 'permanent':
                 self.salary_matrix_type = 'farm'
             elif not self.salary_matrix_type:
@@ -1023,6 +1025,8 @@ class HrContract(models.Model):
                     emp = self.env['hr.employee'].browse(vals.get('employee_id')) if vals.get('employee_id') else False
                     if emp and emp.farm_employee_type == 'head_office':
                         vals['salary_matrix_type'] = 'head_office'
+                    elif emp and emp.farm_employee_type == 'cpw':
+                        vals['salary_matrix_type'] = 'cpw'
                     else:
                         vals['salary_matrix_type'] = 'farm'
 

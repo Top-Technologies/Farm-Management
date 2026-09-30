@@ -231,18 +231,23 @@ class HrPayslip(models.Model):
     def init(self):
         super().init()
         try:
-            with self.env.cr.savepoint():
+            with self.env.cr.savepoint(flush=False):
                 # Set noupdate=False for farm_management data records so XML updates apply seamlessly
                 self.env.cr.execute("""
                     UPDATE ir_model_data 
                     SET noupdate = false 
                     WHERE module IN ('farm_management', 'Farm-Management', 'Farm_Management');
                 """)
-                # Clean up any legacy obsolete salary rules
+                # Clean up any legacy obsolete salary rules safely without violating foreign key constraints
                 self.env.cr.execute("""
-                    DELETE FROM hr_salary_rule WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH');
-                    DELETE FROM hr_salary_rule WHERE code = 'NET' AND name::text LIKE '%Net Salary%' 
-                    AND struct_id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7');
+                    UPDATE hr_salary_rule SET active = false WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH');
+                    DELETE FROM hr_salary_rule 
+                    WHERE code IN ('DED_DASHEN_BANK', 'DED_AWASH')
+                      AND id NOT IN (SELECT salary_rule_id FROM hr_payslip_line WHERE salary_rule_id IS NOT NULL);
+                    DELETE FROM hr_salary_rule 
+                    WHERE code = 'NET' AND name::text LIKE '%Net Salary%' 
+                      AND struct_id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7')
+                      AND id NOT IN (SELECT salary_rule_id FROM hr_payslip_line WHERE salary_rule_id IS NOT NULL);
                 """)
                 # Update sequences across all structures:
                 # 1. Pension 11% right after Pension 7% (110 -> 111)
