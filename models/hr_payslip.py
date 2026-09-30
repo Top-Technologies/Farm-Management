@@ -307,10 +307,18 @@ else:
     result = - 0.35 * taxable + 2050.0
 
 result = round(result, 2)"""
-                pension_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
-result = -round(basic * 0.07, 2)"""
-                comp_pension_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
-result = round(basic * 0.11, 2)"""
+                pension_code = """if not getattr(contract, 'has_pension', True):
+    result = 0.0
+else:
+    basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
+    result = -round(basic * 0.07, 2)"""
+                comp_pension_code = """if not getattr(contract, 'has_pension', True):
+    result = 0.0
+else:
+    basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
+    result = round(basic * 0.11, 2)"""
+
+                pension_cond = "result = bool(getattr(contract, 'has_pension', True))"
 
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
@@ -319,14 +327,18 @@ result = round(basic * 0.11, 2)"""
                 """, (income_tax_code,))
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
-                    SET amount_python_compute = %s
+                    SET amount_python_compute = %s,
+                        condition_select = 'python',
+                        condition_python = %s
                     WHERE code = 'DED_PENSION_7';
-                """, (pension_code,))
+                """, (pension_code, pension_cond))
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
-                    SET amount_python_compute = %s
+                    SET amount_python_compute = %s,
+                        condition_select = 'python',
+                        condition_python = %s
                     WHERE code = 'COMP_PENSION_11';
-                """, (comp_pension_code,))
+                """, (comp_pension_code, pension_cond))
 
                 # Synchronize new rules to other permanent structures (like Beha Land Coffee)
                 self.env.cr.execute("""
