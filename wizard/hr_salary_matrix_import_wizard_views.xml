@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Salary Matrix Import Wizard Form View -->
+    <record id="view_hr_salary_matrix_import_wizard_form" model="ir.ui.view">
+        <field name="name">hr.salary.matrix.import.wizard.form</field>
+        <field name="model">hr.salary.matrix.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Salary Scale (Excel / CSV)">
+                <field name="state" invisible="1"/>
+
+                <!-- DRAFT STATE: Configure & Upload -->
+                <div invisible="state != 'draft'">
+                    <!-- Download Template Box -->
+                    <div class="card mb-3 border-primary shadow-sm">
+                        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+                            <strong><i class="fa fa-file-excel-o me-2"/>Download Sample Excel Template</strong>
+                            <span class="badge bg-light text-dark">Pre-formatted</span>
+                        </div>
+                        <div class="card-body py-2">
+                            <p class="text-muted small mb-2">
+                                Download a ready-to-use Excel template to fill in your salary numbers. Both standard 2D Grid matrices and tabular lists are supported.
+                            </p>
+                            <div class="d-flex align-items-center gap-3">
+                                <field name="template_format" widget="radio" options="{'horizontal': true}"/>
+                                <button name="action_download_template"
+                                        string="⬇️ Download Excel Template"
+                                        type="object"
+                                        class="btn btn-outline-primary btn-sm"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload File & Destination Scale -->
+                    <div class="card border-secondary shadow-sm mb-3">
+                        <div class="card-header bg-secondary text-white py-2">
+                            <strong><i class="fa fa-cloud-upload me-2"/>Upload &amp; Scale Configuration</strong>
+                        </div>
+                        <div class="card-body">
+                            <group>
+                                <group string="1. Target Salary Scale">
+                                    <field name="target_matrix" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="matrix_id" 
+                                           options="{'no_create': True}"
+                                           invisible="target_matrix != 'existing'"
+                                           required="target_matrix == 'existing'"/>
+                                    <field name="new_matrix_name" 
+                                           invisible="target_matrix != 'new'"
+                                           required="target_matrix == 'new'"
+                                           placeholder="e.g. Saudi Star Scale 2018 E.C."/>
+                                    <field name="new_matrix_type" 
+                                           invisible="target_matrix != 'new'"
+                                           required="target_matrix == 'new'"/>
+                                    <field name="new_effective_date" 
+                                           invisible="target_matrix != 'new'"/>
+                                </group>
+                                <group string="2. File &amp; Options">
+                                    <field name="file" filename="filename"/>
+                                    <field name="filename" invisible="1"/>
+                                    <field name="sheet_name"/>
+                                    <field name="import_mode"/>
+                                    <field name="clear_existing_lines" widget="boolean_toggle"/>
+                                </group>
+                            </group>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DONE STATE: Success Summary -->
+                <div invisible="state != 'done'">
+                    <field name="summary" widget="html" nolabel="1"/>
+                </div>
+
+                <footer>
+                    <button name="action_import"
+                            string="📥 Import Salary Scale"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_view_salary_matrix"
+                            string="🔍 Open Imported Salary Scale"
+                            type="object"
+                            class="btn-success"
+                            invisible="state != 'done'"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" invisible="state != 'draft'"/>
+                    <button string="Close" class="btn-secondary" special="cancel" invisible="state != 'done'"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: Open Import Salary Matrix Wizard -->
+    <record id="action_hr_salary_matrix_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Salary Scale</field>
+        <field name="res_model">hr.salary.matrix.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
