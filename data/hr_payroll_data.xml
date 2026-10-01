@@ -226,10 +226,10 @@ result = contract.allowance_overtime
 # Taxable base: Basic wage + Taxable Allowances (Transport, Hardship, Overtime)
 # Untaxed Allowances strictly excluded: ALW_FIELD_WORK (Agricultural Field Entries) and ALW_RETROACTIVE (Back Pay Difference)
 basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
-alw_trans = contract.allowance_transport or 0.0
+alw_trans = getattr(contract, 'taxable_transport_allowance', 0.0) or 0.0
 alw_hard = contract.allowance_hardship or 0.0
 alw_ot = contract.allowance_overtime or 0.0
-result = basic + alw_trans + alw_hard + alw_ot
+result = basic + (alw_trans or 0.0) + alw_hard + alw_ot
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -296,7 +296,7 @@ else:
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Dynamic Ethiopian Progressive Income Tax based on Taxable Salary
-taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (getattr(contract, 'taxable_transport_allowance', 0.0) or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
 
 if taxable &lt;= 2000:
     result = 0.0
