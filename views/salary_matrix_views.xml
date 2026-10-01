@@ -7,7 +7,7 @@
         <field name="arch" type="xml">
             <list string="Salary Scales" sample="1">
                 <field name="name"/>
-                <field name="matrix_type" widget="badge" decoration-info="matrix_type == 'head_office'" decoration-warning="matrix_type == 'cpw'" decoration-success="matrix_type == 'farm'"/>
+                <field name="matrix_type" widget="badge" decoration-info="matrix_type == 'head_office'" decoration-warning="matrix_type == 'cpw'" decoration-success="matrix_type == 'farm'" decoration-primary="matrix_type == 'saudi_star'"/>
                 <field name="effective_date"/>
                 <field name="line_count" string="Scale Lines"/>
                 <field name="company_id" groups="base.group_multi_company"/>
@@ -23,10 +23,18 @@
         <field name="arch" type="xml">
             <form string="Salary Scale">
                 <header>
+                    <button name="action_open_import_wizard"
+                            string="📥 Import Scale (Excel / CSV)"
+                            type="object"
+                            class="btn-primary"/>
+                    <button name="action_download_template"
+                            string="⬇️ Download Excel Template"
+                            type="object"
+                            class="btn-outline-secondary"/>
                     <button name="action_populate_standard_scale"
                             string="⚡ Populate Standard Baseline Scale"
                             type="object"
-                            class="btn-primary"
+                            class="btn-secondary"
                             confirm="Are you sure you want to populate / overwrite this scale with the standard baseline values?"/>
                 </header>
                 <sheet>
@@ -88,6 +96,8 @@
                 <filter string="Head Office" name="head_office" domain="[('matrix_type', '=', 'head_office')]"/>
                 <filter string="CPW" name="cpw" domain="[('matrix_type', '=', 'cpw')]"/>
                 <filter string="Farm" name="farm" domain="[('matrix_type', '=', 'farm')]"/>
+                <filter string="Saudi Star" name="saudi_star" domain="[('matrix_type', '=', 'saudi_star')]"/>
+                <filter string="Other / Custom" name="other" domain="[('matrix_type', '=', 'other')]"/>
                 <separator/>
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
                 <group>
