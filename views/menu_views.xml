@@ -106,6 +106,13 @@
               action="action_hr_salary_matrix"
               sequence="25"
               groups="hr.group_hr_user"/>
+
+    <menuitem id="menu_payroll_salary_matrix_import"
+              name="Import Salary Scale"
+              parent="hr_payroll.menu_hr_salary_configuration"
+              action="action_hr_salary_matrix_import_wizard"
+              sequence="26"
+              groups="hr.group_hr_user"/>
 </odoo>
 
 
