@@ -93,6 +93,8 @@ class HrSalaryMatrix(models.Model):
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('cpw', 'CPW'),
         ('farm', 'Farm (የእርሻ ልማቶች)'),
+        ('saudi_star', 'Saudi Star (ሳዑዲ ስታር)'),
+        ('other', 'Other / Custom (ሌላ)'),
     ], string='Scale Type / Category', required=True, tracking=True, default='head_office')
 
     effective_date = fields.Date(
@@ -200,8 +202,58 @@ class HrSalaryMatrix(models.Model):
                         })
             if lines_to_create:
                 self.env['hr.salary.matrix.line'].create(lines_to_create)
+                rec.sync_grades_from_lines()
 
         return True
+
+    def get_wage(self, grade, level):
+        """Looks up the basic wage amount for this specific salary matrix instance."""
+        self.ensure_one()
+        if not grade or not level:
+            return 0.0
+        line = self.line_ids.filtered(lambda l: l.grade == int(grade) and l.level == str(level))
+        return line[0].amount if line else 0.0
+
+    def action_open_import_wizard(self):
+        """Opens the Import Salary Matrix wizard pre-targeted to this matrix."""
+        self.ensure_one()
+        return {
+            'name': _('Import Salary Scale (Excel / CSV)'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.salary.matrix.import.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_matrix_id': self.id,
+                'default_target_matrix': 'existing',
+                'default_new_matrix_name': self.name,
+                'default_new_matrix_type': self.matrix_type,
+            }
+        }
+
+    def action_download_template(self):
+        """Convenience action to download the standard 2D Grid Excel template."""
+        wizard = self.env['hr.salary.matrix.import.wizard'].create({
+            'template_format': 'grid',
+        })
+        return wizard.action_download_template()
+
+    def sync_grades_from_lines(self):
+        """Ensures hr.salary.matrix.grade records exist for all distinct grades in line_ids."""
+        grade_obj = self.env['hr.salary.matrix.grade']
+        for rec in self:
+            distinct_grades = set(rec.line_ids.mapped('grade'))
+            for g in sorted(distinct_grades):
+                existing = grade_obj.search([
+                    ('matrix_type', '=', rec.matrix_type),
+                    ('grade', '=', g)
+                ], limit=1)
+                if not existing:
+                    grade_obj.create({
+                        'matrix_type': rec.matrix_type,
+                        'grade': g,
+                        'name': f"Grade {g} (ደረጃ {g})",
+                    })
 
     @api.model
     def get_matrix_wage(self, matrix_type, grade, level, company_id=None):
@@ -348,6 +400,8 @@ class HrSalaryMatrixGrade(models.Model):
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('cpw', 'CPW'),
         ('farm', 'Farm (የእርሻ ልማቶች)'),
+        ('saudi_star', 'Saudi Star (ሳዑዲ ስታር)'),
+        ('other', 'Other / Custom (ሌላ)'),
     ], string='Scale Type / Category', required=True, default='head_office')
 
     @api.depends('grade')
