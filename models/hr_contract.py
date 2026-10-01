@@ -52,7 +52,17 @@ class HrContract(models.Model):
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('cpw', 'CPW'),
         ('farm', 'Farm (የእርሻ ልማቶች)'),
+        ('saudi_star', 'Saudi Star (ሳዑዲ ስታር)'),
+        ('other', 'Other / Custom (ሌላ)'),
     ], string='Salary Scale Category', tracking=True, help='Select which Salary Matrix applies to this contract.')
+
+    salary_matrix_id = fields.Many2one(
+        'hr.salary.matrix',
+        string='Salary Scale Sheet',
+        domain="[('matrix_type', '=', salary_matrix_type)] if salary_matrix_type else []",
+        tracking=True,
+        help='Specific Salary Matrix Scale sheet applied to this contract. Defaults to the active scale for the selected category.',
+    )
 
     salary_grade_id = fields.Many2one(
         'hr.salary.matrix.grade',
@@ -266,6 +276,13 @@ class HrContract(models.Model):
         tracking=True,
         help='Legally required employee pension deduction (7% of Basic Salary).',
     )
+    taxable_transport_allowance = fields.Float(
+        string='Taxable Transport Allowance (የሚገበር የመጓጓዣ አበል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly transport allowance portion subject to employee income tax. Defaults to Transport Allowance.',
+    )
     deduction_income_tax = fields.Float(
         string='Income Tax (የገቢ ግብር)',
         compute='_compute_statutory_taxes',
@@ -297,12 +314,21 @@ class HrContract(models.Model):
         tracking=True,
         help='Mandatory 5% credit association contribution computed from base salary.',
     )
-    deduction_credit_assoc_voluntary = fields.Float(
-        string='Credit Association - Voluntary (የብድርና ቁጠባ ፈቃደኝነት)',
-        digits=(16, 2),
+    credit_assoc_voluntary_rate = fields.Float(
+        string='Credit Association Voluntary Rate (%) (የብድርና ቁጠባ ፈቃደኝነት %)',
+        digits=(5, 2),
         default=0.0,
         tracking=True,
-        help='Voluntary additional credit association contribution without mandatory cut percentage.',
+        help='Voluntary credit association contribution percentage deducted from basic salary.',
+    )
+    deduction_credit_assoc_voluntary = fields.Float(
+        string='Credit Association - Voluntary (የብድርና ቁጠባ ፈቃደኝነት)',
+        compute='_compute_credit_association_deductions',
+        store=True,
+        readonly=True,
+        digits=(16, 2),
+        tracking=True,
+        help='Voluntary additional credit association contribution amount, computed from basic salary and voluntary percentage.',
     )
     deduction_social_contribution = fields.Float(
         string='Social Contribution (ማህበራዊ መዋጮ)',
@@ -627,14 +653,17 @@ class HrContract(models.Model):
                     self.transport_allowance_rule = 'fixed_4000'
                     self.fuel_liters = 0.0
                     self.allowance_transport = 4000.0
+                    self.taxable_transport_allowance = 4000.0
                 elif g == 18:
                     self.transport_allowance_rule = 'fuel_50'
                     self.fuel_liters = 50.0
                     self.allowance_transport = 50.0 * fuel_price
+                    self.taxable_transport_allowance = 50.0 * fuel_price
                 else:
                     self.transport_allowance_rule = 'fuel_60'
                     self.fuel_liters = 60.0
                     self.allowance_transport = 60.0 * fuel_price
+                    self.taxable_transport_allowance = 60.0 * fuel_price
             except Exception:
                 pass
 
@@ -643,16 +672,30 @@ class HrContract(models.Model):
         fuel_price = self.fuel_price_per_liter or (self.company_id.fuel_price_per_liter if self.company_id else 165.0) or 165.0
         if self.transport_allowance_rule == 'fixed_4000':
             self.allowance_transport = 4000.0
+            self.taxable_transport_allowance = 4000.0
             self.fuel_liters = 0.0
         elif self.transport_allowance_rule == 'fuel_50':
             self.fuel_liters = 50.0
             self.allowance_transport = 50.0 * fuel_price
+            self.taxable_transport_allowance = 50.0 * fuel_price
         elif self.transport_allowance_rule == 'fuel_60':
             self.fuel_liters = 60.0
             self.allowance_transport = 60.0 * fuel_price
+            self.taxable_transport_allowance = 60.0 * fuel_price
         elif self.transport_allowance_rule == 'none':
             self.allowance_transport = 0.0
+            self.taxable_transport_allowance = 0.0
             self.fuel_liters = 0.0
+
+    @api.onchange('allowance_transport')
+    def _onchange_allowance_transport(self):
+        if not self.taxable_transport_allowance or (hasattr(self, '_origin') and self._origin.allowance_transport == self.taxable_transport_allowance):
+            self.taxable_transport_allowance = self.allowance_transport or 0.0
+
+    @api.onchange('taxable_transport_allowance')
+    def _onchange_taxable_transport_allowance(self):
+        self._compute_statutory_taxes()
+        self._compute_all_deductions()
 
     @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime')
     def _compute_all_allowances(self):
@@ -714,18 +757,22 @@ class HrContract(models.Model):
             gross = c.gross_monthly_wage if c.gross_monthly_wage else (c.wage or 0.0)
             c.net_wage_after_deductions = max(0.0, gross - total)
 
-    @api.depends('salary_matrix_type', 'salary_grade_id', 'salary_grade', 'salary_level', 'company_id')
+    @api.depends('salary_matrix_id', 'salary_matrix_type', 'salary_grade_id', 'salary_grade', 'salary_level', 'company_id')
     def _compute_matrix_basic_wage(self):
         for contract in self:
             grade_val = contract.salary_grade_id.grade if contract.salary_grade_id else (int(contract.salary_grade) if contract.salary_grade else False)
-            if contract.salary_matrix_type and grade_val and contract.salary_level:
+            if grade_val and contract.salary_level:
                 try:
-                    wage = self.env['hr.salary.matrix'].get_matrix_wage(
-                        matrix_type=contract.salary_matrix_type,
-                        grade=int(grade_val),
-                        level=contract.salary_level,
-                        company_id=contract.company_id.id if contract.company_id else None,
-                    )
+                    wage = 0.0
+                    if contract.salary_matrix_id:
+                        wage = contract.salary_matrix_id.get_wage(grade_val, contract.salary_level)
+                    elif contract.salary_matrix_type:
+                        wage = self.env['hr.salary.matrix'].get_matrix_wage(
+                            matrix_type=contract.salary_matrix_type,
+                            grade=int(grade_val),
+                            level=contract.salary_level,
+                            company_id=contract.company_id.id if contract.company_id else None,
+                        )
                     contract.matrix_basic_wage = wage
                     if wage > 0 and (not contract.wage or contract.wage != wage):
                         contract.wage = wage
@@ -738,10 +785,33 @@ class HrContract(models.Model):
     @api.onchange('salary_matrix_type')
     def _onchange_salary_matrix_type(self):
         if self.salary_matrix_type:
+            # Auto-assign active matrix for this type if none or mismatched
+            if not self.salary_matrix_id or self.salary_matrix_id.matrix_type != self.salary_matrix_type:
+                active_matrix = self.env['hr.salary.matrix'].search([
+                    ('matrix_type', '=', self.salary_matrix_type),
+                    ('active', '=', True),
+                    ('company_id', '=', self.company_id.id if self.company_id else self.env.company.id),
+                ], limit=1, order='effective_date desc, id desc')
+                if not active_matrix:
+                    active_matrix = self.env['hr.salary.matrix'].search([
+                        ('matrix_type', '=', self.salary_matrix_type),
+                        ('active', '=', True),
+                    ], limit=1, order='effective_date desc, id desc')
+                self.salary_matrix_id = active_matrix.id if active_matrix else False
+
             if self.salary_grade_id and self.salary_grade_id.matrix_type != self.salary_matrix_type:
                 self.salary_grade_id = False
                 self.salary_grade = False
                 self.matrix_basic_wage = 0.0
+
+        self._onchange_salary_matrix_wage()
+
+    @api.onchange('salary_matrix_id')
+    def _onchange_salary_matrix_id(self):
+        if self.salary_matrix_id:
+            if not self.salary_matrix_type or self.salary_matrix_type != self.salary_matrix_id.matrix_type:
+                self.salary_matrix_type = self.salary_matrix_id.matrix_type
+        self._onchange_salary_matrix_wage()
 
     @api.onchange('salary_grade_id')
     def _onchange_salary_grade_id(self):
@@ -752,16 +822,20 @@ class HrContract(models.Model):
             self.salary_grade = False
         self._onchange_salary_matrix_wage()
 
-    @api.onchange('salary_matrix_type', 'salary_grade_id', 'salary_grade', 'salary_level')
+    @api.onchange('salary_matrix_id', 'salary_matrix_type', 'salary_grade_id', 'salary_grade', 'salary_level')
     def _onchange_salary_matrix_wage(self):
         grade_val = self.salary_grade_id.grade if self.salary_grade_id else (int(self.salary_grade) if self.salary_grade else False)
-        if self.salary_matrix_type and grade_val and self.salary_level:
-            wage = self.env['hr.salary.matrix'].get_matrix_wage(
-                matrix_type=self.salary_matrix_type,
-                grade=int(grade_val),
-                level=self.salary_level,
-                company_id=self.company_id.id if self.company_id else None,
-            )
+        if grade_val and self.salary_level:
+            wage = 0.0
+            if self.salary_matrix_id:
+                wage = self.salary_matrix_id.get_wage(grade_val, self.salary_level)
+            elif self.salary_matrix_type:
+                wage = self.env['hr.salary.matrix'].get_matrix_wage(
+                    matrix_type=self.salary_matrix_type,
+                    grade=int(grade_val),
+                    level=self.salary_level,
+                    company_id=self.company_id.id if self.company_id else None,
+                )
             if wage > 0:
                 self.matrix_basic_wage = wage
                 self.wage = wage
@@ -778,11 +852,12 @@ class HrContract(models.Model):
                 self.salary_matrix_type = 'farm'
             elif not self.salary_matrix_type:
                 self.salary_matrix_type = 'head_office'
+            self._onchange_salary_matrix_type()
 
     # =========================================================================
     # Statutory Taxes Dynamic Computation
     # =========================================================================
-    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'has_pension')
+    @api.depends('wage', 'taxable_transport_allowance', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'has_pension')
     def _compute_statutory_taxes(self):
         for c in self:
             wage = c.wage or 0.0
@@ -792,8 +867,9 @@ class HrContract(models.Model):
             else:
                 c.deduction_pension = 0.0
 
-            # Taxable Salary = Wage + Taxable Allowances (Transport, Hardship, Overtime)
-            taxable = wage + (c.allowance_transport or 0.0) + \
+            # Taxable Salary = Wage + Taxable Allowances (Taxable Transport, Hardship, Overtime)
+            trans_taxable = c.taxable_transport_allowance or 0.0
+            taxable = wage + trans_taxable + \
                       (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
 
             if taxable <= 2000:
@@ -811,19 +887,24 @@ class HrContract(models.Model):
 
             c.deduction_income_tax = round(max(0.0, tax), 2)
 
-    @api.depends('wage', 'has_credit_association')
+    @api.depends('wage', 'has_credit_association', 'credit_assoc_voluntary_rate')
     def _compute_credit_association_deductions(self):
         for c in self:
+            wage = c.wage or 0.0
             if c.has_credit_association:
-                c.deduction_credit_assoc_mandatory = round((c.wage or 0.0) * 0.05, 2)
+                c.deduction_credit_assoc_mandatory = round(wage * 0.05, 2)
             else:
                 c.deduction_credit_assoc_mandatory = 0.0
 
-    @api.onchange('wage', 'has_credit_association')
+            rate = c.credit_assoc_voluntary_rate or 0.0
+            c.deduction_credit_assoc_voluntary = round(wage * (rate / 100.0), 2)
+
+    @api.onchange('wage', 'has_credit_association', 'credit_assoc_voluntary_rate')
     def _onchange_credit_association(self):
         self._compute_credit_association_deductions()
+        self._compute_all_deductions()
 
-    @api.onchange('wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'has_pension')
+    @api.onchange('wage', 'taxable_transport_allowance', 'allowance_transport', 'credit_assoc_voluntary_rate', 'has_credit_association', 'allowance_hardship', 'allowance_overtime', 'has_pension')
     def _onchange_wage_taxes_estimate(self):
         for c in self:
             c._compute_statutory_taxes()
@@ -869,6 +950,7 @@ class HrContract(models.Model):
         'back_pay_previous_pension',
         'wage',
         'allowance_transport',
+        'taxable_transport_allowance',
         'allowance_hardship',
         'allowance_overtime',
         'has_pension',
@@ -885,7 +967,8 @@ class HrContract(models.Model):
 
             # Statutory taxes on new regular salary
             new_pension = round(wage * 0.07, 2) if c.has_pension else 0.0
-            taxable = regular_gross
+            trans_taxable = c.taxable_transport_allowance or 0.0
+            taxable = wage + trans_taxable + (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
             if taxable <= 2000:
                 new_tax = 0.0
             elif taxable <= 4000:
@@ -932,7 +1015,7 @@ class HrContract(models.Model):
                 c.back_pay_pension_monthly = 0.0
                 c.back_pay_pension_total = 0.0
 
-    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'total_monthly_deductions')
+    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'taxable_transport_allowance', 'allowance_hardship', 'allowance_overtime', 'total_monthly_deductions')
     def _onchange_back_pay_calculator(self):
         if self.back_pay_months > 0 and not self.back_pay_previous_net:
             self._fetch_previous_payslip_data()
@@ -944,7 +1027,8 @@ class HrContract(models.Model):
         self.back_pay_new_net = regular_net
 
         new_pension = round(wage * 0.07, 2)
-        taxable = regular_gross
+        trans_taxable = self.taxable_transport_allowance or 0.0
+        taxable = wage + trans_taxable + (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
         if taxable <= 2000:
             new_tax = 0.0
         elif taxable <= 4000:
@@ -1038,19 +1122,24 @@ class HrContract(models.Model):
 
             # 4. Auto-populate basic wage from Salary Matrix if wage is missing / zero
             if not vals.get('wage'):
+                m_id = vals.get('salary_matrix_id')
                 m_type = vals.get('salary_matrix_type')
                 g_val = vals.get('salary_grade')
                 if not g_val and vals.get('salary_grade_id'):
                     g_val = self.env['hr.salary.matrix.grade'].browse(vals['salary_grade_id']).grade
                 l_val = vals.get('salary_level')
-                if m_type and g_val and l_val:
+                if g_val and l_val:
                     try:
-                        matrix_wage = self.env['hr.salary.matrix'].get_matrix_wage(
-                            matrix_type=m_type,
-                            grade=int(g_val),
-                            level=l_val,
-                            company_id=vals.get('company_id')
-                        )
+                        matrix_wage = 0.0
+                        if m_id:
+                            matrix_wage = self.env['hr.salary.matrix'].browse(m_id).get_wage(g_val, l_val)
+                        elif m_type:
+                            matrix_wage = self.env['hr.salary.matrix'].get_matrix_wage(
+                                matrix_type=m_type,
+                                grade=int(g_val),
+                                level=l_val,
+                                company_id=vals.get('company_id')
+                            )
                         if matrix_wage > 0:
                             vals['wage'] = matrix_wage
                             vals['matrix_basic_wage'] = matrix_wage
@@ -1063,11 +1152,23 @@ class HrContract(models.Model):
             if not vals.get('date_start'):
                 vals['date_start'] = fields.Date.today()
 
+            # 6. Default taxable_transport_allowance from allowance_transport if not provided
+            if vals.get('allowance_transport') and not vals.get('taxable_transport_allowance'):
+                vals['taxable_transport_allowance'] = vals['allowance_transport']
+
         return super().create(vals_list)
+
+    def write(self, vals):
+        if 'allowance_transport' in vals and 'taxable_transport_allowance' not in vals:
+            for contract in self:
+                if not contract.taxable_transport_allowance or (contract.allowance_transport and contract.taxable_transport_allowance == contract.allowance_transport):
+                    vals['taxable_transport_allowance'] = vals['allowance_transport']
+                    break
+        return super().write(vals)
 
     def init(self):
         super().init()
-        # Default existing contracts with NULL has_pension to True (enrolled)
+        # Default existing contracts with NULL has_pension to True (enrolled) and backfill taxable_transport_allowance
         self.env.cr.execute("""
             DO $$ 
             BEGIN 
@@ -1077,6 +1178,22 @@ class HrContract(models.Model):
                 ) THEN 
                     UPDATE hr_contract SET has_pension = true WHERE has_pension IS NULL;
                 END IF; 
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'hr_contract' AND column_name = 'taxable_transport_allowance'
+                ) THEN 
+                    UPDATE hr_contract 
+                    SET taxable_transport_allowance = allowance_transport 
+                    WHERE taxable_transport_allowance IS NULL OR (taxable_transport_allowance = 0 AND allowance_transport > 0);
+                END IF; 
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'hr_contract' AND column_name = 'credit_assoc_voluntary_rate'
+                ) THEN 
+                    UPDATE hr_contract 
+                    SET credit_assoc_voluntary_rate = round((deduction_credit_assoc_voluntary / wage) * 100.0, 2) 
+                    WHERE wage > 0 AND deduction_credit_assoc_voluntary > 0 AND (credit_assoc_voluntary_rate IS NULL OR credit_assoc_voluntary_rate = 0);
+                END IF;
             END $$;
         """)
 

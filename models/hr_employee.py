@@ -145,7 +145,13 @@ class HrEmployee(models.Model):
         related='company_id.currency_id',
     )
 
-    # Permanent Employee Salary Matrix Placement (Reflected from Active Contract)
+    salary_matrix_id = fields.Many2one(
+        'hr.salary.matrix',
+        related='contract_id.salary_matrix_id',
+        string='Salary Scale Sheet',
+        readonly=True,
+        store=True,
+    )
     salary_matrix_type = fields.Selection(
         related='contract_id.salary_matrix_type',
         string='Salary Scale Category',

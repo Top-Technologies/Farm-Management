@@ -48,6 +48,12 @@ class HrPayslip(models.Model):
     )
 
     # Permanent Employee Salary Matrix Placement
+    salary_matrix_id = fields.Many2one(
+        'hr.salary.matrix',
+        related='employee_id.salary_matrix_id',
+        string='Salary Scale Sheet',
+        readonly=True,
+    )
     salary_matrix_type = fields.Selection(
         related='employee_id.salary_matrix_type',
         string='Salary Scale Category',
@@ -296,7 +302,8 @@ class HrPayslip(models.Model):
 
                 # Directly ensure DED_INCOME_TAX, DED_PENSION_7, and COMP_PENSION_11 rules compute dynamically
                 income_tax_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
-taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else (basic + (contract.allowance_transport or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+alw_trans = getattr(contract, 'taxable_transport_allowance', 0.0) or 0.0
+taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else (basic + (alw_trans or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
 
 if taxable <= 2000:
     result = 0.0
