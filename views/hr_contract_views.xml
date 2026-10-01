@@ -20,22 +20,30 @@
                         Select the Scale Category, Grade, and Level. The contract monthly wage will be automatically populated based on the company salary matrix.
                     </p>
                     <div class="row">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <group>
                                 <field name="salary_matrix_type" widget="selection" placeholder="Select Scale Category..."/>
                             </group>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <group>
+                                <field name="salary_matrix_id" 
+                                       options="{'no_create': True}" 
+                                       domain="[('matrix_type', '=', salary_matrix_type)] if salary_matrix_type else []" 
+                                       placeholder="Select Scale Sheet..."/>
+                            </group>
+                        </div>
+                        <div class="col-md-3">
                             <group>
                                 <field name="salary_grade_id" 
                                        options="{'no_create': True, 'no_open': True}" 
-                                       domain="[('matrix_type', '=', salary_matrix_type)]" 
+                                       domain="[('matrix_type', '=', salary_matrix_type)] if salary_matrix_type else []" 
                                        placeholder="Select Grade..." 
-                                       invisible="not salary_matrix_type"/>
+                                       invisible="not salary_matrix_type and not salary_matrix_id"/>
                                 <field name="salary_grade" invisible="1"/>
                             </group>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <group>
                                 <field name="salary_level" placeholder="Select Step / Level..." invisible="not salary_grade_id and not salary_grade"/>
                             </group>
@@ -64,6 +72,7 @@
                                     <separator string="Transport &amp; Fuel Policy"/>
                                     <field name="transport_allowance_rule" widget="selection"/>
                                     <field name="allowance_transport" widget="monetary" string="Transport Allowance" invisible="transport_allowance_rule == 'none'"/>
+                                    <field name="taxable_transport_allowance" widget="monetary" string="Taxable Transport" invisible="transport_allowance_rule == 'none'"/>
                                     <field name="fuel_liters" invisible="1"/>
                                     <field name="fuel_price_per_liter" invisible="1"/>
                                     <div class="alert alert-info py-2 px-3 my-2 small d-flex align-items-center" role="status" invisible="transport_allowance_rule not in ('fuel_50', 'fuel_60')">
@@ -166,6 +175,7 @@
                                             <field name="deduction_pension" widget="monetary" class="oe_inline" invisible="not has_pension"/>
                                             <span class="text-muted small" invisible="has_pension">Exempt (አይቀነስም)</span>
                                         </div>
+                                        <field name="taxable_transport_allowance" widget="monetary"/>
                                         <field name="deduction_income_tax"/>
                                         <field name="deduction_luc"/>
                                         <label for="deduction_credit_assoc_mandatory" string="Credit Association Mandatory (5%)"/>
@@ -174,7 +184,15 @@
                                             <field name="deduction_credit_assoc_mandatory" widget="monetary" class="oe_inline" invisible="not has_credit_association"/>
                                             <span class="text-muted small" invisible="has_credit_association">Not Enrolled</span>
                                         </div>
-                                        <field name="deduction_credit_assoc_voluntary" widget="monetary"/>
+                                        <label for="credit_assoc_voluntary_rate" string="Credit Association - Voluntary (የብድርና ቁጠባ ፈቃደኝነት)"/>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="d-flex align-items-center oe_inline">
+                                                <field name="credit_assoc_voluntary_rate" class="oe_inline text-end" style="width: 70px; min-width: 60px;"/>
+                                                <span class="fw-bold ms-1 me-2">%</span>
+                                            </div>
+                                            <span class="text-muted small">➔</span>
+                                            <field name="deduction_credit_assoc_voluntary" widget="monetary" class="oe_inline fw-bold text-primary" readonly="1" force_save="1"/>
+                                        </div>
                                         <field name="deduction_social_contribution"/>
                                     </group>
                                 </div>
@@ -290,8 +308,14 @@
         <field name="model">hr.contract</field>
         <field name="inherit_id" ref="hr_contract.hr_contract_view_tree"/>
         <field name="arch" type="xml">
+            <field name="wage" position="before">
+                <field name="salary_matrix_id" optional="hide" string="Salary Scale"/>
+            </field>
             <field name="wage" position="after">
                 <field name="has_pension" widget="boolean_toggle" optional="hide" string="Pension Subject"/>
+                <field name="allowance_transport" widget="monetary" optional="hide" string="Transport Allowance"/>
+                <field name="taxable_transport_allowance" widget="monetary" optional="hide" string="Taxable Transport"/>
+                <field name="credit_assoc_voluntary_rate" optional="hide" string="Credit Assoc Voluntary (%)"/>
                 <field name="total_monthly_allowances" widget="monetary" optional="show" string="Allowances"/>
                 <field name="gross_monthly_wage" widget="monetary" optional="show" string="Gross Wage"/>
                 <field name="total_monthly_deductions" widget="monetary" optional="show" string="Total Deductions"/>
