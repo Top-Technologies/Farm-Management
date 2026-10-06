@@ -417,6 +417,34 @@ result = -contract.deduction_credit_assoc_loan
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
+        <record id="rule_ded_short_term_loan" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Short Term Loan (የአጭር ጊዜ ብድር)</field>
+            <field name="code">DED_SHORT_LOAN</field>
+            <field name="sequence">123</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_short_term_loan and contract.deduction_short_term_loan > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_short_term_loan
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_long_term_loan" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Long Term Loan (የረጅም ጊዜ ብድር)</field>
+            <field name="code">DED_LONG_LOAN</field>
+            <field name="sequence">124</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_long_term_loan and contract.deduction_long_term_loan > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_long_term_loan
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
         <record id="rule_ded_medical_recovery" model="hr.salary.rule">
             <field name="category_id" ref="hr_payroll.DED"/>
             <field name="name">Medical Recovery (የህክምና ወጪ ተመላሽ)</field>
