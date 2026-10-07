@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- noupdate="0": re-applied on every upgrade so group changes take effect -->
+    <!-- noupdate="0": re-applied on every upgrade so group and rule changes take effect -->
     <data noupdate="0">
         <!-- Module Category: makes groups appear as a row in Settings > Users -->
         <record id="module_category_farm" model="ir.module.category">
@@ -8,18 +8,136 @@
             <field name="sequence">25</field>
         </record>
 
-        <!-- User Group -->
+        <!-- Employee Classification Category: makes classification groups appear in Settings > Users -->
+        <record id="module_category_employee_classification" model="ir.module.category">
+            <field name="name">Employee Classification Access</field>
+            <field name="description">Controls visibility and access to specific employee classifications.</field>
+            <field name="sequence">26</field>
+        </record>
+
+        <!-- Group: All Classifications Access -->
+        <record id="group_employee_classification_all" model="res.groups">
+            <field name="name">All Classifications</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows full visibility across all employee classifications.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+            <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- Group: CPW Classification Access -->
+        <record id="group_employee_classification_cpw" model="res.groups">
+            <field name="name">CPW</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing CPW employees and related records.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
+        <!-- Group: Farm (Permanent) Classification Access -->
+        <record id="group_employee_classification_farm" model="res.groups">
+            <field name="name">Farm (Permanent / የእርሻ)</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing Farm permanent employees and related records.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
+        <!-- Group: Temporary Classification Access -->
+        <record id="group_employee_classification_temporary" model="res.groups">
+            <field name="name">Temporary (ጊዜያዊ)</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing Temporary agricultural workers and related records.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
+        <!-- Group: Zemach (Seasonal) Classification Access -->
+        <record id="group_employee_classification_zemach" model="res.groups">
+            <field name="name">Zemach / Seasonal (ዘመች)</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing Seasonal/Zemach agricultural workers and related records.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
+        <!-- Group: Head Office Classification Access -->
+        <record id="group_employee_classification_head_office" model="res.groups">
+            <field name="name">Head Office (ዋና መ/ቤት)</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing Head Office employees and related records.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
+        <!-- Group: General Classification Access (Legacy) -->
+        <record id="group_employee_classification_general" model="res.groups">
+            <field name="name">General (Farm, HQ, Temp, Zemach)</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing Head Office, Farm, Temporary, and Seasonal (Zemach) employees.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
+        <!-- Farm User Group -->
         <record id="group_farm_user" model="res.groups">
             <field name="name">User</field>
             <field name="category_id" ref="module_category_farm"/>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
         </record>
 
         <!-- Administrator Group: auto-assigned to Odoo admin users on install/upgrade -->
         <record id="group_farm_manager" model="res.groups">
             <field name="name">Administrator</field>
             <field name="category_id" ref="module_category_farm"/>
-            <field name="implied_ids" eval="[(4, ref('group_farm_user')), (4, ref('hr.group_hr_user'))]"/>
+            <field name="implied_ids" eval="[(6, 0, [ref('group_farm_user'), ref('hr.group_hr_user')])]"/>
             <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- ============================================================= -->
+        <!-- EMPLOYEE CLASSIFICATION SEGREGATION RECORD RULES (GLOBAL)     -->
+        <!-- ============================================================= -->
+
+        <record id="hr_employee_classification_rule" model="ir.rule">
+            <field name="name">Employee Classification Segregation Rule</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="hr_employee_public_classification_rule" model="ir.rule">
+            <field name="name">Public Employee Classification Segregation Rule</field>
+            <field name="model_id" ref="hr.model_hr_employee_public"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="hr_contract_classification_rule" model="ir.rule">
+            <field name="name">Contract Classification Segregation Rule</field>
+            <field name="model_id" ref="hr_contract.model_hr_contract"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="hr_payslip_classification_rule" model="ir.rule">
+            <field name="name">Payslip Classification Segregation Rule</field>
+            <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="hr_payslip_run_classification_rule" model="ir.rule">
+            <field name="name">Payslip Batch Classification Segregation Rule</field>
+            <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
+            <field name="domain_force">[('worker_type', 'in', user._get_allowed_payslip_run_classifications())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="farm_work_entry_classification_rule" model="ir.rule">
+            <field name="name">Work Entry Classification Segregation Rule</field>
+            <field name="model_id" ref="model_farm_work_entry"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="hr_salary_matrix_classification_rule" model="ir.rule">
+            <field name="name">Salary Matrix Classification Segregation Rule</field>
+            <field name="model_id" ref="model_hr_salary_matrix"/>
+            <field name="domain_force">[('matrix_type', 'in', user._get_allowed_salary_matrix_types())]</field>
+            <field name="global" eval="True"/>
         </record>
     </data>
 
