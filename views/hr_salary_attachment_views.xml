@@ -86,7 +86,7 @@
                        decoration-success="loan_deduction_type == 'cost_sharing'"
                        decoration-info="loan_deduction_type in ('dashen_credit', 'awash_credit')"
                        decoration-warning="loan_deduction_type == 'credit_assoc_loan'"
-                       decoration-primary="loan_deduction_type in ('advance', 'pre_payment')"/>
+                       decoration-primary="loan_deduction_type in ('advance', 'pre_payment', 'short_term_loan', 'long_term_loan')"/>
                 <field name="current_month_installment" string="Current Month Due" widget="monetary" optional="show"/>
             </xpath>
         </field>
