@@ -9,6 +9,8 @@ LOAN_RULE_TO_ATTACHMENT_TYPE = {
     'DED_DASHEN_CREDIT': 'dashen_credit',
     'DED_AWASH_CREDIT': 'awash_credit',
     'DED_CREDIT_LOAN': 'credit_assoc_loan',
+    'DED_SHORT_LOAN': 'short_term_loan',
+    'DED_LONG_LOAN': 'long_term_loan',
     'DED_ADVANCE': 'advance',
     'DED_PRE_PAYMENT': 'pre_payment',
     'DED_MEDICAL_RECOVERY': 'medical_recovery',
