@@ -37,5 +37,5 @@ access_hr_salary_attachment_schedule_user,hr.salary.attachment.schedule.user,mod
 access_hr_salary_attachment_schedule_mgr,hr.salary.attachment.schedule.mgr,model_hr_salary_attachment_schedule,group_farm_manager,1,1,1,1
 access_hr_salary_attachment_adjust_wizard_user,hr.salary.attachment.adjust.wizard.user,model_hr_salary_attachment_adjust_wizard,base.group_user,1,1,1,1
 access_hr_salary_attachment_adjust_wizard_mgr,hr.salary.attachment.adjust.wizard.mgr,model_hr_salary_attachment_adjust_wizard,group_farm_manager,1,1,1,1
-
-
+access_hr_salary_matrix_cpw_user,hr.salary.matrix.cpw.user,model_hr_salary_matrix,group_employee_classification_cpw,1,0,0,0
+access_hr_salary_matrix_line_cpw_user,hr.salary.matrix.line.cpw.user,model_hr_salary_matrix_line,group_employee_classification_cpw,1,0,0,0
