@@ -39,6 +39,8 @@ class HrContract(models.Model):
     farm_employee_type = fields.Selection(
         related='employee_id.farm_employee_type',
         string='Employee Classification',
+        store=True,
+        index=True,
         readonly=True,
     )
     employment_term = fields.Selection(
@@ -367,6 +369,20 @@ class HrContract(models.Model):
         default=0.0,
         tracking=True,
         help='Credit association loan repayment installment.',
+    )
+    deduction_short_term_loan = fields.Float(
+        string='Short Term Loan (የአጭር ጊዜ ብድር)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Short term loan repayment installment.',
+    )
+    deduction_long_term_loan = fields.Float(
+        string='Long Term Loan (የረጅም ጊዜ ብድር)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Long term loan repayment installment.',
     )
     deduction_medical_recovery = fields.Float(
         string='Medical Recovery (የህክምና ወጪ ተመላሽ)',
@@ -715,6 +731,7 @@ class HrContract(models.Model):
         'deduction_social_contribution',
         # Category 2
         'deduction_advance', 'deduction_pre_payment', 'deduction_credit_assoc_loan',
+        'deduction_short_term_loan', 'deduction_long_term_loan',
         'deduction_medical_recovery', 'deduction_pension_receivable', 'deduction_fine',
         # Category 3
         'deduction_saving_kossa', 'deduction_saving_jimma', 'deduction_suntu_saving',
@@ -735,6 +752,7 @@ class HrContract(models.Model):
                  (c.deduction_credit_assoc_mandatory or 0.0) + (c.deduction_credit_assoc_voluntary or 0.0) + \
                  (c.deduction_social_contribution or 0.0)
             c2 = (c.deduction_advance or 0.0) + (c.deduction_pre_payment or 0.0) + (c.deduction_credit_assoc_loan or 0.0) + \
+                 (c.deduction_short_term_loan or 0.0) + (c.deduction_long_term_loan or 0.0) + \
                  (c.deduction_medical_recovery or 0.0) + (c.deduction_pension_receivable or 0.0) + (c.deduction_fine or 0.0)
             c3 = (c.deduction_saving_kossa or 0.0) + (c.deduction_saving_jimma or 0.0) + (c.deduction_suntu_saving or 0.0) + \
                  (c.deduction_family_allotment or 0.0) + (c.deduction_cost_sharing or 0.0)

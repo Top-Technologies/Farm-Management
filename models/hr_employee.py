@@ -11,6 +11,19 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    def _default_farm_employee_type(self):
+        user = self.env.user
+        allowed = user._get_allowed_farm_employee_types()
+        if allowed and len(allowed) == 1:
+            return allowed[0]
+        if 'temporary' in allowed:
+            return 'temporary'
+        if 'cpw' in allowed:
+            return 'cpw'
+        if allowed:
+            return allowed[0]
+        return 'temporary'
+
     # Agricultural Employee Classification (Mandatory)
     farm_employee_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
@@ -18,7 +31,7 @@ class HrEmployee(models.Model):
         ('temporary', 'Temporary (ጊዜያዊ)'),
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
         ('cpw', 'CPW'),
-    ], string='Employee Classification', default='temporary', required=True, tracking=True)
+    ], string='Employee Classification', default=_default_farm_employee_type, required=True, tracking=True)
 
     # Employment Term: Contract vs Permanent (Applicable for Head Office and Farm employees)
     employment_term = fields.Selection([
@@ -257,6 +270,25 @@ class HrEmployee(models.Model):
                     "Employee '%s' is only %d years old (Date of Birth: %s).\n"
                     "The minimum legal employment age is 18 years or above."
                 ) % (emp.name or 'New Employee', age, emp.birthday))
+
+    @api.constrains('farm_employee_type')
+    def _check_farm_employee_type_access(self):
+        for emp in self:
+            if self.env.su:
+                continue
+            # Self-profile update bypass
+            if emp.user_id == self.env.user and not self.env.user.has_group('hr.group_hr_user'):
+                continue
+            allowed = self.env.user._get_allowed_farm_employee_types()
+            if allowed and emp.farm_employee_type not in allowed:
+                type_label = dict(self._fields['farm_employee_type'].selection).get(
+                    emp.farm_employee_type, emp.farm_employee_type
+                )
+                raise ValidationError(_(
+                    "❌ Access Denied: You do not have permission to manage '%s' employees.\n\n"
+                    "Your permitted employee classifications are restricted by your security group settings. "
+                    "Please contact your administrator to grant access to this classification."
+                ) % type_label)
 
     @api.onchange('birthday')
     def _onchange_birthday_check(self):
@@ -1005,3 +1037,16 @@ class HrEmployee(models.Model):
         if struct and hasattr(Contract, 'struct_id'):
             contract_vals['struct_id'] = struct.id
         return Contract.create(contract_vals)
+
+
+class HrEmployeePublic(models.Model):
+    _inherit = 'hr.employee.public'
+
+    farm_employee_type = fields.Selection([
+        ('head_office', 'Head Office (ዋና መ/ቤት)'),
+        ('permanent', 'Farm (የእርሻ)'),
+        ('temporary', 'Temporary (ጊዜያዊ)'),
+        ('zemach', 'Zemach / Seasonal (ዘመች)'),
+        ('cpw', 'CPW'),
+    ], string='Employee Classification', readonly=True)
+
