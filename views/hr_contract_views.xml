@@ -211,6 +211,8 @@
                                         <field name="deduction_advance"/>
                                         <field name="deduction_pre_payment"/>
                                         <field name="deduction_credit_assoc_loan"/>
+                                        <field name="deduction_short_term_loan"/>
+                                        <field name="deduction_long_term_loan"/>
                                         <field name="deduction_medical_recovery"/>
                                         <field name="deduction_pension_receivable"/>
                                         <field name="deduction_fine"/>
