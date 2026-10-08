@@ -21,7 +21,7 @@ class HrSalaryAttachmentAdjustWizard(models.TransientModel):
     )
     schedule_line_id = fields.Many2one(
         'hr.salary.attachment.schedule',
-        string='Installment Month',
+        string='Scheduled Installment',
         required=True,
         domain="[('attachment_id', '=', attachment_id), ('state', '=', 'scheduled')]",
         help='The scheduled installment month being adjusted.',

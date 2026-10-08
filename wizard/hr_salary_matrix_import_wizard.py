@@ -118,7 +118,7 @@ class HrSalaryMatrixImportWizard(models.TransientModel):
     target_matrix = fields.Selection([
         ('existing', 'Update Current / Selected Salary Scale'),
         ('new', 'Create New Salary Scale'),
-    ], string='Target Salary Scale', default='existing', required=True)
+    ], string='Target Scale Action', default='existing', required=True)
 
     matrix_id = fields.Many2one(
         'hr.salary.matrix',

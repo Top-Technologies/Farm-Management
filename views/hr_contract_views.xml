@@ -86,6 +86,7 @@
                                     <separator string="Other Approved Allowances"/>
                                     <field name="allowance_hardship"/>
                                     <field name="allowance_overtime"/>
+                                    <field name="allowance_cash_indemnity"/>
 
                                     <separator string="Back Pay &amp; Retroactive Adjustments (የተከማቸ ጭማሪ)"/>
                                     <div class="border rounded p-2 bg-white mb-2 shadow-sm">
@@ -318,6 +319,7 @@
                 <field name="allowance_transport" widget="monetary" optional="hide" string="Transport Allowance"/>
                 <field name="taxable_transport_allowance" widget="monetary" optional="hide" string="Taxable Transport"/>
                 <field name="credit_assoc_voluntary_rate" optional="hide" string="Credit Assoc Voluntary (%)"/>
+                <field name="allowance_cash_indemnity" widget="monetary" optional="hide" string="Cash Indemnity"/>
                 <field name="total_monthly_allowances" widget="monetary" optional="show" string="Allowances"/>
                 <field name="gross_monthly_wage" widget="monetary" optional="show" string="Gross Wage"/>
                 <field name="total_monthly_deductions" widget="monetary" optional="show" string="Total Deductions"/>

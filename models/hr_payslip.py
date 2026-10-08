@@ -270,6 +270,13 @@ class HrPayslip(models.Model):
                 self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 190 WHERE code = 'TOTAL_DEDUCTIONS';")
                 self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 195 WHERE code = 'TOTAL_DEPOSITS';")
                 self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 126 WHERE code = 'DED_ABSENT';")
+                self.env.cr.execute("""
+                    UPDATE hr_salary_rule
+                    SET condition_select = 'python',
+                        condition_python = 'result = ''' || code || ''' in inputs'
+                    WHERE amount_python_compute LIKE '%inputs[%'
+                      AND (condition_select = 'none' OR condition_python NOT LIKE '%inputs%');
+                """)
                 # 2. Net salary as final row
                 self.env.cr.execute("UPDATE hr_salary_rule SET sequence = 300 WHERE code = 'NET';")
 
@@ -279,12 +286,26 @@ class HrPayslip(models.Model):
                     SELECT s.id, w.id
                     FROM hr_payroll_structure s
                     CROSS JOIN hr_work_entry_type w
-                    WHERE (w.code = 'LEAVE90' OR w.id IN (SELECT work_entry_type_id FROM hr_leave_type WHERE unpaid = true AND work_entry_type_id IS NOT NULL))
+                    WHERE w.code = 'LEAVE90'
                     AND NOT EXISTS (
                         SELECT 1 FROM hr_payroll_structure_hr_work_entry_type_rel rel
                         WHERE rel.hr_payroll_structure_id = s.id AND rel.hr_work_entry_type_id = w.id
                     );
                 """)
+                # If hr_leave_type exists (from hr_holidays), register unpaid leave types
+                self.env.cr.execute("SELECT to_regclass('public.hr_leave_type');")
+                if self.env.cr.fetchone()[0]:
+                    self.env.cr.execute("""
+                        INSERT INTO hr_payroll_structure_hr_work_entry_type_rel (hr_payroll_structure_id, hr_work_entry_type_id)
+                        SELECT s.id, w.id
+                        FROM hr_payroll_structure s
+                        CROSS JOIN hr_work_entry_type w
+                        WHERE w.id IN (SELECT work_entry_type_id FROM hr_leave_type WHERE unpaid = true AND work_entry_type_id IS NOT NULL)
+                        AND NOT EXISTS (
+                            SELECT 1 FROM hr_payroll_structure_hr_work_entry_type_rel rel
+                            WHERE rel.hr_payroll_structure_id = s.id AND rel.hr_work_entry_type_id = w.id
+                        );
+                    """)
 
                 # Update BASIC rule to evaluate paid worked days and deduct unpaid days
                 basic_code = """result = payslip.paid_amount if (payslip.worked_days_line_ids and payslip.struct_id.use_worked_day_lines) else (contract.wage or 0.0)"""
@@ -304,7 +325,7 @@ class HrPayslip(models.Model):
 
                 # Directly ensure DED_INCOME_TAX, DED_PENSION_7, and COMP_PENSION_11 rules compute dynamically
                 income_tax_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
-alw_trans = getattr(contract, 'taxable_transport_allowance', 0.0) or 0.0
+alw_trans = contract.taxable_transport_allowance or 0.0
 taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else (basic + (alw_trans or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
 
 if taxable <= 2000:
@@ -321,18 +342,18 @@ else:
     result = - 0.35 * taxable + 2050.0
 
 result = round(result, 2)"""
-                pension_code = """if not getattr(contract, 'has_pension', True):
+                pension_code = """if not contract.has_pension:
     result = 0.0
 else:
     basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
     result = -round(basic * 0.07, 2)"""
-                comp_pension_code = """if not getattr(contract, 'has_pension', True):
+                comp_pension_code = """if not contract.has_pension:
     result = 0.0
 else:
     basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
     result = round(basic * 0.11, 2)"""
 
-                pension_cond = "result = bool(getattr(contract, 'has_pension', True))"
+                pension_cond = "result = bool(contract.has_pension)"
 
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
@@ -370,7 +391,7 @@ else:
                     WHERE s.id != r.struct_id
                     AND s.id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7' AND struct_id IS NOT NULL)
                     AND r.struct_id = (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure' LIMIT 1)
-                    AND r.code IN ('DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11', 'DED_ABSENT')
+                    AND r.code IN ('DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11', 'DED_ABSENT', 'ALW_CASH_INDEMNITY')
                     AND NOT EXISTS (
                         SELECT 1 FROM hr_salary_rule existing
                         WHERE existing.struct_id = s.id AND existing.code = r.code

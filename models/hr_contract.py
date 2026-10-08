@@ -245,12 +245,19 @@ class HrContract(models.Model):
         tracking=True,
         help='Payment for approved working hours exceeding normal work schedule.',
     )
+    allowance_cash_indemnity = fields.Float(
+        string='Cash Indemnity (የገንዘብ ኃላፊነት አበል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly cash indemnity allowance paid to cashiers or employees handling cash (tax-exempt per Proclamation No. 979/2016 Art. 65).',
+    )
     total_monthly_allowances = fields.Float(
         string='Total Monthly Allowances (ጠቅላላ አበሎች)',
         compute='_compute_all_allowances',
         store=True,
         digits=(16, 2),
-        help='Sum of all monthly allowances (Transport + EV + Hardship + Retroactive + Overtime).',
+        help='Sum of all monthly allowances (Transport + EV + Hardship + Retroactive + Overtime + Cash Indemnity).',
     )
     gross_monthly_wage = fields.Float(
         string='Total Gross Monthly Wage (ጠቅላላ ወርሃዊ ገቢ)',
@@ -713,12 +720,12 @@ class HrContract(models.Model):
         self._compute_statutory_taxes()
         self._compute_all_deductions()
 
-    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime')
+    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime', 'allowance_cash_indemnity')
     def _compute_all_allowances(self):
         for c in self:
             tot_allow = (c.allowance_transport or 0.0) + \
                         (c.allowance_hardship or 0.0) + (c.allowance_retroactive or 0.0) + \
-                        (c.allowance_overtime or 0.0)
+                        (c.allowance_overtime or 0.0) + (c.allowance_cash_indemnity or 0.0)
             c.total_monthly_allowances = tot_allow
             c.gross_monthly_wage = (c.wage or 0.0) + tot_allow
 
@@ -922,7 +929,7 @@ class HrContract(models.Model):
         self._compute_credit_association_deductions()
         self._compute_all_deductions()
 
-    @api.onchange('wage', 'taxable_transport_allowance', 'allowance_transport', 'credit_assoc_voluntary_rate', 'has_credit_association', 'allowance_hardship', 'allowance_overtime', 'has_pension')
+    @api.onchange('wage', 'taxable_transport_allowance', 'allowance_transport', 'credit_assoc_voluntary_rate', 'has_credit_association', 'allowance_hardship', 'allowance_overtime', 'allowance_cash_indemnity', 'has_pension')
     def _onchange_wage_taxes_estimate(self):
         for c in self:
             c._compute_statutory_taxes()
@@ -971,6 +978,7 @@ class HrContract(models.Model):
         'taxable_transport_allowance',
         'allowance_hardship',
         'allowance_overtime',
+        'allowance_cash_indemnity',
         'has_pension',
         'total_monthly_deductions',
     )
@@ -979,7 +987,8 @@ class HrContract(models.Model):
             wage = c.wage or 0.0
             # Regular monthly net without retroactive addition
             regular_gross = wage + (c.allowance_transport or 0.0) + \
-                            (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
+                            (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
+                            (c.allowance_cash_indemnity or 0.0)
             regular_net = max(0.0, regular_gross - (c.total_monthly_deductions or 0.0))
             c.back_pay_new_net = regular_net
 
@@ -1033,14 +1042,15 @@ class HrContract(models.Model):
                 c.back_pay_pension_monthly = 0.0
                 c.back_pay_pension_total = 0.0
 
-    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'taxable_transport_allowance', 'allowance_hardship', 'allowance_overtime', 'total_monthly_deductions')
+    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'taxable_transport_allowance', 'allowance_hardship', 'allowance_overtime', 'allowance_cash_indemnity', 'total_monthly_deductions')
     def _onchange_back_pay_calculator(self):
         if self.back_pay_months > 0 and not self.back_pay_previous_net:
             self._fetch_previous_payslip_data()
 
         wage = self.wage or 0.0
         regular_gross = wage + (self.allowance_transport or 0.0) + \
-                        (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
+                        (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0) + \
+                        (self.allowance_cash_indemnity or 0.0)
         regular_net = max(0.0, regular_gross - (self.total_monthly_deductions or 0.0))
         self.back_pay_new_net = regular_net
 

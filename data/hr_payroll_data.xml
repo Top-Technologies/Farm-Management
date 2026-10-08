@@ -214,6 +214,20 @@ result = contract.allowance_overtime
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
+        <record id="rule_perm_alw_cash_indemnity" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.ALW"/>
+            <field name="name">Cash Indemnity (የገንዘብ ኃላፊነት አበል - ከግብር ነፃ)</field>
+            <field name="code">ALW_CASH_INDEMNITY</field>
+            <field name="sequence">38</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.allowance_cash_indemnity and contract.allowance_cash_indemnity > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = contract.allowance_cash_indemnity
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
         <!-- 3.3 Gross & Taxable Wage -->
         <record id="rule_perm_taxable" model="hr.salary.rule">
             <field name="category_id" ref="category_taxable_salary"/>
@@ -224,9 +238,9 @@ result = contract.allowance_overtime
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Taxable base: Basic wage + Taxable Allowances (Transport, Hardship, Overtime)
-# Untaxed Allowances strictly excluded: ALW_FIELD_WORK (Agricultural Field Entries) and ALW_RETROACTIVE (Back Pay Difference)
+# Untaxed Allowances strictly excluded: ALW_FIELD_WORK, ALW_RETROACTIVE, and ALW_CASH_INDEMNITY (per Proc. 979/2016 Art. 65)
 basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
-alw_trans = getattr(contract, 'taxable_transport_allowance', 0.0) or 0.0
+alw_trans = contract.taxable_transport_allowance or 0.0
 alw_hard = contract.allowance_hardship or 0.0
 alw_ot = contract.allowance_overtime or 0.0
 result = basic + (alw_trans or 0.0) + alw_hard + alw_ot
@@ -254,11 +268,11 @@ result = categories['BASIC'] + categories['ALW']
             <field name="code">DED_PENSION_7</field>
             <field name="sequence">110</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(getattr(contract, 'has_pension', True))</field>
+            <field name="condition_python">result = bool(contract.has_pension)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Dynamic 7% Employee Pension deduction based on Basic Salary
-if not getattr(contract, 'has_pension', True):
+if not contract.has_pension:
     result = 0.0
 else:
     basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
@@ -274,11 +288,11 @@ else:
             <field name="code">COMP_PENSION_11</field>
             <field name="sequence">111</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(getattr(contract, 'has_pension', True))</field>
+            <field name="condition_python">result = bool(contract.has_pension)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # 11% Company Pension Contribution based on Basic Wage (Not deducted from employee net)
-if not getattr(contract, 'has_pension', True):
+if not contract.has_pension:
     result = 0.0
 else:
     basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
@@ -296,7 +310,7 @@ else:
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Dynamic Ethiopian Progressive Income Tax based on Taxable Salary
-taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (getattr(contract, 'taxable_transport_allowance', 0.0) or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.taxable_transport_allowance or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
 
 if taxable &lt;= 2000:
     result = 0.0
@@ -836,10 +850,10 @@ result = contract.back_pay_tax_total
             <field name="code">BACK_PAY_PENSION_7</field>
             <field name="sequence">181</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(getattr(contract, 'has_pension', True) and contract.back_pay_pension_total and contract.back_pay_pension_total > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
+            <field name="condition_python">result = bool(contract.has_pension and contract.back_pay_pension_total and contract.back_pay_pension_total > 0 and (contract.is_back_pay_approved or not contract.back_pay_months))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = contract.back_pay_pension_total if getattr(contract, 'has_pension', True) else 0.0
+result = contract.back_pay_pension_total if contract.has_pension else 0.0
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
