@@ -228,6 +228,48 @@ result = contract.allowance_cash_indemnity
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
+        <record id="rule_perm_alw_acting_position" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.ALW"/>
+            <field name="name">Acting / Position Allowance (የተጠባባቂ/የኃላፊነት አበል)</field>
+            <field name="code">ALW_ACTING_POSITION</field>
+            <field name="sequence">39</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.allowance_acting_position and contract.allowance_acting_position > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = contract.allowance_acting_position
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_perm_alw_bulk_loading" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.ALW"/>
+            <field name="name">Bulk Loading Allowance (የጅምላ ጭነት አበል)</field>
+            <field name="code">ALW_BULK_LOADING</field>
+            <field name="sequence">40</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.allowance_bulk_loading and contract.allowance_bulk_loading > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = contract.allowance_bulk_loading
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_perm_alw_other" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.ALW"/>
+            <field name="name">Other Allowance (ሌሎች አበሎች)</field>
+            <field name="code">ALW_OTHER</field>
+            <field name="sequence">41</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.allowance_other and contract.allowance_other > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = contract.allowance_other
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
         <!-- 3.3 Gross & Taxable Wage -->
         <record id="rule_perm_taxable" model="hr.salary.rule">
             <field name="category_id" ref="category_taxable_salary"/>
@@ -829,7 +871,176 @@ result = -contract.deduction_meredaja
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
 
-        <!-- 3.10 Informational Government Reporting & Summary Rules (Not Deducted from Net) -->
+        <!-- 3.10 Category 7: Other Operational Deductions -->
+        <record id="rule_ded_ambassador_garment" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Ambassador Garment (አምባሳደር ጋርመንት)</field>
+            <field name="code">DED_AMBASSADOR_GARMENT</field>
+            <field name="sequence">165</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_ambassador_garment and contract.deduction_ambassador_garment > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_ambassador_garment
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_staff_debtors" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">DEBTERS / Staff Debtors (የሰራተኞች እዳ/ዴቢተርስ)</field>
+            <field name="code">DED_STAFF_DEBTORS</field>
+            <field name="sequence">166</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_staff_debtors and contract.deduction_staff_debtors > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_staff_debtors
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_digoma" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Digoma (ድጎማ ተቀናሽ)</field>
+            <field name="code">DED_DIGOMA</field>
+            <field name="sequence">167</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_digoma and contract.deduction_digoma > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_digoma
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_other" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Other Deduction (ሌሎች ተቀናሾች)</field>
+            <field name="code">DED_OTHER</field>
+            <field name="sequence">168</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_other and contract.deduction_other > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_other
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_penalty" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Penalty / Penality (የቅጣት ተቀናሽ)</field>
+            <field name="code">DED_PENALTY</field>
+            <field name="sequence">169</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_penalty and contract.deduction_penalty > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_penalty
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_red_cross" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">RED CROSS (ቀይ መስቀል)</field>
+            <field name="code">DED_RED_CROSS</field>
+            <field name="sequence">170</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_red_cross and contract.deduction_red_cross > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_red_cross
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_rice" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Rice Deduction (የሩዝ ተቀናሽ)</field>
+            <field name="code">DED_RICE</field>
+            <field name="sequence">171</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_rice and contract.deduction_rice > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_rice
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_service_charge" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Service Charges (የአገልግሎት ክፍያ)</field>
+            <field name="code">DED_SERVICE_CHARGE</field>
+            <field name="sequence">172</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_service_charge and contract.deduction_service_charge > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_service_charge
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_kidney_support" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Kidney Support (የኩላሊት ህክምና ድጋፍ)</field>
+            <field name="code">DED_KIDNEY_SUPPORT</field>
+            <field name="sequence">173</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_kidney_support and contract.deduction_kidney_support > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_kidney_support
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_labor_union" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Labor Union (የሰራተኛ ማህበር)</field>
+            <field name="code">DED_LABOR_UNION</field>
+            <field name="sequence">174</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_labor_union and contract.deduction_labor_union > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_labor_union
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_oil" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Oil Deduction (የዘይት ተቀናሽ)</field>
+            <field name="code">DED_OIL</field>
+            <field name="sequence">175</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_oil and contract.deduction_oil > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_oil
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <record id="rule_ded_floor" model="hr.salary.rule">
+            <field name="category_id" ref="hr_payroll.DED"/>
+            <field name="name">Floor / Flour Deduction (የዱቄት ተቀናሽ)</field>
+            <field name="code">DED_FLOOR</field>
+            <field name="sequence">176</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.deduction_floor and contract.deduction_floor > 0)</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = -contract.deduction_floor
+            </field>
+            <field name="struct_id" ref="structure_farm_permanent"/>
+        </record>
+
+        <!-- 3.11 Informational Government Reporting & Summary Rules (Not Deducted from Net) -->
         <record id="rule_back_pay_tax" model="hr.salary.rule">
             <field name="category_id" ref="category_payslip_summary"/>
             <field name="name">Back Pay Income Tax (የተከማቸ ጭማሪ የገቢ ግብር - ለሪፖርት)</field>
