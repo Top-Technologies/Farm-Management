@@ -391,7 +391,12 @@ else:
                     WHERE s.id != r.struct_id
                     AND s.id IN (SELECT DISTINCT struct_id FROM hr_salary_rule WHERE code = 'DED_PENSION_7' AND struct_id IS NOT NULL)
                     AND r.struct_id = (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure' LIMIT 1)
-                    AND r.code IN ('DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11', 'DED_ABSENT', 'ALW_CASH_INDEMNITY')
+                    AND r.code IN (
+                        'DED_CREDIT_VOLUNTARY', 'BACK_PAY_TAX', 'BACK_PAY_PENSION_7', 'TOTAL_DEDUCTIONS', 'TOTAL_DEPOSITS', 'COMP_PENSION_11', 'DED_ABSENT', 'ALW_CASH_INDEMNITY',
+                        'ALW_ACTING_POSITION', 'ALW_BULK_LOADING', 'ALW_OTHER',
+                        'DED_AMBASSADOR_GARMENT', 'DED_STAFF_DEBTORS', 'DED_DIGOMA', 'DED_OTHER', 'DED_PENALTY', 'DED_RED_CROSS',
+                        'DED_RICE', 'DED_SERVICE_CHARGE', 'DED_KIDNEY_SUPPORT', 'DED_LABOR_UNION', 'DED_OIL', 'DED_FLOOR'
+                    )
                     AND NOT EXISTS (
                         SELECT 1 FROM hr_salary_rule existing
                         WHERE existing.struct_id = s.id AND existing.code = r.code
