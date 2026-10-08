@@ -252,12 +252,39 @@ class HrContract(models.Model):
         tracking=True,
         help='Monthly cash indemnity allowance paid to cashiers or employees handling cash (tax-exempt per Proclamation No. 979/2016 Art. 65).',
     )
+    allowance_acting_position = fields.Float(
+        string='Acting / Position Allowance (የተጠባባቂ/የኃላፊነት አበል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly allowance for acting capacity or holding a higher position.',
+    )
+    allowance_bulk_loading = fields.Float(
+        string='Bulk Loading Allowance (የጅምላ ጭነት አበል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly allowance for bulk loading activities.',
+    )
+    allowance_other = fields.Float(
+        string='Other Allowance (ሌሎች አበሎች)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Other miscellaneous monthly approved allowances.',
+    )
+    total_other_allowances = fields.Float(
+        string='Total Other Allowances',
+        compute='_compute_all_allowances',
+        store=True,
+        digits=(16, 2),
+    )
     total_monthly_allowances = fields.Float(
         string='Total Monthly Allowances (ጠቅላላ አበሎች)',
         compute='_compute_all_allowances',
         store=True,
         digits=(16, 2),
-        help='Sum of all monthly allowances (Transport + EV + Hardship + Retroactive + Overtime + Cash Indemnity).',
+        help='Sum of all monthly allowances (Transport + EV + Hardship + Retroactive + Overtime + Cash Indemnity + Other Allowances).',
     )
     gross_monthly_wage = fields.Float(
         string='Total Gross Monthly Wage (ጠቅላላ ወርሃዊ ገቢ)',
@@ -614,6 +641,100 @@ class HrContract(models.Model):
     )
 
     # =========================================================================
+    # 7. Other Operational Deductions
+    # =========================================================================
+    deduction_ambassador_garment = fields.Float(
+        string='Ambassador Garment (አምባሳደር ጋርመንት)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly deduction for Ambassador Garment clothing / credit purchase.',
+    )
+    deduction_staff_debtors = fields.Float(
+        string='DEBTERS / Staff Debtors (የሰራተኞች እዳ/ዴቢተርስ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Staff debtor repayment or short-term operational debt deduction.',
+    )
+    deduction_digoma = fields.Float(
+        string='Digoma (ድጎማ ተቀናሽ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly deduction for Digoma recovery.',
+    )
+    deduction_other = fields.Float(
+        string='Other Deduction (ሌሎች ተቀናሾች)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Miscellaneous other operational deductions.',
+    )
+    deduction_penalty = fields.Float(
+        string='Penalty / Penality (የቅጣት ተቀናሽ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly penalty deduction.',
+    )
+    deduction_red_cross = fields.Float(
+        string='RED CROSS (ቀይ መስቀል)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly Red Cross charitable contribution.',
+    )
+    deduction_rice = fields.Float(
+        string='Rice Deduction (የሩዝ ተቀናሽ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly commissary deduction for rice supply.',
+    )
+    deduction_service_charge = fields.Float(
+        string='Service Charges (የአገልግሎት ክፍያ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly service charge deduction.',
+    )
+    deduction_kidney_support = fields.Float(
+        string='Kidney Support (የኩላሊት ህክምና ድጋፍ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly voluntary or mandatory contribution for kidney dialysis/treatment support.',
+    )
+    deduction_labor_union = fields.Float(
+        string='Labor Union (የሰራተኛ ማህበር)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly labor union membership contribution.',
+    )
+    deduction_oil = fields.Float(
+        string='Oil Deduction (የዘይት ተቀናሽ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly commissary deduction for edible oil supply.',
+    )
+    deduction_floor = fields.Float(
+        string='Floor / Flour Deduction (የዱቄት ተቀናሽ)',
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+        help='Monthly commissary deduction for flour supply.',
+    )
+    total_other_deductions = fields.Float(
+        string='Total Other Deductions',
+        compute='_compute_all_deductions',
+        store=True,
+        digits=(16, 2),
+    )
+
+    # =========================================================================
     # Overall Totals
     # =========================================================================
     total_monthly_deductions = fields.Float(
@@ -720,12 +841,22 @@ class HrContract(models.Model):
         self._compute_statutory_taxes()
         self._compute_all_deductions()
 
-    @api.depends('wage', 'allowance_transport', 'allowance_hardship', 'allowance_retroactive', 'allowance_overtime', 'allowance_cash_indemnity')
+    @api.depends(
+        'wage', 'allowance_transport', 'allowance_hardship', 'allowance_retroactive',
+        'allowance_overtime', 'allowance_cash_indemnity',
+        'allowance_acting_position', 'allowance_bulk_loading', 'allowance_other',
+    )
     def _compute_all_allowances(self):
         for c in self:
+            other_allow = (c.allowance_acting_position or 0.0) + \
+                          (c.allowance_bulk_loading or 0.0) + \
+                          (c.allowance_other or 0.0)
+            c.total_other_allowances = other_allow
+
             tot_allow = (c.allowance_transport or 0.0) + \
                         (c.allowance_hardship or 0.0) + (c.allowance_retroactive or 0.0) + \
-                        (c.allowance_overtime or 0.0) + (c.allowance_cash_indemnity or 0.0)
+                        (c.allowance_overtime or 0.0) + (c.allowance_cash_indemnity or 0.0) + \
+                        other_allow
             c.total_monthly_allowances = tot_allow
             c.gross_monthly_wage = (c.wage or 0.0) + tot_allow
 
@@ -752,6 +883,11 @@ class HrContract(models.Model):
         # Category 6
         'deduction_dashen_credit', 'deduction_dashen_saving',
         'deduction_awash_credit', 'deduction_awash_saving', 'deduction_meredaja',
+        # Category 7: Other Operational Deductions
+        'deduction_ambassador_garment', 'deduction_staff_debtors', 'deduction_digoma',
+        'deduction_other', 'deduction_penalty', 'deduction_red_cross',
+        'deduction_rice', 'deduction_service_charge', 'deduction_kidney_support',
+        'deduction_labor_union', 'deduction_oil', 'deduction_floor',
     )
     def _compute_all_deductions(self):
         for c in self:
@@ -769,6 +905,12 @@ class HrContract(models.Model):
             c5 = (c.deduction_meat_meredaja or 0.0) + (c.deduction_jimma_meat or 0.0) + (c.deduction_suntu_meat or 0.0)
             c6 = (c.deduction_dashen_credit or 0.0) + (c.deduction_dashen_saving or 0.0) + \
                  (c.deduction_awash_credit or 0.0) + (c.deduction_awash_saving or 0.0) + (c.deduction_meredaja or 0.0)
+            c7 = (c.deduction_ambassador_garment or 0.0) + (c.deduction_staff_debtors or 0.0) + \
+                 (c.deduction_digoma or 0.0) + (c.deduction_other or 0.0) + \
+                 (c.deduction_penalty or 0.0) + (c.deduction_red_cross or 0.0) + \
+                 (c.deduction_rice or 0.0) + (c.deduction_service_charge or 0.0) + \
+                 (c.deduction_kidney_support or 0.0) + (c.deduction_labor_union or 0.0) + \
+                 (c.deduction_oil or 0.0) + (c.deduction_floor or 0.0)
 
             c.total_statutory_deductions = c1
             c.total_loan_deductions = c2
@@ -776,8 +918,9 @@ class HrContract(models.Model):
             c.total_welfare_deductions = c4
             c.total_food_deductions = c5
             c.total_bank_deductions = c6
+            c.total_other_deductions = c7
 
-            total = c1 + c2 + c3 + c4 + c5 + c6
+            total = c1 + c2 + c3 + c4 + c5 + c6 + c7
             c.total_monthly_deductions = total
             gross = c.gross_monthly_wage if c.gross_monthly_wage else (c.wage or 0.0)
             c.net_wage_after_deductions = max(0.0, gross - total)
@@ -929,10 +1072,20 @@ class HrContract(models.Model):
         self._compute_credit_association_deductions()
         self._compute_all_deductions()
 
-    @api.onchange('wage', 'taxable_transport_allowance', 'allowance_transport', 'credit_assoc_voluntary_rate', 'has_credit_association', 'allowance_hardship', 'allowance_overtime', 'allowance_cash_indemnity', 'has_pension')
+    @api.onchange(
+        'wage', 'taxable_transport_allowance', 'allowance_transport', 'credit_assoc_voluntary_rate',
+        'has_credit_association', 'allowance_hardship', 'allowance_overtime', 'allowance_cash_indemnity',
+        'allowance_acting_position', 'allowance_bulk_loading', 'allowance_other',
+        'has_pension',
+        'deduction_ambassador_garment', 'deduction_staff_debtors', 'deduction_digoma',
+        'deduction_other', 'deduction_penalty', 'deduction_red_cross',
+        'deduction_rice', 'deduction_service_charge', 'deduction_kidney_support',
+        'deduction_labor_union', 'deduction_oil', 'deduction_floor',
+    )
     def _onchange_wage_taxes_estimate(self):
         for c in self:
             c._compute_statutory_taxes()
+            c._compute_all_allowances()
             c._compute_credit_association_deductions()
             c._compute_all_deductions()
 
