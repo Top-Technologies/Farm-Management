@@ -61,6 +61,7 @@
                 <group string="Workforce &amp; Location Filters">
                     <group>
                         <field name="worker_type" widget="radio" options="{'horizontal': true}" readonly="state != 'draft'"/>
+                        <field name="department_id" placeholder="All Departments (Optional)" readonly="state != 'draft'"/>
                         <field name="structure_id" options="{'no_create': True}" placeholder="All / Any Structure (Optional)" readonly="state != 'draft'"/>
                     </group>
                     <group>
@@ -133,6 +134,88 @@
                 <filter string="Gender" name="group_by_gender" context="{'group_by': 'gender'}"/>
                 <filter string="Worker Classification" name="group_by_farm_employee_type" context="{'group_by': 'farm_employee_type'}"/>
                 <filter string="Farm Location" name="group_by_farm" context="{'group_by': 'farm_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- HR Payslip by Employees Wizard Inherit: Flexible Mode (All, Department, Classification, Custom) -->
+    <record id="view_hr_payslip_by_employees_farm_inherit" model="ir.ui.view">
+        <field name="name">hr.payslip.employees.form.farm.inherit</field>
+        <field name="model">hr.payslip.employees</field>
+        <field name="inherit_id" ref="hr_payroll.view_hr_payslip_by_employees"/>
+        <field name="arch" type="xml">
+            <!-- 1. Selection Mode Header Card -->
+            <xpath expr="//span[1]" position="after">
+                <div class="card mb-3 border bg-light p-3 rounded shadow-sm">
+                    <label for="generation_mode" class="fw-bold mb-2 text-primary d-block" style="font-size: 1.05rem;">
+                        <i class="fa fa-sliders me-1"/> Select Generation Mode / የማመንጫ ዘዴ ይምረጡ:
+                    </label>
+                    <field name="generation_mode" widget="radio" options="{'horizontal': true}"/>
+
+                    <div class="alert alert-success d-flex align-items-center mt-2 mb-0 py-2" role="status" invisible="generation_mode != 'all'">
+                        <i class="fa fa-users fa-lg me-2 text-success"/>
+                        <div>
+                            <strong>All Employees Mode (ለሁሉም ሰራተኞች):</strong>
+                            Generates payslips for all active employees across the entire organization at once. Contracts are verified automatically.
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info d-flex align-items-center mt-2 mb-0 py-2" role="status" invisible="generation_mode != 'department'">
+                        <i class="fa fa-building fa-lg me-2 text-info"/>
+                        <div>
+                            <strong>By Department Mode (በክፍል / በዲፓርትመንት):</strong>
+                            Select a Department below to generate payslips for all employees in that department and sub-departments.
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning d-flex align-items-center mt-2 mb-0 py-2" role="status" invisible="generation_mode != 'worker_type'">
+                        <i class="fa fa-tractor fa-lg me-2 text-warning"/>
+                        <div>
+                            <strong>By Worker Classification Mode (በሰራተኛ ዓይነት / እርሻ):</strong>
+                            Filter by agricultural workforce classification (Farm Staff, Head Office, Temporary, Seasonal/Zemach, CPW).
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+
+            <!-- 2. Dynamic Field Visibility -->
+            <xpath expr="//separator[1]" position="attributes">
+                <attribute name="invisible">generation_mode == 'all'</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='department_id']" position="attributes">
+                <attribute name="invisible">generation_mode not in ('department', 'custom')</attribute>
+                <attribute name="required">generation_mode == 'department'</attribute>
+                <attribute name="placeholder">Select Department...</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='department_id']" position="after">
+                <field name="worker_type" widget="radio" options="{'horizontal': true}" invisible="generation_mode != 'worker_type'"/>
+                <field name="farm_id" placeholder="All Farms (Optional)" invisible="generation_mode != 'worker_type'"/>
+                <field name="sub_farm_id" placeholder="All Sub Farms (Optional)" invisible="generation_mode != 'worker_type' or not farm_id"/>
+                <field name="sub_unit_id" placeholder="All Sub Units (Optional)" invisible="generation_mode != 'worker_type' or not farm_id and not sub_farm_id"/>
+            </xpath>
+
+            <xpath expr="//field[@name='job_id'][1]" position="attributes">
+                <attribute name="invisible">generation_mode != 'custom' or not department_id</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='job_id'][2]" position="attributes">
+                <attribute name="invisible">generation_mode != 'custom' or department_id</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='structure_type_id']" position="attributes">
+                <attribute name="invisible">generation_mode != 'custom'</attribute>
+            </xpath>
+
+            <!-- 3. Employees Header with Selected Count Badge -->
+            <xpath expr="//separator[3]" position="replace">
+                <div class="d-flex align-items-center justify-content-between mb-2 mt-3">
+                    <separator string="Employees / ሰራተኞች" class="m-0"/>
+                    <span class="badge text-bg-primary fs-6 px-3 py-2">
+                        <i class="fa fa-users me-1"/> Selected Employees: <field name="selected_employee_count" class="fw-bold text-white"/>
+                    </span>
+                </div>
             </xpath>
         </field>
     </record>

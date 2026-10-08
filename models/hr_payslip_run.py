@@ -13,8 +13,14 @@ class HrPayslipRun(models.Model):
         ('head_office', 'Head Office Staff (Standard Salary)'),
         ('cpw', 'CPW Staff (Standard Salary)'),
         ('all', 'All Workers'),
-    ], string='Worker Classification', default='temporary', required=True,
+    ], string='Worker Classification', default='all', required=True,
        help='Select which category of workers this payroll batch is targeting.')
+
+    department_id = fields.Many2one(
+        'hr.department',
+        string='Department Filter',
+        help='Optional: Filter payroll batch to employees in a specific department.',
+    )
 
     structure_id = fields.Many2one(
         'hr.payroll.structure',
@@ -218,6 +224,15 @@ class HrPayslipRun(models.Model):
         else:
             eligible_employees = unpaid_entries.mapped('employee_id')
 
+        # Filter by department_id if specified on batch
+        if self.department_id:
+            eligible_employees = eligible_employees.filtered(
+                lambda e: e.department_id and (
+                    e.department_id.id == self.department_id.id or
+                    (e.department_id.parent_path and str(self.department_id.id) in e.department_id.parent_path.split('/'))
+                )
+            )
+
         # Filter by structure_id if specified on batch
         if self.structure_id:
             def _emp_matches_structure(emp, target_struct):
@@ -251,11 +266,12 @@ class HrPayslipRun(models.Model):
 
         if not eligible_employees:
             worker_label = dict(self._fields['worker_type'].selection).get(self.worker_type, self.worker_type)
+            dept_info = f" in department '{self.department_id.name}'" if self.department_id else ""
             struct_info = f" with structure '{self.structure_id.name}'" if self.structure_id else ""
             raise UserError(_(
-                "No eligible employees or unpaid work entries found for %s%s in period from %s to %s.\n\n"
+                "No eligible employees or unpaid work entries found for %s%s%s in period from %s to %s.\n\n"
                 "Please verify that work entries exist and are approved, or that active employees are configured."
-            ) % (worker_label, struct_info, self.date_start, self.date_end))
+            ) % (worker_label, dept_info, struct_info, self.date_start, self.date_end))
 
         # 3. Exclude employees already having a payslip in this batch
         existing_emp_ids = self.slip_ids.mapped('employee_id').ids
