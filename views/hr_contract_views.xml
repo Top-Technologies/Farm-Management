@@ -301,6 +301,76 @@
                         </div>
                     </div>
                 </page>
+
+                <!-- Dedicated Other Deduction and Allowance Notebook Page -->
+                <page string="Other Deduction and Allowance" name="other_deductions_allowances">
+                    <!-- Clean Info Banner with Subtotals -->
+                    <div class="card p-3 mb-4 border-info bg-light">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <h5 class="text-info mb-1"><i class="fa fa-balance-scale me-2"/>Other Deductions &amp; Allowances Schedule</h5>
+                                <div class="text-muted small">Configure specific operational allowances and miscellaneous employee deductions applicable to this contract.</div>
+                            </div>
+                            <div class="d-flex gap-3">
+                                <span class="badge bg-success p-2 fs-6">Total Other Allowances: <field name="total_other_allowances" widget="monetary" readonly="1"/></span>
+                                <span class="badge bg-danger p-2 fs-6">Total Other Deductions: <field name="total_other_deductions" widget="monetary" readonly="1"/></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Allowance Types Table / Card -->
+                        <div class="col-md-5 mb-3">
+                            <div class="card h-100 shadow-sm border-success">
+                                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-plus-circle me-2"/>Allowance Types</strong>
+                                    <span class="badge bg-light text-dark">Subtotal: <field name="total_other_allowances" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <group class="mb-0">
+                                        <field name="allowance_acting_position" widget="monetary"/>
+                                        <field name="allowance_bulk_loading" widget="monetary"/>
+                                        <field name="allowance_other" widget="monetary"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Deduction Types Table / Card -->
+                        <div class="col-md-7 mb-3">
+                            <div class="card h-100 shadow-sm border-danger">
+                                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center py-2">
+                                    <strong class="mb-0"><i class="fa fa-minus-circle me-2"/>Deduction Types</strong>
+                                    <span class="badge bg-light text-dark">Subtotal: <field name="total_other_deductions" widget="monetary" readonly="1"/></span>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <group class="mb-0">
+                                                <field name="deduction_ambassador_garment" widget="monetary"/>
+                                                <field name="deduction_staff_debtors" widget="monetary"/>
+                                                <field name="deduction_digoma" widget="monetary"/>
+                                                <field name="deduction_other" widget="monetary"/>
+                                                <field name="deduction_penalty" widget="monetary"/>
+                                                <field name="deduction_red_cross" widget="monetary"/>
+                                            </group>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <group class="mb-0">
+                                                <field name="deduction_rice" widget="monetary"/>
+                                                <field name="deduction_service_charge" widget="monetary"/>
+                                                <field name="deduction_kidney_support" widget="monetary"/>
+                                                <field name="deduction_labor_union" widget="monetary"/>
+                                                <field name="deduction_oil" widget="monetary"/>
+                                                <field name="deduction_floor" widget="monetary"/>
+                                            </group>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </page>
             </xpath>
         </field>
     </record>
