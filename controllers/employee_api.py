@@ -83,15 +83,161 @@ class EmployeeAPI(http.Controller):
         return response
 
     # -------------------------------------------------------------------------
-    # GET /api/employees & /odoo/api/employees & /api/fms/employees
+    # Helper Methods for Employee & Contract Resolution
+    # -------------------------------------------------------------------------
+    def _find_employee(self, env, identifier=None, kwargs=None):
+        """Helper to resolve an hr.employee by fms_employee_id, employee_code, database ID, barcode, or name."""
+        kwargs = kwargs or {}
+        target = identifier or kwargs.get('employee_id') or kwargs.get('id') or kwargs.get('emp_id') or kwargs.get('code')
+        if not target:
+            return env['hr.employee'].browse()
+
+        target_str = str(target).strip()
+        # 1. Search by fms_employee_id or employee_code
+        emp = env['hr.employee'].search([
+            '|', ('fms_employee_id', '=ilike', target_str),
+                 ('employee_code', '=ilike', target_str)
+        ], limit=1)
+
+        # 2. Search by numeric database ID if digits
+        if not emp and target_str.isdigit():
+            emp = env['hr.employee'].browse(int(target_str)).exists()
+
+        # 3. Search by barcode
+        if not emp and hasattr(env['hr.employee'], 'barcode'):
+            emp = env['hr.employee'].search([('barcode', '=ilike', target_str)], limit=1)
+
+        # 4. Search by exact or case-insensitive name
+        if not emp:
+            emp = env['hr.employee'].search([('name', '=ilike', target_str)], limit=1)
+
+        return emp
+
+    def _get_employee_contract(self, emp):
+        """Resolves the current active (open/draft) or latest contract for an employee."""
+        # 1. Current contract relation on hr.employee
+        if emp.contract_id:
+            return emp.contract_id
+
+        # 2. Search running 'open' contracts
+        contract = emp.env['hr.contract'].search([
+            ('employee_id', '=', emp.id),
+            ('state', '=', 'open'),
+        ], order='date_start desc, id desc', limit=1)
+        if contract:
+            return contract
+
+        # 3. Search 'draft' contracts
+        contract = emp.env['hr.contract'].search([
+            ('employee_id', '=', emp.id),
+            ('state', '=', 'draft'),
+        ], order='date_start desc, id desc', limit=1)
+        if contract:
+            return contract
+
+        # 4. Fallback to latest contract (including expired)
+        return emp.env['hr.contract'].search([
+            ('employee_id', '=', emp.id),
+        ], order='date_start desc, id desc', limit=1)
+
+    def _format_contract_wage_data(self, emp):
+        """Builds structured contract and basic monthly wage payload for an employee."""
+        contract = self._get_employee_contract(emp)
+        farm = emp.current_farm_id or emp.initial_farm_id
+
+        basic_wage = 0.0
+        matrix_basic_wage = 0.0
+        gross_wage = 0.0
+        net_wage = 0.0
+        contract_info = None
+
+        if contract:
+            basic_wage = float(contract.wage or 0.0)
+            if hasattr(contract, 'matrix_basic_wage') and contract.matrix_basic_wage:
+                matrix_basic_wage = float(contract.matrix_basic_wage)
+            elif hasattr(emp, 'matrix_basic_wage') and emp.matrix_basic_wage:
+                matrix_basic_wage = float(emp.matrix_basic_wage)
+
+            if basic_wage == 0.0 and matrix_basic_wage > 0.0:
+                basic_wage = matrix_basic_wage
+
+            gross_wage = float(getattr(contract, 'gross_monthly_wage', 0.0) or basic_wage)
+            net_wage = float(getattr(contract, 'net_wage_after_deductions', 0.0) or 0.0)
+
+            grade_name = ""
+            if hasattr(contract, 'salary_grade_id') and contract.salary_grade_id:
+                grade_name = contract.salary_grade_id.name
+            elif hasattr(contract, 'salary_grade') and contract.salary_grade:
+                grade_name = str(contract.salary_grade)
+
+            scale_name = ""
+            if hasattr(contract, 'salary_matrix_id') and contract.salary_matrix_id:
+                scale_name = contract.salary_matrix_id.name
+
+            level_name = ""
+            if hasattr(contract, 'salary_level') and contract.salary_level:
+                level_name = dict(contract._fields['salary_level'].selection).get(contract.salary_level, contract.salary_level) if 'salary_level' in contract._fields else str(contract.salary_level)
+
+            currency_name = contract.currency_id.name if (hasattr(contract, 'currency_id') and contract.currency_id) else (contract.company_id.currency_id.name if contract.company_id else 'ETB')
+
+            contract_info = {
+                "id": contract.id,
+                "name": contract.name,
+                "state": contract.state,
+                "is_running": contract.state == 'open',
+                "date_start": contract.date_start.isoformat() if contract.date_start else None,
+                "date_end": contract.date_end.isoformat() if contract.date_end else None,
+                "basic_monthly_wage": round(basic_wage, 2),
+                "matrix_basic_wage": round(matrix_basic_wage, 2),
+                "gross_monthly_wage": round(gross_wage, 2),
+                "estimated_net_wage": round(net_wage, 2),
+                "currency": currency_name,
+                "salary_scale": scale_name,
+                "salary_grade": grade_name,
+                "salary_level": level_name,
+                "structure_type": contract.structure_type_id.name if hasattr(contract, 'structure_type_id') and contract.structure_type_id else None,
+            }
+        else:
+            if hasattr(emp, 'matrix_basic_wage') and emp.matrix_basic_wage:
+                basic_wage = float(emp.matrix_basic_wage)
+                matrix_basic_wage = float(emp.matrix_basic_wage)
+
+        classification_labels = dict(emp._fields['farm_employee_type'].selection) if 'farm_employee_type' in emp._fields else {}
+        class_label = classification_labels.get(emp.farm_employee_type, emp.farm_employee_type or 'Permanent')
+
+        return {
+            "id": emp.id,
+            "employee_id": emp.fms_employee_id or emp.employee_code or "",
+            "name": emp.name,
+            "classification": class_label,
+            "classification_code": emp.farm_employee_type or "permanent",
+            "job_title": emp.job_title or (emp.job_id.name if emp.job_id else ""),
+            "department": emp.department_id.name if emp.department_id else "",
+            "farm": {
+                "id": farm.id,
+                "code": farm.code or "",
+                "name": farm.name
+            } if farm else None,
+            "has_active_contract": bool(contract and contract.state == 'open'),
+            "basic_monthly_wage": round(basic_wage, 2),
+            "currency": contract_info["currency"] if contract_info else "ETB",
+            "contract": contract_info
+        }
+
+    # -------------------------------------------------------------------------
+    # GET /api/employees & /api/employees/<employee_identifier>
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/employees/<employee_identifier>',
+        '/odoo/api/employees/<employee_identifier>',
+        '/api/fms/employees/<employee_identifier>',
+        '/odoo/api/fms/employees/<employee_identifier>',
         '/api/employees',
         '/odoo/api/employees',
         '/api/fms/employees',
         '/odoo/api/fms/employees'
     ], type='http', auth='none', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
-    def get_employees(self, **kwargs):
+    def get_employees(self, employee_identifier=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -103,14 +249,87 @@ class EmployeeAPI(http.Controller):
             }, status=500)
 
         try:
-            emp_id = kwargs.get('id') or kwargs.get('employee_id')
+            target = employee_identifier or kwargs.get('id') or kwargs.get('employee_id')
+            if target:
+                emp = self._find_employee(env, identifier=target, kwargs=kwargs)
+                if not emp:
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"Employee with code or ID '{target}' not found in database '{db_name}'."
+                    }, status=404)
+
+                # Format single employee
+                farm = emp.current_farm_id or emp.initial_farm_id
+                sub_farm = emp.current_sub_farm_id or emp.initial_sub_farm_id
+                sub_unit = emp.current_sub_unit_id or emp.initial_sub_unit_id
+                block = emp.current_block_id or emp.initial_block_id
+
+                classification_labels = dict(emp._fields['farm_employee_type'].selection) if 'farm_employee_type' in emp._fields else {}
+                class_label = classification_labels.get(emp.farm_employee_type, emp.farm_employee_type or 'Temporary')
+
+                contract_wage_data = self._format_contract_wage_data(emp)
+
+                temp_rate = False
+                is_temp_worker = (emp.farm_employee_type == 'temporary') or ('T' in (emp.fms_employee_id or '').upper())
+                if farm and is_temp_worker:
+                    norm_rec = env['farm.activity.norm'].search([
+                        ('activity_id.type', '=', 'fixed'),
+                        ('farm_id', '=', farm.id),
+                    ], limit=1)
+                    if norm_rec:
+                        temp_rate = {
+                            "full_day_rate": norm_rec.norm_value,
+                            "half_day_rate": round(norm_rec.norm_value / 2.0, 2),
+                            "uom": norm_rec.uom_name or "Birr/Day",
+                        }
+
+                emp_data = {
+                    "id": emp.id,
+                    "employee_id": emp.fms_employee_id or emp.employee_code or "",
+                    "name": emp.name,
+                    "classification": class_label,
+                    "classification_code": emp.farm_employee_type or "temporary",
+                    "farm": {
+                        "id": farm.id if farm else None,
+                        "code": farm.code if farm else "",
+                        "name": farm.name if farm else ""
+                    } if farm else None,
+                    "sub_farm": {
+                        "id": sub_farm.id if sub_farm else None,
+                        "code": sub_farm.code if sub_farm else "",
+                        "name": sub_farm.name if sub_farm else ""
+                    } if sub_farm else None,
+                    "sub_unit": {
+                        "id": sub_unit.id if sub_unit else None,
+                        "code": sub_unit.code if sub_unit else "",
+                        "name": sub_unit.name if sub_unit else ""
+                    } if sub_unit else None,
+                    "block": {
+                        "id": block.id if block else None,
+                        "code": block.code if block else "",
+                        "name": block.name if block else ""
+                    } if block else None,
+                    "contract_basic_wage": contract_wage_data["basic_monthly_wage"],
+                    "has_active_contract": contract_wage_data["has_active_contract"],
+                    "contract": contract_wage_data["contract"],
+                    "temporary_wage_rate": temp_rate,
+                    "job_title": emp.job_title or (emp.job_id.name if emp.job_id else ""),
+                    "department": emp.department_id.name if emp.department_id else "",
+                    "work_phone": emp.work_phone or emp.mobile_phone or "",
+                    "work_email": emp.work_email or "",
+                    "total_work_entries": emp.work_entry_count,
+                    "total_earned_amount": emp.total_earned_amount
+                }
+                return self._json_response({
+                    "status": "success",
+                    "database": db_name,
+                    "data": emp_data
+                }, status=200)
+
             farm_code = kwargs.get('farm') or kwargs.get('farm_code')
             employee_type = kwargs.get('type') or kwargs.get('classification')
 
             domain = [('active', '=', True)]
-            if emp_id:
-                domain = ['|', ('fms_employee_id', '=ilike', f'%{emp_id}%'),
-                               ('employee_code', '=ilike', f'%{emp_id}%')]
             if employee_type:
                 domain.append(('farm_employee_type', '=', employee_type.lower()))
 
@@ -128,6 +347,10 @@ class EmployeeAPI(http.Controller):
 
                 classification_labels = dict(emp._fields['farm_employee_type'].selection) if 'farm_employee_type' in emp._fields else {}
                 class_label = classification_labels.get(emp.farm_employee_type, emp.farm_employee_type or 'Temporary')
+
+                # Contract basic wage calculation
+                contract_wage = float(emp.contract_id.wage or getattr(emp, 'matrix_basic_wage', 0.0) or 0.0)
+                has_active_contract = bool(emp.contract_id and emp.contract_id.state == 'open')
 
                 # Look up daily wage rate from active fixed farm activity
                 temp_rate = False
@@ -170,6 +393,8 @@ class EmployeeAPI(http.Controller):
                         "code": block.code if block else "",
                         "name": block.name if block else ""
                     } if block else None,
+                    "contract_basic_wage": round(contract_wage, 2),
+                    "has_active_contract": has_active_contract,
                     "temporary_wage_rate": temp_rate,
                     "job_title": emp.job_title or (emp.job_id.name if emp.job_id else ""),
                     "department": emp.department_id.name if emp.department_id else "",
@@ -188,6 +413,96 @@ class EmployeeAPI(http.Controller):
 
         except Exception as e:
             _logger.error("Error retrieving employees in REST API: %s", str(e), exc_info=True)
+            return self._json_response({
+                "status": "error",
+                "message": f"Server error: {str(e)}"
+            }, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # GET /api/employees/<employee_identifier>/contract_wage & /api/employees/contract_wage
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/employees/<employee_identifier>/contract_wage',
+        '/api/employees/<employee_identifier>/wage',
+        '/api/employees/<employee_identifier>/contract',
+        '/odoo/api/employees/<employee_identifier>/contract_wage',
+        '/odoo/api/employees/<employee_identifier>/wage',
+        '/api/fms/employees/<employee_identifier>/contract_wage',
+        '/odoo/api/fms/employees/<employee_identifier>/contract_wage',
+        '/api/employees/contract_wage',
+        '/odoo/api/employees/contract_wage',
+        '/api/fms/employees/contract_wage',
+        '/odoo/api/fms/employees/contract_wage',
+        '/api/contracts/basic_wage',
+        '/odoo/api/contracts/basic_wage',
+        '/api/fms/contracts/basic_wage',
+        '/odoo/api/fms/contracts/basic_wage',
+    ], type='http', auth='none', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
+    def get_employee_contract_wage(self, employee_identifier=None, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({
+                "status": "error",
+                "message": "Database not found or could not connect."
+            }, status=500)
+
+        try:
+            target = employee_identifier or kwargs.get('employee_id') or kwargs.get('id') or kwargs.get('emp_id') or kwargs.get('code')
+            if target:
+                emp = self._find_employee(env, identifier=target, kwargs=kwargs)
+                if not emp:
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"Employee with code or ID '{target}' not found in database '{db_name}'."
+                    }, status=404)
+
+                return self._json_response({
+                    "status": "success",
+                    "database": db_name,
+                    "data": self._format_contract_wage_data(emp)
+                }, status=200)
+
+            # Filtered list of all employee contract wages
+            farm_code = kwargs.get('farm') or kwargs.get('farm_code')
+            employee_type = kwargs.get('type') or kwargs.get('classification')
+            has_contract_param = kwargs.get('has_contract')
+
+            domain = [('active', '=', True)]
+            if employee_type:
+                domain.append(('farm_employee_type', '=', employee_type.lower()))
+
+            employees = env['hr.employee'].search(domain, order='fms_employee_id asc, id asc')
+
+            data = []
+            for emp in employees:
+                farm = emp.current_farm_id or emp.initial_farm_id
+                if farm_code and farm and farm.code and farm.code.lower() != farm_code.lower():
+                    continue
+
+                formatted = self._format_contract_wage_data(emp)
+
+                if has_contract_param is not None:
+                    filter_has_contract = str(has_contract_param).lower() in ('1', 'true', 'yes')
+                    if formatted['has_active_contract'] != filter_has_contract:
+                        continue
+
+                data.append(formatted)
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "count": len(data),
+                "data": data
+            }, status=200)
+
+        except Exception as e:
+            _logger.error("Error retrieving contract wage in REST API: %s", str(e), exc_info=True)
             return self._json_response({
                 "status": "error",
                 "message": f"Server error: {str(e)}"
@@ -285,13 +600,7 @@ class EmployeeAPI(http.Controller):
 
         try:
             # 1. Resolve Employee
-            emp = env['hr.employee'].search([
-                '|', ('fms_employee_id', '=ilike', str(emp_identifier).strip()),
-                     ('employee_code', '=ilike', str(emp_identifier).strip())
-            ], limit=1)
-
-            if not emp and str(emp_identifier).isdigit():
-                emp = env['hr.employee'].browse(int(emp_identifier)).exists()
+            emp = self._find_employee(env, identifier=emp_identifier)
 
             if not emp:
                 return self._json_response({
