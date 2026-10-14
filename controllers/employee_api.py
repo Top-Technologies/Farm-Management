@@ -1475,3 +1475,511 @@ class EmployeeAPI(http.Controller):
             if cr:
                 cr.close()
 
+    # -------------------------------------------------------------------------
+    # Helper: Single Farm Formatter
+    # -------------------------------------------------------------------------
+    def _format_single_farm_dict(self, farm):
+        return {
+            "id": farm.id,
+            "name": farm.name,
+            "code": farm.code or "",
+            "active": farm.active,
+            "company_id": farm.company_id.id if farm.company_id else None,
+            "company_name": farm.company_id.name if farm.company_id else "",
+            "manager": {
+                "id": farm.manager_id.id,
+                "name": farm.manager_id.name,
+                "employee_id": farm.manager_id.fms_employee_id or ""
+            } if farm.manager_id else None,
+            "location": farm.location or "",
+            "address": farm.address or "",
+            "description": farm.description or "",
+            "total_area": farm.total_area,
+            "sub_farm_count": farm.sub_farm_count,
+            "sub_unit_count": farm.sub_unit_count,
+            "block_count": farm.block_count,
+        }
+
+    # -------------------------------------------------------------------------
+    # CREATE: POST /api/farms & /odoo/api/farms & /api/fms/farms
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/farms',
+        '/odoo/api/farms',
+        '/api/fms/farms',
+        '/odoo/api/fms/farms'
+    ], type='http', auth='none', methods=['POST', 'OPTIONS'], csrf=False, cors='*')
+    def create_farm(self, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found or could not connect."}, status=500)
+
+        payload = self._parse_payload(kwargs)
+        name = payload.get('name')
+        if not name or not str(name).strip():
+            if cr: cr.close()
+            return self._json_response({
+                "status": "error",
+                "message": "Missing required field: 'name'."
+            }, status=400)
+
+        try:
+            vals = {'name': str(name).strip()}
+
+            code = payload.get('code') or payload.get('farm_code')
+            if code and str(code).strip():
+                code_str = str(code).strip()
+                existing = env['farm.farm'].search([('code', '=ilike', code_str)], limit=1)
+                if existing:
+                    if cr: cr.close()
+                    return self._json_response({
+                        "status": "error",
+                        "message": f"Farm with code '{code_str}' already exists (ID: {existing.id}, Name: {existing.name})."
+                    }, status=409)
+                vals['code'] = code_str
+
+            for char_f in ('location', 'address', 'description'):
+                if char_f in payload and payload[char_f] is not None:
+                    vals[char_f] = str(payload[char_f]).strip()
+
+            if 'active' in payload:
+                vals['active'] = (payload['active'] is True or str(payload['active']).lower() in ('1', 'true', 'yes'))
+
+            if 'company_id' in payload and payload['company_id']:
+                try:
+                    vals['company_id'] = int(payload['company_id'])
+                except (ValueError, TypeError):
+                    pass
+
+            manager_id = payload.get('manager_id') or payload.get('manager')
+            if manager_id:
+                emp = self._find_employee(env, identifier=manager_id, kwargs=payload)
+                if emp:
+                    vals['manager_id'] = emp.id
+
+            farm = env['farm.farm'].create(vals)
+            cr.commit()
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "message": f"Farm '{farm.name}' ({farm.code}) created successfully.",
+                "data": self._format_single_farm_dict(farm)
+            }, status=201)
+
+        except Exception as e:
+            if cr: cr.rollback()
+            _logger.error("Error creating farm in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Failed to create farm: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # UPDATE: PUT/PATCH /api/farms/<farm_identifier> & /api/farms
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/farms/<farm_identifier>',
+        '/odoo/api/farms/<farm_identifier>',
+        '/api/fms/farms/<farm_identifier>',
+        '/odoo/api/fms/farms/<farm_identifier>',
+        '/api/farms',
+        '/odoo/api/farms',
+        '/api/fms/farms',
+        '/odoo/api/fms/farms'
+    ], type='http', auth='none', methods=['PUT', 'PATCH', 'OPTIONS'], csrf=False, cors='*')
+    def update_farm(self, farm_identifier=None, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found or could not connect."}, status=500)
+
+        payload = self._parse_payload(kwargs)
+        target = farm_identifier or payload.get('id') or payload.get('farm_id') or payload.get('code') or payload.get('farm_code')
+
+        if not target:
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Missing farm identifier (id or code)."}, status=400)
+
+        try:
+            target_str = str(target).strip()
+            farm = None
+            if target_str.isdigit():
+                farm = env['farm.farm'].browse(int(target_str)).exists()
+            if not farm:
+                farm = env['farm.farm'].search(['|', ('code', '=ilike', target_str), ('name', '=ilike', target_str)], limit=1)
+
+            if not farm:
+                if cr: cr.close()
+                return self._json_response({"status": "error", "message": f"Farm '{target_str}' not found."}, status=404)
+
+            vals = {}
+            if 'name' in payload and str(payload['name']).strip():
+                vals['name'] = str(payload['name']).strip()
+
+            if 'code' in payload and str(payload['code']).strip():
+                new_code = str(payload['code']).strip()
+                if new_code.lower() != (farm.code or '').lower():
+                    dup = env['farm.farm'].search([('code', '=ilike', new_code), ('id', '!=', farm.id)], limit=1)
+                    if dup:
+                        if cr: cr.close()
+                        return self._json_response({"status": "error", "message": f"Farm code '{new_code}' is already in use by ID {dup.id}."}, status=409)
+                    vals['code'] = new_code
+
+            for char_f in ('location', 'address', 'description'):
+                if char_f in payload:
+                    vals[char_f] = str(payload[char_f]).strip() if payload[char_f] is not None else ''
+
+            if 'active' in payload:
+                vals['active'] = (payload['active'] is True or str(payload['active']).lower() in ('1', 'true', 'yes'))
+
+            if 'company_id' in payload and payload['company_id']:
+                try:
+                    vals['company_id'] = int(payload['company_id'])
+                except (ValueError, TypeError):
+                    pass
+
+            if 'manager_id' in payload or 'manager' in payload:
+                manager_val = payload.get('manager_id') or payload.get('manager')
+                if manager_val:
+                    emp = self._find_employee(env, identifier=manager_val, kwargs=payload)
+                    vals['manager_id'] = emp.id if emp else False
+                else:
+                    vals['manager_id'] = False
+
+            if vals:
+                farm.write(vals)
+                cr.commit()
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "message": f"Farm '{farm.name}' ({farm.code}) updated successfully.",
+                "data": self._format_single_farm_dict(farm)
+            }, status=200)
+
+        except Exception as e:
+            if cr: cr.rollback()
+            _logger.error("Error updating farm in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Failed to update farm: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # DELETE: DELETE /api/farms/<farm_identifier> & /api/farms
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/farms/<farm_identifier>',
+        '/odoo/api/farms/<farm_identifier>',
+        '/api/fms/farms/<farm_identifier>',
+        '/odoo/api/fms/farms/<farm_identifier>',
+        '/api/farms',
+        '/odoo/api/farms',
+        '/api/fms/farms',
+        '/odoo/api/fms/farms'
+    ], type='http', auth='none', methods=['DELETE', 'OPTIONS'], csrf=False, cors='*')
+    def delete_farm(self, farm_identifier=None, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found or could not connect."}, status=500)
+
+        payload = self._parse_payload(kwargs)
+        target = farm_identifier or payload.get('id') or payload.get('farm_id') or payload.get('code') or payload.get('farm_code')
+
+        if not target:
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Missing farm identifier (id or code)."}, status=400)
+
+        try:
+            target_str = str(target).strip()
+            farm = None
+            if target_str.isdigit():
+                farm = env['farm.farm'].browse(int(target_str)).exists()
+            if not farm:
+                farm = env['farm.farm'].search(['|', ('code', '=ilike', target_str), ('name', '=ilike', target_str)], limit=1)
+
+            if not farm:
+                if cr: cr.close()
+                return self._json_response({"status": "error", "message": f"Farm '{target_str}' not found."}, status=404)
+
+            f_id = farm.id
+            f_name = farm.name
+            f_code = farm.code or ""
+
+            # Check if farm has linked sub farms
+            if farm.sub_farm_ids:
+                # Soft delete / archive to protect spatial hierarchy
+                farm.write({'active': False})
+                cr.commit()
+                return self._json_response({
+                    "status": "success",
+                    "action": "archived",
+                    "database": db_name,
+                    "message": f"Farm '{f_name}' ({f_code}) has {len(farm.sub_farm_ids)} sub farms and was archived to protect spatial integrity.",
+                    "id": f_id,
+                    "code": f_code,
+                    "active": False
+                }, status=200)
+            else:
+                farm.unlink()
+                cr.commit()
+                return self._json_response({
+                    "status": "success",
+                    "action": "deleted",
+                    "database": db_name,
+                    "message": f"Farm '{f_name}' ({f_code}) was successfully deleted.",
+                    "id": f_id,
+                    "code": f_code
+                }, status=200)
+
+        except Exception as e:
+            if cr: cr.rollback()
+            _logger.error("Error deleting farm in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Failed to delete farm: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # SUB FARMS: POST, PUT, DELETE /api/sub_farms
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/sub_farms',
+        '/odoo/api/sub_farms',
+        '/api/fms/sub_farms',
+        '/odoo/api/fms/sub_farms'
+    ], type='http', auth='none', methods=['POST', 'OPTIONS'], csrf=False, cors='*')
+    def create_sub_farm(self, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found."}, status=500)
+
+        payload = self._parse_payload(kwargs)
+        name = payload.get('name')
+        if not name or not str(name).strip():
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Missing required field: 'name'."}, status=400)
+
+        farm = self._resolve_farm(env, payload)
+        if not farm:
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Parent farm not found. Specify 'farm_id' or 'farm_code'."}, status=400)
+
+        try:
+            vals = {
+                'name': str(name).strip(),
+                'farm_id': farm.id,
+            }
+            if 'area' in payload and payload['area'] is not None:
+                try: vals['area'] = float(payload['area'])
+                except (ValueError, TypeError): pass
+
+            if 'description' in payload and payload['description']:
+                vals['description'] = str(payload['description']).strip()
+
+            manager_id = payload.get('manager_id') or payload.get('manager')
+            if manager_id:
+                emp = self._find_employee(env, identifier=manager_id, kwargs=payload)
+                if emp: vals['manager_id'] = emp.id
+
+            sub_farm = env['farm.sub.farm'].create(vals)
+            cr.commit()
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "message": f"Sub Farm '{sub_farm.name}' ({sub_farm.code}) created successfully.",
+                "data": {
+                    "id": sub_farm.id,
+                    "name": sub_farm.name,
+                    "code": sub_farm.code or "",
+                    "farm_id": farm.id,
+                    "farm_code": farm.code or "",
+                    "area": sub_farm.area
+                }
+            }, status=201)
+
+        except Exception as e:
+            if cr: cr.rollback()
+            _logger.error("Error creating sub farm in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Failed to create sub farm: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # SUB UNITS: POST /api/sub_units
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/sub_units',
+        '/odoo/api/sub_units',
+        '/api/fms/sub_units',
+        '/odoo/api/fms/sub_units'
+    ], type='http', auth='none', methods=['POST', 'OPTIONS'], csrf=False, cors='*')
+    def create_sub_unit(self, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found."}, status=500)
+
+        payload = self._parse_payload(kwargs)
+        name = payload.get('name')
+        if not name or not str(name).strip():
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Missing required field: 'name'."}, status=400)
+
+        # Resolve parent sub farm
+        sub_farm = None
+        sf_id = payload.get('sub_farm_id') or payload.get('sub_farm')
+        sf_code = payload.get('sub_farm_code')
+        if sf_id and str(sf_id).isdigit():
+            sub_farm = env['farm.sub.farm'].browse(int(sf_id)).exists()
+        if not sub_farm and sf_code:
+            sub_farm = env['farm.sub.farm'].search([('code', '=ilike', str(sf_code).strip())], limit=1)
+
+        if not sub_farm:
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Parent sub farm not found. Specify 'sub_farm_id' or 'sub_farm_code'."}, status=400)
+
+        try:
+            vals = {
+                'name': str(name).strip(),
+                'sub_farm_id': sub_farm.id,
+            }
+            if 'hudad_number' in payload and payload['hudad_number']:
+                vals['hudad_number'] = str(payload['hudad_number']).strip()
+
+            if 'area' in payload and payload['area'] is not None:
+                try: vals['area'] = float(payload['area'])
+                except (ValueError, TypeError): pass
+
+            manager_id = payload.get('manager_id') or payload.get('manager')
+            if manager_id:
+                emp = self._find_employee(env, identifier=manager_id, kwargs=payload)
+                if emp: vals['manager_id'] = emp.id
+
+            sub_unit = env['farm.sub.unit'].create(vals)
+            cr.commit()
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "message": f"Sub Unit '{sub_unit.name}' ({sub_unit.code}) created successfully.",
+                "data": {
+                    "id": sub_unit.id,
+                    "name": sub_unit.name,
+                    "code": sub_unit.code or "",
+                    "sub_farm_id": sub_farm.id,
+                    "sub_farm_code": sub_farm.code or "",
+                    "hudad_number": sub_unit.hudad_number or "",
+                    "area": sub_unit.area
+                }
+            }, status=201)
+
+        except Exception as e:
+            if cr: cr.rollback()
+            _logger.error("Error creating sub unit in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Failed to create sub unit: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+    # -------------------------------------------------------------------------
+    # BLOCKS: POST /api/blocks
+    # -------------------------------------------------------------------------
+    @http.route([
+        '/api/blocks',
+        '/odoo/api/blocks',
+        '/api/fms/blocks',
+        '/odoo/api/fms/blocks'
+    ], type='http', auth='none', methods=['POST', 'OPTIONS'], csrf=False, cors='*')
+    def create_block(self, **kwargs):
+        if request.httprequest.method == 'OPTIONS':
+            return self._json_response({}, status=200)
+
+        env, cr, db_name = self._get_env_and_user()
+        if not env:
+            return self._json_response({"status": "error", "message": "Database not found."}, status=500)
+
+        payload = self._parse_payload(kwargs)
+        name = payload.get('name')
+        if not name or not str(name).strip():
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Missing required field: 'name'."}, status=400)
+
+        # Resolve parent sub unit
+        sub_unit = None
+        su_id = payload.get('sub_unit_id') or payload.get('sub_unit')
+        su_code = payload.get('sub_unit_code')
+        if su_id and str(su_id).isdigit():
+            sub_unit = env['farm.sub.unit'].browse(int(su_id)).exists()
+        if not sub_unit and su_code:
+            sub_unit = env['farm.sub.unit'].search([('code', '=ilike', str(su_code).strip())], limit=1)
+
+        if not sub_unit:
+            if cr: cr.close()
+            return self._json_response({"status": "error", "message": "Parent sub unit not found. Specify 'sub_unit_id' or 'sub_unit_code'."}, status=400)
+
+        try:
+            vals = {
+                'name': str(name).strip(),
+                'sub_unit_id': sub_unit.id,
+            }
+            if 'area' in payload and payload['area'] is not None:
+                try: vals['area'] = float(payload['area'])
+                except (ValueError, TypeError): pass
+
+            for char_f in ('crop_name', 'crop_type', 'variety', 'productivity_quarter', 'soil_type'):
+                if char_f in payload and payload[char_f]:
+                    vals[char_f] = str(payload[char_f]).strip()
+
+            if 'population' in payload and payload['population'] is not None:
+                try: vals['population'] = float(payload['population'])
+                except (ValueError, TypeError): pass
+
+            supervisor_id = payload.get('supervisor_id') or payload.get('supervisor')
+            if supervisor_id:
+                emp = self._find_employee(env, identifier=supervisor_id, kwargs=payload)
+                if emp: vals['supervisor_id'] = emp.id
+
+            block = env['farm.block'].create(vals)
+            cr.commit()
+
+            return self._json_response({
+                "status": "success",
+                "database": db_name,
+                "message": f"Block '{block.name}' ({block.code}) created successfully.",
+                "data": {
+                    "id": block.id,
+                    "name": block.name,
+                    "code": block.code or "",
+                    "sub_unit_id": sub_unit.id,
+                    "sub_unit_code": sub_unit.code or "",
+                    "area": block.area,
+                    "crop_name": block.crop_name or ""
+                }
+            }, status=201)
+
+        except Exception as e:
+            if cr: cr.rollback()
+            _logger.error("Error creating block in REST API: %s", str(e), exc_info=True)
+            return self._json_response({"status": "error", "message": f"Failed to create block: {str(e)}"}, status=500)
+        finally:
+            if cr:
+                cr.close()
+
+

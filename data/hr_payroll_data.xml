@@ -550,10 +550,10 @@ result = -contract.deduction_fine
             <field name="code">DED_ABSENT</field>
             <field name="sequence">126</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.work_entry_source != 'attendance' and ((payslip.absent_deduction_amount and payslip.absent_deduction_amount > 0) or (hasattr(contract, 'absent_deduction_amount') and contract.absent_deduction_amount and contract.absent_deduction_amount > 0)))</field>
+            <field name="condition_python">result = bool(contract.work_entry_source != 'attendance' and ((payslip.absent_deduction_amount and payslip.absent_deduction_amount > 0) or (contract.absent_deduction_amount and contract.absent_deduction_amount > 0)))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-amt = payslip.absent_deduction_amount or (contract.absent_deduction_amount if hasattr(contract, 'absent_deduction_amount') else 0.0) or 0.0
+amt = payslip.absent_deduction_amount or contract.absent_deduction_amount or 0.0
 result = -round(amt, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
