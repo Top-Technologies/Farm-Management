@@ -315,11 +315,12 @@ class HrPayslip(models.Model):
                     WHERE code = 'BASIC' AND struct_id IN (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure');
                 """, (basic_code,))
 
-                # Update DED_CREDIT_MANDATORY to dynamically compute 5% of Basic Salary
-                credit_mand_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)\nresult = -round(basic * 0.05, 2)"""
+                # Update DED_CREDIT_MANDATORY to dynamically compute 5% of Basic Salary for all employees
+                credit_mand_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)\nresult = -round(basic * 0.05, 2)"""
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
-                    SET amount_python_compute = %s
+                    SET amount_python_compute = %s,
+                        condition_select = 'none'
                     WHERE code = 'DED_CREDIT_MANDATORY';
                 """, (credit_mand_code,))
 
@@ -347,10 +348,10 @@ result = round(result, 2)"""
 else:
     basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
     result = -round(basic * 0.07, 2)"""
-                comp_pension_code = """if not contract.has_pension:
-    result = 0.0
-else:
-    basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
+                comp_pension_code = """# 11% Company Pension Contribution based on Basic Wage (Informational only, not added or deducted from employee salary)
+result = 0.0
+if contract and contract.has_pension:
+    basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
     result = round(basic * 0.11, 2)"""
 
                 pension_cond = "result = bool(contract.has_pension)"

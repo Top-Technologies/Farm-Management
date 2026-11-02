@@ -333,10 +333,9 @@ else:
             <field name="condition_python">result = bool(contract.has_pension)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-# 11% Company Pension Contribution based on Basic Wage (Not deducted from employee net)
-if not contract.has_pension:
-    result = 0.0
-else:
+# 11% Company Pension Contribution based on Basic Wage (Informational only, not added or deducted from employee salary)
+result = 0.0
+if contract and contract.has_pension:
     basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
     result = round(basic * 0.11, 2)
             </field>
@@ -391,11 +390,10 @@ result = -contract.deduction_luc
             <field name="name">Credit Association Mandatory (የብድርና ቁጠባ አስገዳጅ)</field>
             <field name="code">DED_CREDIT_MANDATORY</field>
             <field name="sequence">114</field>
-            <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_credit_assoc_mandatory and contract.deduction_credit_assoc_mandatory > 0)</field>
+            <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-# Mandatory 5% Credit Association contribution based on basic salary
+# Mandatory 5% Credit Association contribution based on basic salary (Applies to all employees)
 basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
 result = -round(basic * 0.05, 2)
             </field>

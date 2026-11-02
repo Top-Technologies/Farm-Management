@@ -203,6 +203,27 @@ class HrEmployee(models.Model):
         store=True,
         help='Calculated age in years from Date of Birth.',
     )
+    age_group = fields.Selection([
+        ('under_20', 'Under 20'),
+        ('20_29', '20 - 29 Years'),
+        ('30_39', '30 - 39 Years'),
+        ('40_49', '40 - 49 Years'),
+        ('50_59', '50 - 59 Years'),
+        ('60_plus', '60+ Years'),
+        ('unspecified', 'Unspecified'),
+    ], string='Age Group', compute='_compute_employee_age', store=True, index=True,
+       help='Categorical age grouping for reporting, analytics, and cross-tabulation.')
+
+    # Contract Status for multi-dimensional reporting and cross-checking
+    contract_status = fields.Selection([
+        ('open', 'Running'),
+        ('draft', 'New / Draft'),
+        ('close', 'Expired'),
+        ('cancel', 'Cancelled'),
+        ('none', 'No Contract'),
+    ], string='Contract Status', compute='_compute_contract_status', store=True, index=True,
+       help='Current contract status for real-time reporting and cross-checking.')
+
     has_medical_certificate = fields.Boolean(
         string='Medical Check / Certificate (የህክምና ማስረጃ)',
         default=False,
@@ -210,17 +231,64 @@ class HrEmployee(models.Model):
         help='Mandatory confirmation that the employee has undergone required medical examination and submitted a valid medical certificate.',
     )
 
+    def _auto_init(self):
+        try:
+            self.env.cr.execute("""
+                ALTER TABLE hr_employee ADD COLUMN IF NOT EXISTS age_group VARCHAR;
+                ALTER TABLE hr_employee ADD COLUMN IF NOT EXISTS contract_status VARCHAR;
+            """)
+        except Exception as e:
+            _logger.warning("HrEmployee._auto_init() column creation warning: %s", e)
+        return super()._auto_init()
+
+    @api.model
+    def _register_hook(self):
+        super()._register_hook()
+        try:
+            with self.env.cr.savepoint(flush=False):
+                self.env.cr.execute("""
+                    ALTER TABLE hr_employee ADD COLUMN IF NOT EXISTS age_group VARCHAR;
+                    ALTER TABLE hr_employee ADD COLUMN IF NOT EXISTS contract_status VARCHAR;
+                """)
+        except Exception as e:
+            _logger.warning("HrEmployee._register_hook() column creation warning: %s", e)
+
     def init(self):
         super().init()
         try:
             with self.env.cr.savepoint(flush=False):
                 self.env.cr.execute("""
+                    ALTER TABLE hr_employee ADD COLUMN IF NOT EXISTS age_group VARCHAR;
+                    ALTER TABLE hr_employee ADD COLUMN IF NOT EXISTS contract_status VARCHAR;
+
                     UPDATE hr_employee 
                     SET has_medical_certificate = true 
                     WHERE has_medical_certificate IS NULL;
+
                     UPDATE hr_employee
                     SET employment_term = 'permanent'
                     WHERE farm_employee_type IN ('head_office', 'permanent', 'cpw') AND employment_term IS NULL;
+
+                    UPDATE hr_employee
+                    SET age_group = CASE
+                        WHEN birthday IS NULL THEN 'unspecified'
+                        WHEN age < 20 THEN 'under_20'
+                        WHEN age BETWEEN 20 AND 29 THEN '20_29'
+                        WHEN age BETWEEN 30 AND 39 THEN '30_39'
+                        WHEN age BETWEEN 40 AND 49 THEN '40_49'
+                        WHEN age BETWEEN 50 AND 59 THEN '50_59'
+                        ELSE '60_plus'
+                    END
+                    WHERE age_group IS NULL;
+
+                    UPDATE hr_employee e
+                    SET contract_status = COALESCE(
+                        (SELECT c.state FROM hr_contract c WHERE c.id = e.contract_id),
+                        (SELECT c.state FROM hr_contract c WHERE c.employee_id = e.id AND c.state = 'open' LIMIT 1),
+                        (SELECT c.state FROM hr_contract c WHERE c.employee_id = e.id ORDER BY c.date_start DESC NULLS LAST, c.id DESC LIMIT 1),
+                        'none'
+                    )
+                    WHERE e.contract_status IS NULL;
                 """)
         except Exception as e:
             _logger.warning("HrEmployee.init() warning: %s", e)
@@ -232,9 +300,38 @@ class HrEmployee(models.Model):
             if emp.birthday:
                 d_birth = emp.birthday
                 age = today.year - d_birth.year - ((today.month, today.day) < (d_birth.month, d_birth.day))
-                emp.age = max(0, age)
+                age = max(0, age)
+                emp.age = age
+                if age < 20:
+                    emp.age_group = 'under_20'
+                elif 20 <= age <= 29:
+                    emp.age_group = '20_29'
+                elif 30 <= age <= 39:
+                    emp.age_group = '30_39'
+                elif 40 <= age <= 49:
+                    emp.age_group = '40_49'
+                elif 50 <= age <= 59:
+                    emp.age_group = '50_59'
+                else:
+                    emp.age_group = '60_plus'
             else:
                 emp.age = 0
+                emp.age_group = 'unspecified'
+
+    @api.depends('contract_id', 'contract_id.state', 'contract_ids.state')
+    def _compute_contract_status(self):
+        for emp in self:
+            if emp.contract_id and emp.contract_id.state:
+                emp.contract_status = emp.contract_id.state
+            elif emp.contract_ids:
+                open_contracts = emp.contract_ids.filtered(lambda c: c.state == 'open')
+                if open_contracts:
+                    emp.contract_status = 'open'
+                else:
+                    sorted_contracts = emp.contract_ids.sorted(lambda c: c.date_start or fields.Date.min, reverse=True)
+                    emp.contract_status = sorted_contracts[0].state or 'draft'
+            else:
+                emp.contract_status = 'none'
 
     @api.constrains('has_medical_certificate')
     def _check_medical_certificate(self):

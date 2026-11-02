@@ -79,8 +79,15 @@
               sequence="30"/>
 
     <!-- ================================================================= -->
-    <!-- HR MODULE REPORTING INTEGRATION: Work Entries Analysis            -->
+    <!-- HR MODULE REPORTING INTEGRATION                                   -->
     <!-- ================================================================= -->
+    <menuitem id="menu_hr_report_employee_analysis"
+              name="Employee Report"
+              parent="hr.hr_menu_hr_reports"
+              action="action_hr_employee_report"
+              sequence="5"
+              groups="hr.group_hr_user"/>
+
     <menuitem id="menu_hr_report_farm_work_entries"
               name="Work Entries Analysis"
               parent="hr.hr_menu_hr_reports"

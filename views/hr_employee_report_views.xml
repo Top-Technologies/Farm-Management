@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ================================================================= -->
+    <!-- EMPLOYEE REPORT: PIVOT VIEW (CROSS-CHECK & TABULATION)            -->
+    <!-- ================================================================= -->
+    <record id="view_hr_employee_report_pivot" model="ir.ui.view">
+        <field name="name">hr.employee.report.pivot</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <pivot string="Employee Cross-Check Analysis" sample="1">
+                <!-- Default Dimension Matrix: Row by Employee Classification & Gender, Col by Contract Status -->
+                <field name="farm_employee_type" type="row"/>
+                <field name="gender" type="row"/>
+                <field name="contract_status" type="col"/>
+                <!-- Total Number is __count by default in Odoo pivot; age can be measured as average -->
+                <field name="age" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- ================================================================= -->
+    <!-- EMPLOYEE REPORT: GRAPH VIEW                                       -->
+    <!-- ================================================================= -->
+    <record id="view_hr_employee_report_graph" model="ir.ui.view">
+        <field name="name">hr.employee.report.graph</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <graph string="Employee Analysis" type="bar" sample="1">
+                <field name="farm_employee_type"/>
+                <field name="gender"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- ================================================================= -->
+    <!-- EMPLOYEE REPORT: LIST VIEW                                        -->
+    <!-- ================================================================= -->
+    <record id="view_hr_employee_report_list" model="ir.ui.view">
+        <field name="name">hr.employee.report.list</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <list string="Employee Report" sample="1" decoration-muted="not active">
+                <field name="employee_code" string="Employee ID" optional="show"/>
+                <field name="name" string="Employee Name"/>
+                <field name="farm_employee_type" string="Classification" widget="badge"/>
+                <field name="employment_term" string="Employment Type" optional="show"/>
+                <field name="contract_status" string="Contract Status" widget="badge"
+                       decoration-success="contract_status == 'open'"
+                       decoration-info="contract_status == 'draft'"
+                       decoration-danger="contract_status == 'close'"
+                       decoration-warning="contract_status == 'none'"/>
+                <field name="gender" string="Gender"/>
+                <field name="birthday" string="Date of Birth" optional="show"/>
+                <field name="age" string="Age"/>
+                <field name="age_group" string="Age Group" widget="badge" optional="show"/>
+                <field name="certificate" string="Education Level" optional="show"/>
+                <field name="study_field" string="Field of Study" optional="show"/>
+                <field name="department_id" string="Department" optional="show"/>
+                <field name="job_id" string="Job Position" optional="show"/>
+                <field name="initial_farm_id" string="Assigned Farm" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+                <field name="active" widget="boolean_toggle" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================= -->
+    <!-- EMPLOYEE REPORT: SEARCH & FILTER VIEW (MULTI-DIMENSIONAL GROUPBY) -->
+    <!-- ================================================================= -->
+    <record id="view_hr_employee_report_search" model="ir.ui.view">
+        <field name="name">hr.employee.report.search</field>
+        <field name="model">hr.employee</field>
+        <field name="arch" type="xml">
+            <search string="Employee Report Search &amp; Filters">
+                <!-- Search Inputs -->
+                <field name="name" string="Employee" filter_domain="['|', ('name', 'ilike', self), ('employee_code', 'ilike', self)]"/>
+                <field name="employee_code" string="Employee ID"/>
+                <field name="fms_employee_id" string="FMS ID"/>
+                <field name="department_id"/>
+                <field name="job_id"/>
+                <field name="initial_farm_id"/>
+                <field name="study_field"/>
+
+                <!-- Active Status -->
+                <separator string="Active Status"/>
+                <filter name="filter_active" string="Active Employees" domain="[('active', '=', True)]"/>
+                <filter name="filter_inactive" string="Archived / Inactive" domain="[('active', '=', False)]"/>
+
+                <!-- Contract Status -->
+                <separator string="Contract Status"/>
+                <filter name="filter_contract_running" string="Contract: Running" domain="[('contract_status', '=', 'open')]"/>
+                <filter name="filter_contract_draft" string="Contract: Draft" domain="[('contract_status', '=', 'draft')]"/>
+                <filter name="filter_contract_expired" string="Contract: Expired" domain="[('contract_status', '=', 'close')]"/>
+                <filter name="filter_no_contract" string="No Contract" domain="[('contract_status', '=', 'none')]"/>
+
+                <!-- Gender -->
+                <separator string="Gender"/>
+                <filter name="filter_gender_male" string="Male" domain="[('gender', '=', 'male')]"/>
+                <filter name="filter_gender_female" string="Female" domain="[('gender', '=', 'female')]"/>
+
+                <!-- Employee Status / Classification -->
+                <separator string="Employee Status / Classification"/>
+                <filter name="filter_farm" string="Farm Workers" domain="[('farm_employee_type', '=', 'permanent')]"/>
+                <filter name="filter_head_office" string="Head Office" domain="[('farm_employee_type', '=', 'head_office')]"/>
+                <filter name="filter_temp" string="Temporary" domain="[('farm_employee_type', '=', 'temporary')]"/>
+                <filter name="filter_zemach" string="Zemach / Seasonal" domain="[('farm_employee_type', '=', 'zemach')]"/>
+                <filter name="filter_cpw" string="CPW" domain="[('farm_employee_type', '=', 'cpw')]"/>
+
+                <!-- Education Background -->
+                <separator string="Education Background"/>
+                <filter name="filter_edu_graduate" string="Graduate" domain="[('certificate', '=', 'graduate')]"/>
+                <filter name="filter_edu_bachelor" string="Bachelor" domain="[('certificate', '=', 'bachelor')]"/>
+                <filter name="filter_edu_master" string="Master" domain="[('certificate', '=', 'master')]"/>
+                <filter name="filter_edu_doctor" string="Doctor" domain="[('certificate', '=', 'doctor')]"/>
+                <filter name="filter_edu_other" string="Other Education" domain="[('certificate', '=', 'other')]"/>
+
+                <!-- Age Groups -->
+                <separator string="Age Groups"/>
+                <filter name="filter_age_under_20" string="Age: &lt; 20" domain="[('age_group', '=', 'under_20')]"/>
+                <filter name="filter_age_20_29" string="Age: 20 - 29" domain="[('age_group', '=', '20_29')]"/>
+                <filter name="filter_age_30_39" string="Age: 30 - 39" domain="[('age_group', '=', '30_39')]"/>
+                <filter name="filter_age_40_49" string="Age: 40 - 49" domain="[('age_group', '=', '40_49')]"/>
+                <filter name="filter_age_50_59" string="Age: 50 - 59" domain="[('age_group', '=', '50_59')]"/>
+                <filter name="filter_age_60_plus" string="Age: 60+" domain="[('age_group', '=', '60_plus')]"/>
+
+                <!-- Group By Dimensions for Cross-Checking -->
+                <group expand="1" string="Cross-Check &amp; Group By">
+                    <filter name="group_farm_employee_type" string="Employee Status / Classification" context="{'group_by': 'farm_employee_type'}"/>
+                    <filter name="group_employment_term" string="Employment Type" context="{'group_by': 'employment_term'}"/>
+                    <filter name="group_contract_status" string="Contract Status" context="{'group_by': 'contract_status'}"/>
+                    <filter name="group_gender" string="Gender" context="{'group_by': 'gender'}"/>
+                    <filter name="group_certificate" string="Education Level" context="{'group_by': 'certificate'}"/>
+                    <filter name="group_study_field" string="Field of Study" context="{'group_by': 'study_field'}"/>
+                    <filter name="group_age_group" string="Age Group" context="{'group_by': 'age_group'}"/>
+                    <filter name="group_age" string="Age (Exact Years)" context="{'group_by': 'age'}"/>
+                    <filter name="group_department" string="Department" context="{'group_by': 'department_id'}"/>
+                    <filter name="group_job" string="Job Position" context="{'group_by': 'job_id'}"/>
+                    <filter name="group_farm" string="Assigned Farm" context="{'group_by': 'initial_farm_id'}"/>
+                    <filter name="group_company" string="Company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================= -->
+    <!-- WINDOW ACTION: EMPLOYEE REPORT                                    -->
+    <!-- ================================================================= -->
+    <record id="action_hr_employee_report" model="ir.actions.act_window">
+        <field name="name">Employee Report</field>
+        <field name="res_model">hr.employee</field>
+        <field name="view_mode">pivot,graph,list,form</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_hr_employee_report_pivot')}),
+            (0, 0, {'view_mode': 'graph', 'view_id': ref('view_hr_employee_report_graph')}),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_hr_employee_report_list')}),
+        ]"/>
+        <field name="search_view_id" ref="view_hr_employee_report_search"/>
+        <field name="context">{
+            'search_default_filter_active': 1,
+            'pivot_measures': ['__count', 'age'],
+            'pivot_row_groupby': ['farm_employee_type', 'gender'],
+            'pivot_column_groupby': ['contract_status']
+        }</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Comprehensive Employee Cross-Check Reporting
+            </p>
+            <p>
+                Analyze and cross-check employee distribution across employee classification, contract status, gender, education background, and age brackets with real-time total numbers.
+            </p>
+        </field>
+    </record>
+</odoo>
