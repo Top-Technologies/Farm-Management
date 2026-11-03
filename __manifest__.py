@@ -24,7 +24,7 @@ This module structures agricultural operations directly integrated into the HR E
 - RESTful JSON API endpoints for external FMS system synchronization
 - Smart navigation and integrated chatter/activity tracking
     """,
-    'author': 'Custom Development',
+    'author': 'Top Technologies',
     'website': 'https://www.odoo.com',
     'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise', 'approvals', 'survey', 'hr_appraisal_survey'],
     'data': [

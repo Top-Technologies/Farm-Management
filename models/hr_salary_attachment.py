@@ -18,6 +18,7 @@ DEDUCTION_FIELD_MAP = {
     'medical_recovery': 'deduction_medical_recovery',
     'pension_receivable': 'deduction_pension_receivable',
     'fine': 'deduction_fine',
+    'ambassador_garment': 'deduction_ambassador_garment',
 }
 
 
@@ -37,6 +38,7 @@ class HrSalaryAttachment(models.Model):
         ('medical_recovery', 'Medical Recovery'),
         ('pension_receivable', 'Pension Receivable'),
         ('fine', 'Fine'),
+        ('ambassador_garment', 'Ambassador Garment (አምባሳደር ጋርመንት)'),
     ], string='Contract Deduction Link', default='other', tracking=True,
        help='Link this salary attachment / loan to the employee contract deduction field for seamless tracking without double-deduction.')
 
@@ -165,6 +167,28 @@ class HrSalaryAttachment(models.Model):
                 'default_attachment_id': self.id,
             },
         }
+
+    def record_payment(self, amount, payslip_id=False):
+        """Records a payment against this salary attachment, marks schedule line as paid, and closes attachment if completed."""
+        for att in self:
+            if not att.schedule_line_ids:
+                continue
+            today = fields.Date.today()
+            line = att.schedule_line_ids.filtered(
+                lambda l: l.state == 'scheduled' and l.date and l.date.year == today.year and l.date.month == today.month
+            )
+            if not line:
+                line = att.schedule_line_ids.filtered(lambda l: l.state == 'scheduled')[:1]
+            if line:
+                vals = {'state': 'paid'}
+                if payslip_id:
+                    vals['payslip_id'] = payslip_id
+                line.write(vals)
+
+            remaining_unpaid = att.schedule_line_ids.filtered(lambda l: l.state == 'scheduled')
+            paid_sum = sum(att.schedule_line_ids.filtered(lambda l: l.state == 'paid').mapped('amount'))
+            if not remaining_unpaid or (att.has_total_amount and att.total_amount > 0 and paid_sum >= att.total_amount):
+                att.write({'state': 'close'})
 
     @api.model_create_multi
     def create(self, vals_list):

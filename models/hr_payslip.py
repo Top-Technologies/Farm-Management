@@ -16,6 +16,7 @@ LOAN_RULE_TO_ATTACHMENT_TYPE = {
     'DED_MEDICAL_RECOVERY': 'medical_recovery',
     'DED_PENSION_RECEIVABLE': 'pension_receivable',
     'DED_FINE': 'fine',
+    'DED_AMBASSADOR_GARMENT': 'ambassador_garment',
 }
 
 
@@ -166,7 +167,8 @@ class HrPayslip(models.Model):
                     lambda a: a.state == 'open' and a.loan_deduction_type == ded_type
                 )
                 for att in attachments:
-                    att.record_payment(amount_paid)
+                    if hasattr(att, 'record_payment'):
+                        att.record_payment(amount_paid, payslip_id=slip.id)
                     att.write({'payslip_ids': [(4, slip.id)]})
 
     def compute_sheet(self):

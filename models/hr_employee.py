@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 from odoo.tools import html_escape
+# pyrefly: ignore[missing-import]
 from markupsafe import Markup
 import logging
 
