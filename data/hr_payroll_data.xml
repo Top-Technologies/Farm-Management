@@ -279,13 +279,16 @@ result = contract.allowance_other
             <field name="condition_select">none</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-# Taxable base: Basic wage + Taxable Allowances (Transport, Hardship, Overtime)
+# Taxable base: Basic wage + Taxable Allowances (Transport, Hardship, Overtime, Acting/Position, Bulk Loading, Other)
 # Untaxed Allowances strictly excluded: ALW_FIELD_WORK, ALW_RETROACTIVE, and ALW_CASH_INDEMNITY (per Proc. 979/2016 Art. 65)
 basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
 alw_trans = contract.taxable_transport_allowance or 0.0
 alw_hard = contract.allowance_hardship or 0.0
 alw_ot = contract.allowance_overtime or 0.0
-result = basic + (alw_trans or 0.0) + alw_hard + alw_ot
+alw_acting = contract.allowance_acting_position or 0.0
+alw_bulk = contract.allowance_bulk_loading or 0.0
+alw_other = contract.allowance_other or 0.0
+result = basic + (alw_trans or 0.0) + alw_hard + alw_ot + alw_acting + alw_bulk + alw_other
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -351,7 +354,7 @@ if contract and contract.has_pension:
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Dynamic Ethiopian Progressive Income Tax based on Taxable Salary
-taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.taxable_transport_allowance or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0))
+taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.taxable_transport_allowance or 0.0) + (contract.allowance_hardship or 0.0) + (contract.allowance_overtime or 0.0) + (contract.allowance_acting_position or 0.0) + (contract.allowance_bulk_loading or 0.0) + (contract.allowance_other or 0.0))
 
 if taxable &lt;= 2000:
     result = 0.0

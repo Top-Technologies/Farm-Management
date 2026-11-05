@@ -1024,7 +1024,11 @@ class HrContract(models.Model):
     # =========================================================================
     # Statutory Taxes Dynamic Computation
     # =========================================================================
-    @api.depends('wage', 'taxable_transport_allowance', 'allowance_transport', 'allowance_hardship', 'allowance_overtime', 'has_pension')
+    @api.depends(
+        'wage', 'taxable_transport_allowance', 'allowance_transport', 'allowance_hardship',
+        'allowance_overtime', 'allowance_acting_position', 'allowance_bulk_loading', 'allowance_other',
+        'has_pension'
+    )
     def _compute_statutory_taxes(self):
         for c in self:
             wage = c.wage or 0.0
@@ -1034,10 +1038,12 @@ class HrContract(models.Model):
             else:
                 c.deduction_pension = 0.0
 
-            # Taxable Salary = Wage + Taxable Allowances (Taxable Transport, Hardship, Overtime)
+            # Taxable Salary = Wage + Taxable Allowances (Taxable Transport, Hardship, Overtime, Acting/Position, Bulk Loading, Other)
             trans_taxable = c.taxable_transport_allowance or 0.0
             taxable = wage + trans_taxable + \
-                      (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
+                      (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
+                      (c.allowance_acting_position or 0.0) + (c.allowance_bulk_loading or 0.0) + \
+                      (c.allowance_other or 0.0)
 
             if taxable <= 2000:
                 tax = 0.0
@@ -1131,6 +1137,9 @@ class HrContract(models.Model):
         'allowance_hardship',
         'allowance_overtime',
         'allowance_cash_indemnity',
+        'allowance_acting_position',
+        'allowance_bulk_loading',
+        'allowance_other',
         'has_pension',
         'total_monthly_deductions',
     )
@@ -1140,14 +1149,15 @@ class HrContract(models.Model):
             # Regular monthly net without retroactive addition
             regular_gross = wage + (c.allowance_transport or 0.0) + \
                             (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
-                            (c.allowance_cash_indemnity or 0.0)
+                            (c.allowance_cash_indemnity or 0.0) + (c.total_other_allowances or 0.0)
             regular_net = max(0.0, regular_gross - (c.total_monthly_deductions or 0.0))
             c.back_pay_new_net = regular_net
 
             # Statutory taxes on new regular salary
             new_pension = round(wage * 0.07, 2) if c.has_pension else 0.0
             trans_taxable = c.taxable_transport_allowance or 0.0
-            taxable = wage + trans_taxable + (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0)
+            taxable = wage + trans_taxable + (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
+                      (c.allowance_acting_position or 0.0) + (c.allowance_bulk_loading or 0.0) + (c.allowance_other or 0.0)
             if taxable <= 2000:
                 new_tax = 0.0
             elif taxable <= 4000:
@@ -1194,7 +1204,7 @@ class HrContract(models.Model):
                 c.back_pay_pension_monthly = 0.0
                 c.back_pay_pension_total = 0.0
 
-    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'taxable_transport_allowance', 'allowance_hardship', 'allowance_overtime', 'allowance_cash_indemnity', 'total_monthly_deductions')
+    @api.onchange('back_pay_months', 'back_pay_previous_net', 'wage', 'allowance_transport', 'taxable_transport_allowance', 'allowance_hardship', 'allowance_overtime', 'allowance_cash_indemnity', 'allowance_acting_position', 'allowance_bulk_loading', 'allowance_other', 'total_monthly_deductions')
     def _onchange_back_pay_calculator(self):
         if self.back_pay_months > 0 and not self.back_pay_previous_net:
             self._fetch_previous_payslip_data()
@@ -1202,13 +1212,14 @@ class HrContract(models.Model):
         wage = self.wage or 0.0
         regular_gross = wage + (self.allowance_transport or 0.0) + \
                         (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0) + \
-                        (self.allowance_cash_indemnity or 0.0)
+                        (self.allowance_cash_indemnity or 0.0) + (self.total_other_allowances or 0.0)
         regular_net = max(0.0, regular_gross - (self.total_monthly_deductions or 0.0))
         self.back_pay_new_net = regular_net
 
         new_pension = round(wage * 0.07, 2)
         trans_taxable = self.taxable_transport_allowance or 0.0
-        taxable = wage + trans_taxable + (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0)
+        taxable = wage + trans_taxable + (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0) + \
+                  (self.allowance_acting_position or 0.0) + (self.allowance_bulk_loading or 0.0) + (self.allowance_other or 0.0)
         if taxable <= 2000:
             new_tax = 0.0
         elif taxable <= 4000:
