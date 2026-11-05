@@ -393,12 +393,16 @@ result = -contract.deduction_luc
             <field name="name">Credit Association Mandatory (የብድርና ቁጠባ አስገዳጅ)</field>
             <field name="code">DED_CREDIT_MANDATORY</field>
             <field name="sequence">114</field>
-            <field name="condition_select">none</field>
+            <field name="condition_select">python</field>
+            <field name="condition_python">result = bool(contract.has_credit_association)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-# Mandatory 5% Credit Association contribution based on basic salary (Applies to all employees)
-basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
-result = -round(basic * 0.05, 2)
+# Mandatory 5% Credit Association contribution based on basic salary (Applies only when enrolled)
+if not contract.has_credit_association:
+    result = 0.0
+else:
+    basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+    result = -round(basic * 0.05, 2)
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -409,10 +413,10 @@ result = -round(basic * 0.05, 2)
             <field name="code">DED_CREDIT_VOLUNTARY</field>
             <field name="sequence">115</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)</field>
+            <field name="condition_python">result = bool(contract.has_credit_association and contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_credit_assoc_voluntary
+result = -contract.deduction_credit_assoc_voluntary if contract.has_credit_association else 0.0
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>

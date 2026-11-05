@@ -317,14 +317,30 @@ class HrPayslip(models.Model):
                     WHERE code = 'BASIC' AND struct_id IN (SELECT id FROM hr_payroll_structure WHERE name = 'Permanent & Head Office Employee Structure');
                 """, (basic_code,))
 
-                # Update DED_CREDIT_MANDATORY to dynamically compute 5% of Basic Salary for all employees
-                credit_mand_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)\nresult = -round(basic * 0.05, 2)"""
+                # Update DED_CREDIT_MANDATORY and DED_CREDIT_VOLUNTARY to respect contract.has_credit_association toggle
+                credit_mand_code = """if not contract.has_credit_association:
+    result = 0.0
+else:
+    basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
+    result = -round(basic * 0.05, 2)"""
+                credit_mand_cond = "result = bool(contract.has_credit_association)"
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
                     SET amount_python_compute = %s,
-                        condition_select = 'none'
+                        condition_select = 'python',
+                        condition_python = %s
                     WHERE code = 'DED_CREDIT_MANDATORY';
-                """, (credit_mand_code,))
+                """, (credit_mand_code, credit_mand_cond))
+
+                credit_vol_code = "result = -contract.deduction_credit_assoc_voluntary if contract.has_credit_association else 0.0"
+                credit_vol_cond = "result = bool(contract.has_credit_association and contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)"
+                self.env.cr.execute("""
+                    UPDATE hr_salary_rule
+                    SET amount_python_compute = %s,
+                        condition_select = 'python',
+                        condition_python = %s
+                    WHERE code = 'DED_CREDIT_VOLUNTARY';
+                """, (credit_vol_code, credit_vol_cond))
 
                 # Update TAXABLE_SALARY to include all taxable allowances per Ethiopian Income Tax Proc. 979/2016
                 taxable_salary_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
