@@ -852,9 +852,10 @@ class HrContract(models.Model):
                           (c.allowance_other or 0.0)
             c.total_other_allowances = other_allow
 
+            ot_amt = getattr(c, 'total_ot_amount', 0.0) or c.allowance_overtime or 0.0
             tot_allow = (c.allowance_transport or 0.0) + \
                         (c.allowance_hardship or 0.0) + (c.allowance_retroactive or 0.0) + \
-                        (c.allowance_overtime or 0.0) + (c.allowance_cash_indemnity or 0.0) + \
+                        ot_amt + (c.allowance_cash_indemnity or 0.0) + \
                         other_allow
             c.total_monthly_allowances = tot_allow
             c.gross_monthly_wage = (c.wage or 0.0) + tot_allow
@@ -1040,8 +1041,9 @@ class HrContract(models.Model):
 
             # Taxable Salary = Wage + Taxable Allowances (Taxable Transport, Hardship, Overtime, Acting/Position, Bulk Loading, Other)
             trans_taxable = c.taxable_transport_allowance or 0.0
+            ot_amt = getattr(c, 'total_ot_amount', 0.0) or c.allowance_overtime or 0.0
             taxable = wage + trans_taxable + \
-                      (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
+                      (c.allowance_hardship or 0.0) + ot_amt + \
                       (c.allowance_acting_position or 0.0) + (c.allowance_bulk_loading or 0.0) + \
                       (c.allowance_other or 0.0)
 
@@ -1147,8 +1149,9 @@ class HrContract(models.Model):
         for c in self:
             wage = c.wage or 0.0
             # Regular monthly net without retroactive addition
+            ot_amt = getattr(c, 'total_ot_amount', 0.0) or c.allowance_overtime or 0.0
             regular_gross = wage + (c.allowance_transport or 0.0) + \
-                            (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
+                            (c.allowance_hardship or 0.0) + ot_amt + \
                             (c.allowance_cash_indemnity or 0.0) + (c.total_other_allowances or 0.0)
             regular_net = max(0.0, regular_gross - (c.total_monthly_deductions or 0.0))
             c.back_pay_new_net = regular_net
@@ -1156,7 +1159,7 @@ class HrContract(models.Model):
             # Statutory taxes on new regular salary
             new_pension = round(wage * 0.07, 2) if c.has_pension else 0.0
             trans_taxable = c.taxable_transport_allowance or 0.0
-            taxable = wage + trans_taxable + (c.allowance_hardship or 0.0) + (c.allowance_overtime or 0.0) + \
+            taxable = wage + trans_taxable + (c.allowance_hardship or 0.0) + ot_amt + \
                       (c.allowance_acting_position or 0.0) + (c.allowance_bulk_loading or 0.0) + (c.allowance_other or 0.0)
             if taxable <= 2000:
                 new_tax = 0.0
@@ -1210,15 +1213,16 @@ class HrContract(models.Model):
             self._fetch_previous_payslip_data()
 
         wage = self.wage or 0.0
+        ot_amt = getattr(self, 'total_ot_amount', 0.0) or self.allowance_overtime or 0.0
         regular_gross = wage + (self.allowance_transport or 0.0) + \
-                        (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0) + \
+                        (self.allowance_hardship or 0.0) + ot_amt + \
                         (self.allowance_cash_indemnity or 0.0) + (self.total_other_allowances or 0.0)
         regular_net = max(0.0, regular_gross - (self.total_monthly_deductions or 0.0))
         self.back_pay_new_net = regular_net
 
         new_pension = round(wage * 0.07, 2)
         trans_taxable = self.taxable_transport_allowance or 0.0
-        taxable = wage + trans_taxable + (self.allowance_hardship or 0.0) + (self.allowance_overtime or 0.0) + \
+        taxable = wage + trans_taxable + (self.allowance_hardship or 0.0) + ot_amt + \
                   (self.allowance_acting_position or 0.0) + (self.allowance_bulk_loading or 0.0) + (self.allowance_other or 0.0)
         if taxable <= 2000:
             new_tax = 0.0
