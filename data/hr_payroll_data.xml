@@ -206,10 +206,10 @@ result = contract.allowance_retroactive
             <field name="code">ALW_OVERTIME</field>
             <field name="sequence">35</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool((getattr(payslip, 'total_ot_amount', 0.0) and payslip.total_ot_amount > 0) or (getattr(contract, 'total_ot_amount', 0.0) and contract.total_ot_amount > 0) or (getattr(contract, 'allowance_overtime', 0.0) and contract.allowance_overtime > 0))</field>
+            <field name="condition_python">result = bool((payslip.total_ot_amount and payslip.total_ot_amount > 0) or (contract.total_ot_amount and contract.total_ot_amount > 0) or (contract.allowance_overtime and contract.allowance_overtime > 0))</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = getattr(payslip, 'total_ot_amount', 0.0) or getattr(contract, 'total_ot_amount', 0.0) or getattr(contract, 'allowance_overtime', 0.0) or 0.0
+result = payslip.total_ot_amount or contract.total_ot_amount or contract.allowance_overtime or 0.0
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>
@@ -284,7 +284,7 @@ result = contract.allowance_other
 basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
 alw_trans = contract.taxable_transport_allowance or 0.0
 alw_hard = contract.allowance_hardship or 0.0
-alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (getattr(payslip, 'total_ot_amount', 0.0) or getattr(contract, 'total_ot_amount', 0.0) or getattr(contract, 'allowance_overtime', 0.0) or 0.0))
+alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (payslip.total_ot_amount or contract.total_ot_amount or contract.allowance_overtime or 0.0))
 alw_acting = contract.allowance_acting_position or 0.0
 alw_bulk = contract.allowance_bulk_loading or 0.0
 alw_other = contract.allowance_other or 0.0
@@ -354,7 +354,7 @@ if contract and contract.has_pension:
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
 # Dynamic Ethiopian Progressive Income Tax based on Taxable Salary
-alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (getattr(payslip, 'total_ot_amount', 0.0) or getattr(contract, 'total_ot_amount', 0.0) or getattr(contract, 'allowance_overtime', 0.0) or 0.0))
+alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (payslip.total_ot_amount or contract.total_ot_amount or contract.allowance_overtime or 0.0))
 taxable = result_rules['TAXABLE_SALARY']['total'] if ('TAXABLE_SALARY' in result_rules and result_rules['TAXABLE_SALARY']['total'] is not None) else ((categories.get('BASIC', 0.0) or (contract.wage or 0.0)) + (contract.taxable_transport_allowance or 0.0) + (contract.allowance_hardship or 0.0) + alw_ot + (contract.allowance_acting_position or 0.0) + (contract.allowance_bulk_loading or 0.0) + (contract.allowance_other or 0.0))
 
 if taxable &lt;= 2000:
@@ -414,10 +414,10 @@ else:
             <field name="code">DED_CREDIT_VOLUNTARY</field>
             <field name="sequence">115</field>
             <field name="condition_select">python</field>
-            <field name="condition_python">result = bool(contract.has_credit_association and contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)</field>
+            <field name="condition_python">result = bool(contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-result = -contract.deduction_credit_assoc_voluntary if contract.has_credit_association else 0.0
+result = -contract.deduction_credit_assoc_voluntary
             </field>
             <field name="struct_id" ref="structure_farm_permanent"/>
         </record>

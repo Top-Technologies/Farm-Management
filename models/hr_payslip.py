@@ -332,8 +332,8 @@ else:
                     WHERE code = 'DED_CREDIT_MANDATORY';
                 """, (credit_mand_code, credit_mand_cond))
 
-                credit_vol_code = "result = -contract.deduction_credit_assoc_voluntary if contract.has_credit_association else 0.0"
-                credit_vol_cond = "result = bool(contract.has_credit_association and contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)"
+                credit_vol_code = "result = -contract.deduction_credit_assoc_voluntary"
+                credit_vol_cond = "result = bool(contract.deduction_credit_assoc_voluntary and contract.deduction_credit_assoc_voluntary > 0)"
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
                     SET amount_python_compute = %s,
@@ -343,8 +343,8 @@ else:
                 """, (credit_vol_code, credit_vol_cond))
 
                 # Update ALW_OVERTIME to check payslip/contract total_ot_amount (from attendance sheets) or allowance_overtime
-                ot_code = """result = getattr(payslip, 'total_ot_amount', 0.0) or getattr(contract, 'total_ot_amount', 0.0) or getattr(contract, 'allowance_overtime', 0.0) or 0.0"""
-                ot_cond = """result = bool((getattr(payslip, 'total_ot_amount', 0.0) and payslip.total_ot_amount > 0) or (getattr(contract, 'total_ot_amount', 0.0) and contract.total_ot_amount > 0) or (getattr(contract, 'allowance_overtime', 0.0) and contract.allowance_overtime > 0))"""
+                ot_code = """result = payslip.total_ot_amount or contract.total_ot_amount or contract.allowance_overtime or 0.0"""
+                ot_cond = """result = bool((payslip.total_ot_amount and payslip.total_ot_amount > 0) or (contract.total_ot_amount and contract.total_ot_amount > 0) or (contract.allowance_overtime and contract.allowance_overtime > 0))"""
                 self.env.cr.execute("""
                     UPDATE hr_salary_rule
                     SET amount_python_compute = %s,
@@ -357,7 +357,7 @@ else:
                 taxable_salary_code = """basic = categories.get('BASIC', 0.0) or (contract.wage or 0.0)
 alw_trans = contract.taxable_transport_allowance or 0.0
 alw_hard = contract.allowance_hardship or 0.0
-alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (getattr(payslip, 'total_ot_amount', 0.0) or getattr(contract, 'total_ot_amount', 0.0) or getattr(contract, 'allowance_overtime', 0.0) or 0.0))
+alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (payslip.total_ot_amount or contract.total_ot_amount or contract.allowance_overtime or 0.0))
 alw_acting = contract.allowance_acting_position or 0.0
 alw_bulk = contract.allowance_bulk_loading or 0.0
 alw_other = contract.allowance_other or 0.0
@@ -371,7 +371,7 @@ result = basic + (alw_trans or 0.0) + alw_hard + alw_ot + alw_acting + alw_bulk 
                 # Directly ensure DED_INCOME_TAX, DED_PENSION_7, and COMP_PENSION_11 rules compute dynamically
                 income_tax_code = """basic = categories['BASIC'] if 'BASIC' in categories else (contract.wage or 0.0)
 alw_trans = contract.taxable_transport_allowance or 0.0
-alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (getattr(payslip, 'total_ot_amount', 0.0) or getattr(contract, 'total_ot_amount', 0.0) or getattr(contract, 'allowance_overtime', 0.0) or 0.0))
+alw_ot = (result_rules['ALW_OVERTIME']['total'] if ('ALW_OVERTIME' in result_rules and result_rules['ALW_OVERTIME']['total'] is not None) else (payslip.total_ot_amount or contract.total_ot_amount or contract.allowance_overtime or 0.0))
 alw_acting = contract.allowance_acting_position or 0.0
 alw_bulk = contract.allowance_bulk_loading or 0.0
 alw_other = contract.allowance_other or 0.0
