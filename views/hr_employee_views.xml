@@ -105,9 +105,9 @@
                         <div class="col-md-6" invisible="farm_employee_type in ('head_office', 'cpw', 'jimma_head_office')">
                             <group>
                                 <field name="initial_farm_id" options="{'no_create': True}" required="farm_employee_type not in ('head_office', 'cpw', 'jimma_head_office')" placeholder="Select Farm..."/>
-                                <field name="initial_sub_farm_id" options="{'no_create': True}" required="farm_employee_type not in ('head_office', 'cpw', 'jimma_head_office')" placeholder="Select Sub Farm..."/>
-                                <field name="initial_sub_unit_id" options="{'no_create': True}" required="farm_employee_type not in ('head_office', 'cpw', 'jimma_head_office')" placeholder="Select Sub Unit..."/>
-                                <field name="initial_block_id" options="{'no_create': True}" placeholder="Select Block (Optional)..."/>
+                                <field name="initial_sub_farm_id" options="{'no_create': True}" domain="[('farm_id', '=', initial_farm_id)] if initial_farm_id else []" placeholder="Select Sub Farm (Optional)..."/>
+                                <field name="initial_sub_unit_id" options="{'no_create': True}" domain="[('sub_farm_id', '=', initial_sub_farm_id)] if initial_sub_farm_id else ([('farm_id', '=', initial_farm_id)] if initial_farm_id else [])" placeholder="Select Sub Unit (Optional)..."/>
+                                <field name="initial_block_id" options="{'no_create': True}" domain="[('sub_unit_id', '=', initial_sub_unit_id)] if initial_sub_unit_id else ([('sub_farm_id', '=', initial_sub_farm_id)] if initial_sub_farm_id else ([('farm_id', '=', initial_farm_id)] if initial_farm_id else []))" placeholder="Select Block (Optional)..."/>
                             </group>
                         </div>
                         <div class="col-md-6" invisible="farm_employee_type != 'head_office'">

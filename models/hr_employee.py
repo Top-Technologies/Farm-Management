@@ -495,6 +495,11 @@ class HrEmployee(models.Model):
             self.initial_sub_farm_id = False
             self.initial_sub_unit_id = False
             self.initial_block_id = False
+        elif self.initial_sub_unit_id and self.initial_sub_unit_id.farm_id != self.initial_farm_id:
+            self.initial_sub_unit_id = False
+            self.initial_block_id = False
+        elif self.initial_block_id and self.initial_block_id.farm_id != self.initial_farm_id:
+            self.initial_block_id = False
         self._update_preview_id()
 
     @api.onchange('initial_sub_farm_id')
@@ -503,6 +508,8 @@ class HrEmployee(models.Model):
             self.initial_farm_id = self.initial_sub_farm_id.farm_id
             if self.initial_sub_unit_id and self.initial_sub_unit_id.sub_farm_id != self.initial_sub_farm_id:
                 self.initial_sub_unit_id = False
+                self.initial_block_id = False
+            elif self.initial_block_id and self.initial_block_id.sub_farm_id != self.initial_sub_farm_id:
                 self.initial_block_id = False
         self._update_preview_id()
 
@@ -711,6 +718,13 @@ class HrEmployee(models.Model):
                         if not vals.get('initial_farm_id') and sub_unit.farm_id:
                             vals['initial_farm_id'] = sub_unit.farm_id.id
 
+                # Cascade hierarchy from initial_sub_farm_id if provided
+                sub_farm_id = vals.get('initial_sub_farm_id')
+                if sub_farm_id and not vals.get('initial_farm_id'):
+                    sub_farm = self.env['farm.sub.farm'].browse(sub_farm_id)
+                    if sub_farm and sub_farm.farm_id:
+                        vals['initial_farm_id'] = sub_farm.farm_id.id
+
                 farm_id = vals.get('initial_farm_id')
                 farm = self.env['farm.farm'].browse(farm_id) if farm_id else self.env['farm.farm'].search([], limit=1)
 
@@ -768,7 +782,7 @@ class HrEmployee(models.Model):
                         vals['employment_term'] = 'permanent'
                         break
 
-        # Cascade hierarchy if initial_sub_unit_id is modified
+        # Cascade hierarchy if initial_sub_unit_id or initial_sub_farm_id is modified
         if 'initial_sub_unit_id' in vals and vals['initial_sub_unit_id']:
             sub_unit = self.env['farm.sub.unit'].browse(vals['initial_sub_unit_id'])
             if sub_unit:
@@ -776,6 +790,10 @@ class HrEmployee(models.Model):
                     vals['initial_sub_farm_id'] = sub_unit.sub_farm_id.id
                 if sub_unit.farm_id and 'initial_farm_id' not in vals:
                     vals['initial_farm_id'] = sub_unit.farm_id.id
+        elif 'initial_sub_farm_id' in vals and vals['initial_sub_farm_id']:
+            sub_farm = self.env['farm.sub.farm'].browse(vals['initial_sub_farm_id'])
+            if sub_farm and sub_farm.farm_id and 'initial_farm_id' not in vals:
+                vals['initial_farm_id'] = sub_farm.farm_id.id
 
         if 'farm_employee_type' in vals or 'initial_farm_id' in vals or 'initial_sub_unit_id' in vals:
             if len(self) > 1:
