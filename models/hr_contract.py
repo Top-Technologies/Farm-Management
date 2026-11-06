@@ -1012,7 +1012,7 @@ class HrContract(models.Model):
     @api.onchange('employee_id')
     def _onchange_employee_matrix_default(self):
         if self.employee_id:
-            if self.employee_id.farm_employee_type == 'head_office':
+            if self.employee_id.farm_employee_type in ('head_office', 'jimma_head_office'):
                 self.salary_matrix_type = 'head_office'
             elif self.employee_id.farm_employee_type == 'cpw':
                 self.salary_matrix_type = 'cpw'
@@ -1302,7 +1302,7 @@ class HrContract(models.Model):
                         vals['salary_matrix_type'] = grade_rec.matrix_type
                 if not vals.get('salary_matrix_type'):
                     emp = self.env['hr.employee'].browse(vals.get('employee_id')) if vals.get('employee_id') else False
-                    if emp and emp.farm_employee_type == 'head_office':
+                    if emp and emp.farm_employee_type in ('head_office', 'jimma_head_office'):
                         vals['salary_matrix_type'] = 'head_office'
                     elif emp and emp.farm_employee_type == 'cpw':
                         vals['salary_matrix_type'] = 'cpw'

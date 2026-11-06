@@ -27,6 +27,7 @@ class HrEmployee(models.Model):
     # Agricultural Employee Classification (Mandatory)
     farm_employee_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
+        ('jimma_head_office', 'Jimma Head Office (የጅማ ዋና መ/ቤት)'),
         ('permanent', 'Farm (የእርሻ)'),
         ('temporary', 'Temporary (ጊዜያዊ)'),
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
@@ -524,19 +525,19 @@ class HrEmployee(models.Model):
 
     @api.onchange('farm_employee_type')
     def _onchange_farm_employee_type(self):
-        if self.farm_employee_type in ('head_office', 'cpw'):
+        if self.farm_employee_type in ('head_office', 'cpw', 'jimma_head_office'):
             self.initial_farm_id = False
             self.initial_sub_farm_id = False
             self.initial_sub_unit_id = False
             self.initial_block_id = False
-        if self.farm_employee_type not in ('head_office', 'permanent', 'cpw'):
+        if self.farm_employee_type not in ('head_office', 'permanent', 'cpw', 'jimma_head_office'):
             self.employment_term = False
         elif not self.employment_term:
             self.employment_term = 'permanent'
         self._update_preview_id()
 
     def _update_preview_id(self):
-        if self.farm_employee_type in ('head_office', 'cpw'):
+        if self.farm_employee_type in ('head_office', 'cpw', 'jimma_head_office'):
             new_id = self._generate_farm_employee_id(False, self.farm_employee_type)
             self.fms_employee_id = new_id
             self.employee_code = new_id
@@ -565,6 +566,7 @@ class HrEmployee(models.Model):
         """Generates sequential ID:
         - Head Office Staff: HQ001, HQ002, HQ003...
         - CPW Staff: CPW001, CPW002, CPW003...
+        - Jimma Head Office Staff: JHO001, JHO002, JHO003...
         - Farm Employees: [FarmCode][TypeCode][SequentialNumber] e.g. FM01T0001, FM01P0001, FM01Z0001.
         Supports in-memory tracking via taken_codes for batch imports and multi-create.
         """
@@ -573,6 +575,9 @@ class HrEmployee(models.Model):
             digits = 3
         elif emp_type == 'cpw':
             prefix = 'CPW'
+            digits = 3
+        elif emp_type == 'jimma_head_office':
+            prefix = 'JHO'
             digits = 3
         else:
             type_map = {'permanent': 'P', 'temporary': 'T', 'zemach': 'Z'}
@@ -669,12 +674,12 @@ class HrEmployee(models.Model):
 
             emp_type = vals.get('farm_employee_type', 'temporary')
             vals['farm_employee_type'] = emp_type
-            if emp_type in ('head_office', 'permanent'):
+            if emp_type in ('head_office', 'permanent', 'cpw', 'jimma_head_office'):
                 vals.setdefault('employment_term', 'permanent')
             else:
                 vals['employment_term'] = False
 
-            if emp_type == 'head_office':
+            if emp_type in ('head_office', 'cpw', 'jimma_head_office'):
                 vals['initial_farm_id'] = False
                 vals['initial_sub_farm_id'] = False
                 vals['initial_sub_unit_id'] = False
@@ -682,7 +687,7 @@ class HrEmployee(models.Model):
 
                 cur_id = vals.get('fms_employee_id')
                 if not cur_id or '_' in str(cur_id):
-                    new_id = self._generate_farm_employee_id(False, 'head_office', taken_codes=taken_codes)
+                    new_id = self._generate_farm_employee_id(False, emp_type, taken_codes=taken_codes)
                     vals['fms_employee_id'] = new_id
                     if not vals.get('employee_code'):
                         vals['employee_code'] = new_id
@@ -734,7 +739,7 @@ class HrEmployee(models.Model):
 
         # Auto-create initial transfer record & sync sub unit field workers for farm employees
         for emp in employees:
-            if emp.farm_employee_type not in ('head_office', 'cpw'):
+            if emp.farm_employee_type not in ('head_office', 'cpw', 'jimma_head_office'):
                 if emp.initial_farm_id and not emp.transfer_history_ids:
                     self.env['farm.employee.transfer'].create({
                         'employee_id': emp.id,
@@ -750,12 +755,12 @@ class HrEmployee(models.Model):
 
     def write(self, vals):
         if 'farm_employee_type' in vals:
-            if vals['farm_employee_type'] in ('head_office', 'cpw'):
+            if vals['farm_employee_type'] in ('head_office', 'cpw', 'jimma_head_office'):
                 vals['initial_farm_id'] = False
                 vals['initial_sub_farm_id'] = False
                 vals['initial_sub_unit_id'] = False
                 vals['initial_block_id'] = False
-            if vals['farm_employee_type'] not in ('head_office', 'permanent', 'cpw'):
+            if vals['farm_employee_type'] not in ('head_office', 'permanent', 'cpw', 'jimma_head_office'):
                 vals['employment_term'] = False
             elif 'employment_term' not in vals:
                 for emp in self:
@@ -1141,6 +1146,7 @@ class HrEmployeePublic(models.Model):
 
     farm_employee_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
+        ('jimma_head_office', 'Jimma Head Office (የጅማ ዋና መ/ቤት)'),
         ('permanent', 'Farm (የእርሻ)'),
         ('temporary', 'Temporary (ጊዜያዊ)'),
         ('zemach', 'Zemach / Seasonal (ዘመች)'),

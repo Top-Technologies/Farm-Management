@@ -64,6 +64,14 @@
             <field name="implied_ids" eval="[(6, 0, [])]"/>
         </record>
 
+        <!-- Group: Jimma Head Office Classification Access -->
+        <record id="group_employee_classification_jimma_head_office" model="res.groups">
+            <field name="name">Jimma Head Office (የጅማ ዋና መ/ቤት)</field>
+            <field name="category_id" ref="module_category_employee_classification"/>
+            <field name="comment">Allows viewing and managing Jimma Head Office employees and related records.</field>
+            <field name="implied_ids" eval="[(6, 0, [])]"/>
+        </record>
+
         <!-- Group: General Classification Access (Legacy) -->
         <record id="group_employee_classification_general" model="res.groups">
             <field name="name">General (Farm, HQ, Temp, Zemach)</field>

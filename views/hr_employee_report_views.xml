@@ -102,6 +102,7 @@
                 <separator string="Employee Status / Classification"/>
                 <filter name="filter_farm" string="Farm Workers" domain="[('farm_employee_type', '=', 'permanent')]"/>
                 <filter name="filter_head_office" string="Head Office" domain="[('farm_employee_type', '=', 'head_office')]"/>
+                <filter name="filter_jimma_head_office" string="Jimma Head Office" domain="[('farm_employee_type', '=', 'jimma_head_office')]"/>
                 <filter name="filter_temp" string="Temporary" domain="[('farm_employee_type', '=', 'temporary')]"/>
                 <filter name="filter_zemach" string="Zemach / Seasonal" domain="[('farm_employee_type', '=', 'zemach')]"/>
                 <filter name="filter_cpw" string="CPW" domain="[('farm_employee_type', '=', 'cpw')]"/>

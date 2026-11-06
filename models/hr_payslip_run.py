@@ -10,6 +10,7 @@ class HrPayslipRun(models.Model):
         ('zemach', 'Seasonal / Zemach Workers (Piece Rate)'),
         ('permanent', 'Farm Staff (Standard Salary)'),
         ('head_office', 'Head Office Staff (Standard Salary)'),
+        ('jimma_head_office', 'Jimma Head Office Staff (Standard Salary)'),
         ('cpw', 'CPW Staff (Standard Salary)'),
         ('all', 'All Workers'),
     ], string='Worker Classification', default='all', required=True,
@@ -194,7 +195,7 @@ class HrPayslipRun(models.Model):
         unpaid_entries = self.env['farm.work.entry'].search(we_domain)
 
         # 2. Resolve eligible employees
-        if self.worker_type in ('permanent', 'head_office'):
+        if self.worker_type in ('permanent', 'head_office', 'jimma_head_office', 'cpw'):
             emp_domain = [
                 ('farm_employee_type', '=', self.worker_type),
                 '|', ('company_id', '=', False), ('company_id', '=', self.company_id.id)
@@ -209,7 +210,7 @@ class HrPayslipRun(models.Model):
         elif self.worker_type == 'all':
             we_employees = unpaid_entries.mapped('employee_id')
             perm_domain = [
-                ('farm_employee_type', 'in', ('permanent', 'head_office', 'cpw')),
+                ('farm_employee_type', 'in', ('permanent', 'head_office', 'jimma_head_office', 'cpw')),
                 '|', ('company_id', '=', False), ('company_id', '=', self.company_id.id)
             ]
             if self.farm_id:
