@@ -24,7 +24,7 @@ class HrEmployee(models.Model):
             return allowed[0]
         return 'temporary'
 
-    # Agricultural Employee Classification (Mandatory)
+    # Agricultural Employee Classification (Mandatory in UI/Validation; DB nullable to prevent DDL lock contention during module upgrades)
     farm_employee_type = fields.Selection([
         ('head_office', 'Head Office (ዋና መ/ቤት)'),
         ('jimma_head_office', 'Jimma Head Office (የጅማ ዋና መ/ቤት)'),
@@ -32,7 +32,7 @@ class HrEmployee(models.Model):
         ('temporary', 'Temporary (ጊዜያዊ)'),
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
         ('cpw', 'CPW'),
-    ], string='Employee Classification', default=_default_farm_employee_type, required=True, tracking=True)
+    ], string='Employee Classification', default=_default_farm_employee_type, required=False, tracking=True)
 
     # Employment Term: Contract vs Permanent (Applicable for Head Office and Farm employees)
     employment_term = fields.Selection([
@@ -372,6 +372,8 @@ class HrEmployee(models.Model):
     @api.constrains('farm_employee_type')
     def _check_farm_employee_type_access(self):
         for emp in self:
+            if not emp.farm_employee_type:
+                raise ValidationError(_("❌ Employee Classification is required. Please select a valid classification."))
             if self.env.su:
                 continue
             # Self-profile update bypass

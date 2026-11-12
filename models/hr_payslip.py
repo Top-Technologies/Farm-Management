@@ -432,7 +432,7 @@ if contract and contract.has_pension:
                         struct_id, create_uid, write_uid, create_date, write_date
                     )
                     SELECT 
-                        'Acting / Position Allowance (የተጠባባቂ/የኃላፊነት አበል)',
+                        '{"en_US": "Acting / Position Allowance (የተጠባባቂ/የኃላፊነት አበል)"}'::jsonb,
                         'ALW_ACTING_POSITION',
                         39,
                         (SELECT id FROM hr_salary_rule_category WHERE code = 'ALW' LIMIT 1),
