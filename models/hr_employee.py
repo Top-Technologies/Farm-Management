@@ -809,7 +809,8 @@ class HrEmployee(models.Model):
                 for employee in self:
                     emp_vals = dict(vals)
                     new_type = emp_vals.get('farm_employee_type', employee.farm_employee_type)
-                    if new_type == 'head_office':
+                    if new_type in ('head_office', 'cpw', 'jimma_head_office', 'bebeka_head_office'):
+                        farm_id = False
                         new_farm = False
                     else:
                         farm_id = emp_vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
@@ -832,7 +833,8 @@ class HrEmployee(models.Model):
             else:
                 for employee in self:
                     new_type = vals.get('farm_employee_type', employee.farm_employee_type)
-                    if new_type == 'head_office':
+                    if new_type in ('head_office', 'cpw', 'jimma_head_office', 'bebeka_head_office'):
+                        farm_id = False
                         new_farm = False
                     else:
                         farm_id = vals.get('initial_farm_id', employee.initial_farm_id.id if employee.initial_farm_id else False)
