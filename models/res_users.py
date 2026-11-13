@@ -19,8 +19,8 @@ class ResUsers(models.Model):
             Used dynamically in record rules for hr.employee, hr.contract, hr.payslip, etc.
         """
         self.ensure_one()
-        # Admin, superuser, or explicit All Classifications group sees all classifications
-        if self._is_admin() or self._has_farm_group('group_employee_classification_all'):
+        # Superuser or explicit All Classifications group sees all classifications
+        if self._is_superuser() or self._has_farm_group('group_employee_classification_all'):
             return ['head_office', 'jimma_head_office', 'bebeka_head_office', 'permanent', 'temporary', 'zemach', 'cpw']
 
         allowed = []
@@ -45,14 +45,21 @@ class ResUsers(models.Model):
                 if t not in allowed:
                     allowed.append(t)
 
-        return allowed
+        if allowed:
+            return allowed
+
+        # Fallback only if no classification groups are selected on the user:
+        if self._is_admin():
+            return ['head_office', 'jimma_head_office', 'bebeka_head_office', 'permanent', 'temporary', 'zemach', 'cpw']
+
+        return []
 
     def _get_allowed_salary_matrix_types(self):
         """ Return list of salary matrix scale types accessible by this user.
             Used dynamically in record rules for hr.salary.matrix.
         """
         self.ensure_one()
-        if self._is_admin() or self._has_farm_group('group_employee_classification_all'):
+        if self._is_superuser() or self._has_farm_group('group_employee_classification_all'):
             return ['head_office', 'farm', 'saudi_star', 'cpw', 'other']
 
         allowed_types = []
@@ -73,7 +80,13 @@ class ResUsers(models.Model):
             if 'farm' not in allowed_types:
                 allowed_types.append('farm')
 
-        return list(set(allowed_types))
+        if allowed_types:
+            return list(set(allowed_types))
+
+        if self._is_admin():
+            return ['head_office', 'farm', 'saudi_star', 'cpw', 'other']
+
+        return []
 
     def _get_allowed_payslip_run_classifications(self):
         """ Return list of worker classifications for payslip batches accessible by this user.

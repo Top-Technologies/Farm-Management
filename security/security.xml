@@ -21,7 +21,7 @@
             <field name="category_id" ref="module_category_employee_classification"/>
             <field name="comment">Allows full visibility across all employee classifications.</field>
             <field name="implied_ids" eval="[(6, 0, [])]"/>
-            <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+            <field name="users" eval="[(4, ref('base.user_root'))]"/>
         </record>
 
         <!-- Group: CPW Classification Access -->
