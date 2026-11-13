@@ -21,7 +21,7 @@ class ResUsers(models.Model):
         self.ensure_one()
         # Admin, superuser, or explicit All Classifications group sees all classifications
         if self._is_admin() or self._has_farm_group('group_employee_classification_all'):
-            return ['head_office', 'jimma_head_office', 'permanent', 'temporary', 'zemach', 'cpw']
+            return ['head_office', 'jimma_head_office', 'bebeka_head_office', 'permanent', 'temporary', 'zemach', 'cpw']
 
         allowed = []
         if self._has_farm_group('group_employee_classification_cpw'):
@@ -36,10 +36,12 @@ class ResUsers(models.Model):
             allowed.append('head_office')
         if self._has_farm_group('group_employee_classification_jimma_head_office'):
             allowed.append('jimma_head_office')
+        if self._has_farm_group('group_employee_classification_bebeka_head_office'):
+            allowed.append('bebeka_head_office')
 
         # Backward compatibility for existing general group assignments
         if self._has_farm_group('group_employee_classification_general'):
-            for t in ['head_office', 'jimma_head_office', 'permanent', 'temporary', 'zemach']:
+            for t in ['head_office', 'jimma_head_office', 'bebeka_head_office', 'permanent', 'temporary', 'zemach']:
                 if t not in allowed:
                     allowed.append(t)
 
@@ -60,6 +62,10 @@ class ResUsers(models.Model):
             allowed_types.extend(['farm', 'saudi_star'])
         if self._has_farm_group('group_employee_classification_head_office'):
             allowed_types.append('head_office')
+        if self._has_farm_group('group_employee_classification_jimma_head_office'):
+            allowed_types.append('head_office')
+        if self._has_farm_group('group_employee_classification_bebeka_head_office'):
+            allowed_types.append('head_office')
         if self._has_farm_group('group_employee_classification_general'):
             allowed_types.extend(['head_office', 'farm', 'saudi_star', 'other'])
         if (self._has_farm_group('group_employee_classification_temporary') or
@@ -78,7 +84,7 @@ class ResUsers(models.Model):
         if not allowed_emp:
             return []
         if set(allowed_emp) >= {'head_office', 'permanent', 'temporary', 'zemach', 'cpw'}:
-            return ['temporary', 'zemach', 'permanent', 'head_office', 'jimma_head_office', 'cpw', 'all']
+            return ['temporary', 'zemach', 'permanent', 'head_office', 'jimma_head_office', 'bebeka_head_office', 'cpw', 'all']
 
         res = list(allowed_emp)
         if set(['temporary', 'zemach', 'permanent']).issubset(set(allowed_emp)):

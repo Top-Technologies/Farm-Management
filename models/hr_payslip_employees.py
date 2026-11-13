@@ -25,6 +25,7 @@ class HrPayslipEmployees(models.TransientModel):
         ('permanent', 'Farm Staff (Standard Salary)'),
         ('head_office', 'Head Office Staff (Standard Salary)'),
         ('jimma_head_office', 'Jimma Head Office Staff (Standard Salary)'),
+        ('bebeka_head_office', 'Bebeka Head Office Staff (Standard Salary)'),
         ('cpw', 'CPW Staff (Standard Salary)'),
         ('all', 'All Workers'),
     ], string='Worker Classification Filter', default='all')
@@ -181,7 +182,7 @@ class HrPayslipEmployees(models.TransientModel):
                     self.env.ref('Farm-Management.structure_farm_zemach', raise_if_not_found=False) or
                     self.env.ref('Farm_Management.structure_farm_zemach', raise_if_not_found=False)
                 )
-            elif emp.farm_employee_type in ('permanent', 'head_office', 'jimma_head_office', 'cpw'):
+            elif emp.farm_employee_type in ('permanent', 'head_office', 'jimma_head_office', 'bebeka_head_office', 'cpw'):
                 emp_struct = (
                     self.env.ref('farm_management.structure_farm_permanent', raise_if_not_found=False) or
                     self.env.ref('Farm-Management.structure_farm_permanent', raise_if_not_found=False) or

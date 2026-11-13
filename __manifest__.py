@@ -26,7 +26,7 @@ This module structures agricultural operations directly integrated into the HR E
     """,
     'author': 'Top Technologies',
     'website': 'https://www.odoo.com',
-    'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise', 'approvals', 'survey', 'hr_appraisal_survey'],
+    'depends': ['base', 'hr', 'mail', 'hr_payroll', 'hr_work_entry_contract_enterprise', 'approvals', 'survey', 'hr_appraisal_survey', 'hr_holidays', 'hr_attendance'],
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
