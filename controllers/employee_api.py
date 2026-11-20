@@ -328,10 +328,22 @@ class EmployeeAPI(http.Controller):
 
             farm_code = kwargs.get('farm') or kwargs.get('farm_code')
             employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
+            exclude_type = kwargs.get('exclude') or kwargs.get('exclude_classification') or kwargs.get('exclude_type')
 
             domain = [('active', '=', True)]
             if employee_type:
-                domain.append(('farm_employee_type', '=', employee_type.lower()))
+                types = [t.strip().lower() for t in str(employee_type).split(',') if t.strip()]
+                normalized_types = ['permanent' if t == 'farm' else t for t in types]
+                if len(normalized_types) == 1:
+                    domain.append(('farm_employee_type', '=', normalized_types[0]))
+                elif len(normalized_types) > 1:
+                    domain.append(('farm_employee_type', 'in', normalized_types))
+
+            if exclude_type:
+                ex_types = [t.strip().lower() for t in str(exclude_type).split(',') if t.strip()]
+                ex_normalized = ['permanent' if t == 'farm' else t for t in ex_types]
+                if ex_normalized:
+                    domain.append(('farm_employee_type', 'not in', ex_normalized))
 
             employees = env['hr.employee'].search(domain, order='fms_employee_id asc, id asc')
 
@@ -471,11 +483,23 @@ class EmployeeAPI(http.Controller):
             # Filtered list of all employee contract wages
             farm_code = kwargs.get('farm') or kwargs.get('farm_code')
             employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
+            exclude_type = kwargs.get('exclude') or kwargs.get('exclude_classification') or kwargs.get('exclude_type')
             has_contract_param = kwargs.get('has_contract')
 
             domain = [('active', '=', True)]
             if employee_type:
-                domain.append(('farm_employee_type', '=', employee_type.lower()))
+                types = [t.strip().lower() for t in str(employee_type).split(',') if t.strip()]
+                normalized_types = ['permanent' if t == 'farm' else t for t in types]
+                if len(normalized_types) == 1:
+                    domain.append(('farm_employee_type', '=', normalized_types[0]))
+                elif len(normalized_types) > 1:
+                    domain.append(('farm_employee_type', 'in', normalized_types))
+
+            if exclude_type:
+                ex_types = [t.strip().lower() for t in str(exclude_type).split(',') if t.strip()]
+                ex_normalized = ['permanent' if t == 'farm' else t for t in ex_types]
+                if ex_normalized:
+                    domain.append(('farm_employee_type', 'not in', ex_normalized))
 
             employees = env['hr.employee'].search(domain, order='fms_employee_id asc, id asc')
 
