@@ -327,7 +327,7 @@ class EmployeeAPI(http.Controller):
                 }, status=200)
 
             farm_code = kwargs.get('farm') or kwargs.get('farm_code')
-            employee_type = kwargs.get('type') or kwargs.get('classification')
+            employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
 
             domain = [('active', '=', True)]
             if employee_type:
@@ -470,7 +470,7 @@ class EmployeeAPI(http.Controller):
 
             # Filtered list of all employee contract wages
             farm_code = kwargs.get('farm') or kwargs.get('farm_code')
-            employee_type = kwargs.get('type') or kwargs.get('classification')
+            employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
             has_contract_param = kwargs.get('has_contract')
 
             domain = [('active', '=', True)]
@@ -1333,12 +1333,16 @@ class EmployeeAPI(http.Controller):
     # GET /api/farms & /odoo/api/farms & /api/fms/farms
     # -------------------------------------------------------------------------
     @http.route([
+        '/api/farms/<farm_identifier>',
+        '/odoo/api/farms/<farm_identifier>',
+        '/api/fms/farms/<farm_identifier>',
+        '/odoo/api/fms/farms/<farm_identifier>',
         '/api/farms',
         '/odoo/api/farms',
         '/api/fms/farms',
         '/odoo/api/fms/farms'
     ], type='http', auth='none', methods=['GET', 'OPTIONS'], csrf=False, cors='*')
-    def get_farms(self, farm_id=None, code=None, company_id=None, **kwargs):
+    def get_farms(self, farm_identifier=None, farm_id=None, code=None, company_id=None, **kwargs):
         if request.httprequest.method == 'OPTIONS':
             return self._json_response({}, status=200)
 
@@ -1351,6 +1355,13 @@ class EmployeeAPI(http.Controller):
             target_id = farm_id or kwargs.get('id')
             target_code = code or kwargs.get('farm_code')
             target_company = company_id or kwargs.get('company')
+
+            if farm_identifier:
+                target_str = str(farm_identifier).strip()
+                if target_str.isdigit():
+                    target_id = int(target_str)
+                else:
+                    target_code = target_str
 
             if target_id:
                 domain.append(('id', '=', int(target_id)))
