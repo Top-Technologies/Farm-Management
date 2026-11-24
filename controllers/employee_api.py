@@ -327,7 +327,7 @@ class EmployeeAPI(http.Controller):
                     "data": emp_data
                 }, status=200)
 
-            farm_code = kwargs.get('farm') or kwargs.get('farm_code')
+            farm_code = kwargs.get('farm') or kwargs.get('farm_code') or kwargs.get('farms')
             employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
             exclude_type = kwargs.get('exclude') or kwargs.get('exclude_classification') or kwargs.get('exclude_type')
             sub_function = kwargs.get('sub_function') or kwargs.get('is_sub_function')
@@ -339,6 +339,16 @@ class EmployeeAPI(http.Controller):
                     domain.append(('is_sub_function', '=', True))
                 elif sub_func_str in ('0', 'false', 'no', 'f'):
                     domain.append(('is_sub_function', '=', False))
+
+            farm_codes_list = [f.strip().lower() for f in str(farm_code).split(',') if f.strip()] if farm_code else []
+            if farm_codes_list:
+                matching_farms = env['farm.farm'].sudo().search([])
+                matching_farm_ids = [f.id for f in matching_farms if (f.code or "").lower() in farm_codes_list]
+                domain.extend([
+                    '|',
+                    ('current_farm_id', 'in', matching_farm_ids),
+                    ('initial_farm_id', 'in', matching_farm_ids)
+                ])
 
             if employee_type:
                 types = [t.strip().lower() for t in str(employee_type).split(',') if t.strip()]
@@ -363,8 +373,10 @@ class EmployeeAPI(http.Controller):
                 sub_unit = emp.current_sub_unit_id or emp.initial_sub_unit_id
                 block = emp.current_block_id or emp.initial_block_id
 
-                if farm_code and farm and farm.code and farm.code.lower() != farm_code.lower():
-                    continue
+                if farm_codes_list:
+                    emp_farm_code = (farm.code or "").lower() if farm else ""
+                    if not emp_farm_code or emp_farm_code not in farm_codes_list:
+                        continue
 
                 classification_labels = dict(emp._fields['farm_employee_type'].selection) if 'farm_employee_type' in emp._fields else {}
                 class_label = classification_labels.get(emp.farm_employee_type, emp.farm_employee_type or 'Temporary')
@@ -516,8 +528,10 @@ class EmployeeAPI(http.Controller):
             data = []
             for emp in employees:
                 farm = emp.current_farm_id or emp.initial_farm_id
-                if farm_code and farm and farm.code and farm.code.lower() != farm_code.lower():
-                    continue
+                if farm_codes_list:
+                    emp_farm_code = (farm.code or "").lower() if farm else ""
+                    if not emp_farm_code or emp_farm_code not in farm_codes_list:
+                        continue
 
                 formatted = self._format_contract_wage_data(emp)
 

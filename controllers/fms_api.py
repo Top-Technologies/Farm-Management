@@ -94,10 +94,16 @@ class FmsRestController(http.Controller):
 
         try:
             domain = []
-            if farm_code:
-                domain.append('|')
-                domain.append(('current_farm_id.code', '=ilike', farm_code.strip()))
-                domain.append(('initial_farm_id.code', '=ilike', farm_code.strip()))
+            farm_param = farm_code or kwargs.get('farm') or kwargs.get('farms')
+            if farm_param:
+                farm_list = [f.strip().lower() for f in str(farm_param).split(',') if f.strip()]
+                all_farms = request.env['farm.farm'].sudo().search([])
+                matching_farm_ids = [f.id for f in all_farms if (f.code or "").lower() in farm_list]
+                domain.extend([
+                    '|',
+                    ('current_farm_id', 'in', matching_farm_ids),
+                    ('initial_farm_id', 'in', matching_farm_ids)
+                ])
 
             if employee_type:
                 domain.append(('farm_employee_type', '=', employee_type.strip().lower()))
