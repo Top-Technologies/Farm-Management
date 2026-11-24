@@ -328,6 +328,7 @@ class EmployeeAPI(http.Controller):
                 }, status=200)
 
             farm_code = kwargs.get('farm') or kwargs.get('farm_code') or kwargs.get('farms')
+            sub_farm_code = kwargs.get('sub_farm') or kwargs.get('sub_farm_code') or kwargs.get('subfarms')
             employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
             exclude_type = kwargs.get('exclude') or kwargs.get('exclude_classification') or kwargs.get('exclude_type')
             sub_function = kwargs.get('sub_function') or kwargs.get('is_sub_function')
@@ -348,6 +349,16 @@ class EmployeeAPI(http.Controller):
                     '|',
                     ('current_farm_id', 'in', matching_farm_ids),
                     ('initial_farm_id', 'in', matching_farm_ids)
+                ])
+
+            sub_farm_codes_list = [sf.strip().lower() for sf in str(sub_farm_code).split(',') if sf.strip()] if sub_farm_code else []
+            if sub_farm_codes_list:
+                matching_sub_farms = env['farm.sub.farm'].sudo().search([])
+                matching_sub_farm_ids = [sf.id for sf in matching_sub_farms if (sf.code or "").lower() in sub_farm_codes_list]
+                domain.extend([
+                    '|',
+                    ('current_sub_farm_id', 'in', matching_sub_farm_ids),
+                    ('initial_sub_farm_id', 'in', matching_sub_farm_ids)
                 ])
 
             if employee_type:

@@ -105,6 +105,17 @@ class FmsRestController(http.Controller):
                     ('initial_farm_id', 'in', matching_farm_ids)
                 ])
 
+            sub_farm_param = kwargs.get('sub_farm') or kwargs.get('sub_farm_code') or kwargs.get('subfarms')
+            if sub_farm_param:
+                sub_farm_list = [sf.strip().lower() for sf in str(sub_farm_param).split(',') if sf.strip()]
+                all_sub_farms = request.env['farm.sub.farm'].sudo().search([])
+                matching_sub_farm_ids = [sf.id for sf in all_sub_farms if (sf.code or "").lower() in sub_farm_list]
+                domain.extend([
+                    '|',
+                    ('current_sub_farm_id', 'in', matching_sub_farm_ids),
+                    ('initial_sub_farm_id', 'in', matching_sub_farm_ids)
+                ])
+
             if employee_type:
                 domain.append(('farm_employee_type', '=', employee_type.strip().lower()))
 
