@@ -5,6 +5,58 @@ from odoo import api, fields, models
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
+    allowed_farm_ids = fields.Many2many(
+        'farm.farm',
+        'res_users_farm_rel',
+        'user_id',
+        'farm_id',
+        string='Allowed Farms / የተፈቀደላቸው እርሻዎች',
+        help='Farms this user is permitted to view and manage. Leave empty to allow all farms (for Admin/HQ) or auto-restrict to their linked employee assigned farm.',
+    )
+
+    def _get_allowed_farm_ids(self):
+        """ Return list of farm IDs accessible by this user.
+            Used dynamically in record rules for farm.farm, farm.sub.farm, farm.sub.unit,
+            farm.block, hr.employee, hr.payslip, etc.
+        """
+        self.ensure_one()
+        # 1. Explicitly configured allowed farms on the user record take top precedence
+        if self.allowed_farm_ids:
+            return self.allowed_farm_ids.ids
+
+        # 2. Superuser or explicit All Classifications group sees all farms
+        if self._is_superuser() or self._has_farm_group('group_employee_classification_all'):
+            return self.env['farm.farm'].sudo().search([]).ids
+
+        # 3. Fallback to linked employee assigned farm
+        emp = self.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', self.id)], limit=1)
+        if emp:
+            farm = emp.current_farm_id or emp.initial_farm_id
+            if farm:
+                return [farm.id]
+
+        # 4. If admin user without explicit restriction, default to all farms
+        if self._is_admin():
+            return self.env['farm.farm'].sudo().search([]).ids
+
+        # 5. Default: no farm accessible
+        return []
+
+    def _is_farm_restricted(self):
+        """ Returns True if the user is restricted to specific farms, False if they can see all farms. """
+        self.ensure_one()
+        if self.allowed_farm_ids:
+            all_farm_count = self.env['farm.farm'].sudo().search_count([])
+            return len(self.allowed_farm_ids) < all_farm_count
+        if self._is_superuser() or self._has_farm_group('group_employee_classification_all'):
+            return False
+        emp = self.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', self.id)], limit=1)
+        if emp and (emp.current_farm_id or emp.initial_farm_id):
+            return True
+        if self._is_admin():
+            return False
+        return True
+
     def _has_farm_group(self, xml_name):
         """Helper to check group membership regardless of whether module
         is registered as farm_management, Farm-Management, or Farm_Management."""

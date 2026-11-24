@@ -1180,4 +1180,6 @@ class HrEmployeePublic(models.Model):
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
         ('cpw', 'CPW'),
     ], string='Employee Classification', readonly=True)
+    current_farm_id = fields.Many2one('farm.farm', string='Current Farm', readonly=True)
+    initial_farm_id = fields.Many2one('farm.farm', string='Assigned Farm', readonly=True)
 

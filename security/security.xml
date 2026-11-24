@@ -104,48 +104,83 @@
         </record>
 
         <!-- ============================================================= -->
-        <!-- EMPLOYEE CLASSIFICATION SEGREGATION RECORD RULES (GLOBAL)     -->
+        <!-- EMPLOYEE CLASSIFICATION & FARM SEGREGATION RECORD RULES (GLOBAL) -->
         <!-- ============================================================= -->
 
+        <record id="farm_farm_user_rule" model="ir.rule">
+            <field name="name">Farm User Location Segregation Rule</field>
+            <field name="model_id" ref="model_farm_farm"/>
+            <field name="domain_force">[('id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="farm_sub_farm_user_rule" model="ir.rule">
+            <field name="name">Sub Farm User Location Segregation Rule</field>
+            <field name="model_id" ref="model_farm_sub_farm"/>
+            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="farm_sub_unit_user_rule" model="ir.rule">
+            <field name="name">Sub Unit User Location Segregation Rule</field>
+            <field name="model_id" ref="model_farm_sub_unit"/>
+            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="farm_block_user_rule" model="ir.rule">
+            <field name="name">Block User Location Segregation Rule</field>
+            <field name="model_id" ref="model_farm_block"/>
+            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
+        <record id="farm_employee_transfer_user_rule" model="ir.rule">
+            <field name="name">Farm Transfer User Location Segregation Rule</field>
+            <field name="model_id" ref="model_farm_employee_transfer"/>
+            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="global" eval="True"/>
+        </record>
+
         <record id="hr_employee_classification_rule" model="ir.rule">
-            <field name="name">Employee Classification Segregation Rule</field>
+            <field name="name">Employee Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
-            <field name="domain_force">['|', ('user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('user_id', '=', user.id), '&amp;', ('farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('current_farm_id', 'in', user._get_allowed_farm_ids()), ('initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_employee_public_classification_rule" model="ir.rule">
-            <field name="name">Public Employee Classification Segregation Rule</field>
+            <field name="name">Public Employee Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr.model_hr_employee_public"/>
-            <field name="domain_force">['|', ('user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('user_id', '=', user.id), '&amp;', ('farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('current_farm_id', 'in', user._get_allowed_farm_ids()), ('initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_contract_classification_rule" model="ir.rule">
-            <field name="name">Contract Classification Segregation Rule</field>
+            <field name="name">Contract Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_contract.model_hr_contract"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_payslip_classification_rule" model="ir.rule">
-            <field name="name">Payslip Classification Segregation Rule</field>
+            <field name="name">Payslip Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_payroll.model_hr_payslip"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_payslip_run_classification_rule" model="ir.rule">
-            <field name="name">Payslip Batch Classification Segregation Rule</field>
+            <field name="name">Payslip Batch Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_payroll.model_hr_payslip_run"/>
-            <field name="domain_force">[('worker_type', 'in', user._get_allowed_payslip_run_classifications())]</field>
+            <field name="domain_force">['&amp;', ('worker_type', 'in', user._get_allowed_payslip_run_classifications()), '|', ('farm_id', '=', False), ('farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="farm_work_entry_classification_rule" model="ir.rule">
-            <field name="name">Work Entry Classification Segregation Rule</field>
+            <field name="name">Work Entry Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="model_farm_work_entry"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('farm_id', '=', False), ('farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
@@ -157,37 +192,37 @@
         </record>
 
         <record id="hr_leave_classification_rule" model="ir.rule">
-            <field name="name">Time Off Classification Segregation Rule</field>
+            <field name="name">Time Off Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_holidays.model_hr_leave"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('employee_id.farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_leave_allocation_classification_rule" model="ir.rule">
-            <field name="name">Time Off Allocation Classification Segregation Rule</field>
+            <field name="name">Time Off Allocation Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_holidays.model_hr_leave_allocation"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('employee_id.farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_leave_report_classification_rule" model="ir.rule">
-            <field name="name">Time Off Analysis Classification Segregation Rule</field>
+            <field name="name">Time Off Analysis Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_holidays.model_hr_leave_report"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('employee_id.farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_attendance_classification_rule" model="ir.rule">
-            <field name="name">Attendance Classification Segregation Rule</field>
+            <field name="name">Attendance Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('employee_id.farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="hr_work_entry_classification_rule" model="ir.rule">
-            <field name="name">Standard Work Entry Classification Segregation Rule</field>
+            <field name="name">Standard Work Entry Classification &amp; Farm Segregation Rule</field>
             <field name="model_id" ref="hr_work_entry.model_hr_work_entry"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types())]</field>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), '&amp;', ('employee_id.farm_employee_type', 'in', user._get_allowed_farm_employee_types()), '|', ('employee_id.farm_employee_type', 'not in', ['permanent', 'temporary', 'zemach']), '|', ('employee_id.current_farm_id', 'in', user._get_allowed_farm_ids()), ('employee_id.initial_farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
         </record>
     </data>
