@@ -102,6 +102,14 @@ class FmsRestController(http.Controller):
             if employee_type:
                 domain.append(('farm_employee_type', '=', employee_type.strip().lower()))
 
+            sub_function = kwargs.get('sub_function') or kwargs.get('is_sub_function')
+            if sub_function is not None:
+                sub_func_str = str(sub_function).strip().lower()
+                if sub_func_str in ('1', 'true', 'yes', 't'):
+                    domain.append(('is_sub_function', '=', True))
+                elif sub_func_str in ('0', 'false', 'no', 'f'):
+                    domain.append(('is_sub_function', '=', False))
+
             if search:
                 domain.append('|')
                 domain.append(('name', 'ilike', search.strip()))
@@ -149,6 +157,7 @@ class FmsRestController(http.Controller):
                     "department": emp.department_id.name if emp.department_id else "",
                     "work_phone": emp.work_phone or emp.mobile_phone or "",
                     "work_email": emp.work_email or "",
+                    "is_sub_function": bool(getattr(emp, 'is_sub_function', False)),
                     "total_work_entries": emp.work_entry_count,
                     "total_earned_amount": emp.total_earned_amount
                 })

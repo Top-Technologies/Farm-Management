@@ -35,6 +35,14 @@ class HrEmployee(models.Model):
         ('cpw', 'CPW'),
     ], string='Employee Classification', default=_default_farm_employee_type, required=False, tracking=True)
 
+    # Sub Function flag (Used for filtering employees in API calls)
+    is_sub_function = fields.Boolean(
+        string='Sub Function',
+        default=False,
+        tracking=True,
+        help='Check if this employee belongs to a Sub Function (used for API and workforce filtering).'
+    )
+
     # Employment Term: Contract vs Permanent (Applicable for Head Office and Farm employees)
     employment_term = fields.Selection([
         ('permanent', 'Permanent (ቋሚ)'),
@@ -1180,6 +1188,7 @@ class HrEmployeePublic(models.Model):
         ('zemach', 'Zemach / Seasonal (ዘመች)'),
         ('cpw', 'CPW'),
     ], string='Employee Classification', readonly=True)
+    is_sub_function = fields.Boolean(string='Sub Function', readonly=True)
     current_farm_id = fields.Many2one('farm.farm', string='Current Farm', readonly=True)
     initial_farm_id = fields.Many2one('farm.farm', string='Assigned Farm', readonly=True)
 

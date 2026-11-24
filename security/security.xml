@@ -110,36 +110,56 @@
         <record id="farm_farm_user_rule" model="ir.rule">
             <field name="name">Farm User Location Segregation Rule</field>
             <field name="model_id" ref="model_farm_farm"/>
-            <field name="domain_force">[('id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="domain_force">['|', (not user._is_farm_restricted(), '=', True), ('id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="farm_sub_farm_user_rule" model="ir.rule">
             <field name="name">Sub Farm User Location Segregation Rule</field>
             <field name="model_id" ref="model_farm_sub_farm"/>
-            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="domain_force">['|', (not user._is_farm_restricted(), '=', True), ('farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="farm_sub_unit_user_rule" model="ir.rule">
             <field name="name">Sub Unit User Location Segregation Rule</field>
             <field name="model_id" ref="model_farm_sub_unit"/>
-            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="domain_force">['|', (not user._is_farm_restricted(), '=', True), ('farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="farm_block_user_rule" model="ir.rule">
             <field name="name">Block User Location Segregation Rule</field>
             <field name="model_id" ref="model_farm_block"/>
-            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="domain_force">['|', (not user._is_farm_restricted(), '=', True), ('farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="farm_employee_transfer_user_rule" model="ir.rule">
             <field name="name">Farm Transfer User Location Segregation Rule</field>
             <field name="model_id" ref="model_farm_employee_transfer"/>
-            <field name="domain_force">[('farm_id', 'in', user._get_allowed_farm_ids())]</field>
+            <field name="domain_force">['|', (not user._is_farm_restricted(), '=', True), ('farm_id', 'in', user._get_allowed_farm_ids())]</field>
             <field name="global" eval="True"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
 
         <record id="hr_employee_classification_rule" model="ir.rule">

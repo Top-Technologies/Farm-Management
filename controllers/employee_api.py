@@ -317,6 +317,7 @@ class EmployeeAPI(http.Controller):
                     "department": emp.department_id.name if emp.department_id else "",
                     "work_phone": emp.work_phone or emp.mobile_phone or "",
                     "work_email": emp.work_email or "",
+                    "is_sub_function": bool(getattr(emp, 'is_sub_function', False)),
                     "total_work_entries": emp.work_entry_count,
                     "total_earned_amount": emp.total_earned_amount
                 }
@@ -329,8 +330,16 @@ class EmployeeAPI(http.Controller):
             farm_code = kwargs.get('farm') or kwargs.get('farm_code')
             employee_type = kwargs.get('type') or kwargs.get('classification') or kwargs.get('employee_type')
             exclude_type = kwargs.get('exclude') or kwargs.get('exclude_classification') or kwargs.get('exclude_type')
+            sub_function = kwargs.get('sub_function') or kwargs.get('is_sub_function')
 
             domain = [('active', '=', True)]
+            if sub_function is not None:
+                sub_func_str = str(sub_function).strip().lower()
+                if sub_func_str in ('1', 'true', 'yes', 't'):
+                    domain.append(('is_sub_function', '=', True))
+                elif sub_func_str in ('0', 'false', 'no', 'f'):
+                    domain.append(('is_sub_function', '=', False))
+
             if employee_type:
                 types = [t.strip().lower() for t in str(employee_type).split(',') if t.strip()]
                 normalized_types = ['permanent' if t == 'farm' else t for t in types]
@@ -412,6 +421,7 @@ class EmployeeAPI(http.Controller):
                     "department": emp.department_id.name if emp.department_id else "",
                     "work_phone": emp.work_phone or emp.mobile_phone or "",
                     "work_email": emp.work_email or "",
+                    "is_sub_function": bool(getattr(emp, 'is_sub_function', False)),
                     "total_work_entries": emp.work_entry_count,
                     "total_earned_amount": emp.total_earned_amount
                 })

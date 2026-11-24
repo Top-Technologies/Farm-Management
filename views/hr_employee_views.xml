@@ -39,6 +39,11 @@
             </div>
 
 
+            <!-- Place Sub Function Checkbox directly below Company -->
+            <xpath expr="//field[@name='company_id'][@groups='base.group_multi_company']" position="after">
+                <field name="is_sub_function"/>
+            </xpath>
+
             <!-- Mandatory Classification & Location Placement -->
             <xpath expr="//notebook" position="before">
                 <div class="card p-3 mb-3 border-primary bg-light">
@@ -278,6 +283,7 @@
             <field name="work_email" position="after">
                 <field name="farm_employee_type" widget="badge" decoration-success="farm_employee_type in ('head_office', 'jimma_head_office', 'bebeka_head_office')" decoration-primary="farm_employee_type == 'permanent'" decoration-warning="farm_employee_type == 'temporary'" decoration-info="farm_employee_type == 'zemach'" decoration-muted="farm_employee_type == 'cpw'" optional="show"/>
                 <field name="employment_term" widget="badge" decoration-success="employment_term == 'permanent'" decoration-info="employment_term == 'contract'" optional="show"/>
+                <field name="is_sub_function" string="Sub Function" optional="show"/>
                 <field name="birthday" optional="show"/>
                 <field name="age" string="Age" optional="show"/>
                 <field name="current_farm_id" string="Farm" optional="show"/>
@@ -304,6 +310,8 @@
                 <filter string="Temporary Employees" name="filter_temporary" domain="[('farm_employee_type', '=', 'temporary')]"/>
                 <filter string="Zemach Employees" name="filter_zemach" domain="[('farm_employee_type', '=', 'zemach')]"/>
                 <filter string="CPW" name="filter_cpw" domain="[('farm_employee_type', '=', 'cpw')]"/>
+                <separator/>
+                <filter string="Sub Function" name="filter_sub_function" domain="[('is_sub_function', '=', True)]"/>
                 <separator/>
                 <filter string="Permanent Staff" name="filter_term_permanent" domain="[('employment_term', '=', 'permanent')]"/>
                 <filter string="Contract Staff" name="filter_term_contract" domain="[('employment_term', '=', 'contract')]"/>
